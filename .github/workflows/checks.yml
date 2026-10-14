@@ -1,0 +1,29 @@
+name: Checks
+on: [push, pull_request]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        python: ["3.12", "3.13"]
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install playback engine on Linux
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y mpv ffmpeg
+      - name: Install playback engine on macOS
+        if: runner.os == 'macOS'
+        run: brew install mpv ffmpeg
+      - run: uv sync --locked
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run pytest -q
+      - run: uv build

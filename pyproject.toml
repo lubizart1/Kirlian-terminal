@@ -1,0 +1,42 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "kirlian-terminal"
+version = "0.1.0a1"
+description = "An album-first local music player for the terminal"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "mutagen>=1.48.1",
+    "pillow>=12.3.0",
+    "platformdirs>=4.13.0",
+    "textual>=8.2.8",
+    "textual-image[textual]>=0.14.1",
+]
+
+[project.scripts]
+kirlian = "kirlian_terminal.__main__:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/kirlian_terminal"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+markers = ["integration: exercises an installed mpv process"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+    "ruff>=0.17.0",
+]
