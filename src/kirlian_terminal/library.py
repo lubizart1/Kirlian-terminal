@@ -60,6 +60,7 @@ class ScanProgress:
     skipped: int
     done: bool = False
     error: str = ""
+    blocked: int = 0
 
 
 def read_track(path: Path) -> Track:
@@ -153,13 +154,14 @@ class Library:
         if not root.is_dir() or not os.access(root, os.R_OK | os.X_OK):
             report(ScanProgress(0, 0, True, "Choose a readable music folder."))
             return
-        indexed = skipped = 0
+        indexed = skipped = blocked = 0
         seen: set[str] = set()
         last_report = time.monotonic()
 
         def walk_error(error: OSError) -> None:
-            nonlocal skipped
+            nonlocal skipped, blocked
             skipped += 1
+            blocked += isinstance(error, PermissionError)
 
         try:
             self.set_setting("music_folder", str(root))
@@ -198,7 +200,7 @@ class Library:
                     "UPDATE tracks SET available=0 WHERE path=?",
                     [(row[0],) for row in known if row[0] not in seen],
                 )
-            report(ScanProgress(indexed, skipped, True))
+            report(ScanProgress(indexed, skipped, True, blocked=blocked))
         except (OSError, sqlite3.Error) as error:
             report(ScanProgress(indexed, skipped, True, f"Could not finish indexing: {error}"))
 

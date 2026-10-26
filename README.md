@@ -83,7 +83,11 @@ item jumps to it. `>` marks the current track; the highlighted row is your selec
 
 The player reads MP3, FLAC, M4A/AAC, Ogg Vorbis/Opus, and WAV candidates. Playback
 depends on your installed mpv decoders and the file itself. Unreadable files are
-summarized during scanning; playback failures appear in the status line.
+summarized during scanning; playback failures appear in the status line. If a scan
+finds no music, the status line says whether folders were permission-denied. On
+macOS, the Music app's library inside `~/Music` is protected: allow your terminal
+under System Settings › Privacy & Security › Files and Folders, or press `f` to
+choose a different folder.
 
 ## Covers and the filament ribbon
 

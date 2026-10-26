@@ -85,3 +85,14 @@ def test_invalid_folder_does_not_replace_previous_library(tmp_path, audio_factor
     assert progress[-1].error
     assert library.setting("music_folder") == str(root)
     assert len(library.tracks()) == 1
+
+
+def test_permission_denied_subfolder_is_reported_as_blocked(tmp_path, audio_factory):
+    root = tmp_path / "Music"
+    audio_factory(root / "Private" / "1.wav")
+    (root / "Private").chmod(0)
+    try:
+        result = scan(Library(tmp_path / "library.db"), root)
+    finally:
+        (root / "Private").chmod(0o755)
+    assert (result.indexed, result.skipped, result.blocked) == (0, 1, 1)

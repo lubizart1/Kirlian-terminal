@@ -6,6 +6,7 @@ import asyncio
 import json
 import os
 import sqlite3
+import sys
 import threading
 from collections import OrderedDict
 from dataclasses import dataclass, replace
@@ -37,6 +38,27 @@ from .visuals import Animation, Progress
 def clock(seconds: float) -> str:
     minutes, seconds = divmod(max(0, int(seconds)), 60)
     return f"{minutes}:{seconds:02d}"
+
+
+def scan_message(progress: ScanProgress) -> str:
+    if progress.error:
+        return progress.error
+    if not progress.done or progress.indexed:
+        return (
+            f"{'Indexed' if progress.done else 'Indexing'} {progress.indexed} files · "
+            f"{progress.skipped} unreadable files/folders skipped"
+        )
+    if progress.blocked:
+        where = (
+            "allow your terminal in System Settings › Privacy & Security › Files and Folders"
+            if sys.platform == "darwin"
+            else "check the folder permissions"
+        )
+        return (
+            f"No music indexed: permission denied for {progress.blocked} folder(s). "
+            f"Press f to choose another folder, or {where} and press r."
+        )
+    return "No music files found in this folder. Press f to choose another folder."
 
 
 @dataclass(frozen=True)
@@ -817,11 +839,7 @@ class KirlianApp(App):
         await self.refresh_library()
         self.scanning = not progress.done
         self.update_ribbon_palette(getattr(self, "display_state", self.player.state))
-        self.status(
-            progress.error
-            or f"{'Indexed' if progress.done else 'Indexing'} {progress.indexed} files · "
-            f"{progress.skipped} unreadable files/folders skipped"
-        )
+        self.status(scan_message(progress))
 
     def action_rescan(self) -> None:
         if self.scanning:

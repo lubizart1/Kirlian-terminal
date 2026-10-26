@@ -701,3 +701,18 @@ rendered at the initial full width before the square layout settled, so revisiti
 that cover at square dimensions correctly required another upload. The test now
 settles its initial dimensions before measuring reuse; its explicit resize and
 image-ID cleanup assertions remain. No artwork renderer changes were needed.
+
+## 2026-10-21: empty `~/Music` scan explained
+
+The owner launched with `--music "$HOME/Music"` and saw no music. On this Mac,
+`~/Music` holds only the Apple Music library folder, which macOS privacy controls
+refuse to the terminal (`Operation not permitted`); the scan finished with
+"Indexed 0 files · 1 unreadable files/folders skipped", which did not say why.
+Spotlight lists no audio under `~/Music`; local files are in other folders.
+
+Scans now count permission-denied folders. A finished scan with no music says
+whether folders were blocked (with the macOS Privacy & Security location, or a
+permissions hint elsewhere) or the folder simply has no supported files, and points
+to `f` to choose another folder. A regression test covers a denied subfolder.
+Smoke: scanning the real `~/Music` read-only reports one blocked folder.
+Whether granting access exposes any downloaded (non-streaming) files is unverified.
