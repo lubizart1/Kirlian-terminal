@@ -20,7 +20,7 @@ A public repository and an open-source license are separate decisions.
 | Pillow | 12.3.0 | MIT-CMU | Image decoding and resizing |
 | textual-image | 0.14.1 | LGPL-3.0-or-later | Terminal graphics and character-cell image rendering |
 | platformdirs | 4.13.0 | MIT | Application data location |
-| keyring | 25.7.0 | MIT | Optional Exa API key in the system credential store |
+| keyring | 25.7.0 | MIT | Optional song-facts API keys in the system credential store |
 | mpv | External installation | Depends on build; see mpv's license | Separate playback process |
 
 This table records direct dependencies, not a completed distribution audit.

@@ -332,18 +332,18 @@ async def test_facts_follow_the_playing_song_and_discard_late_answers(
     tmp_path, audio_factory, monkeypatch
 ):
     from kirlian_terminal.app import PlayerUpdate
-    from kirlian_terminal.facts import Credentials, Fact
+    from kirlian_terminal.facts import PROVIDERS, Credentials, Fact
 
     monkeypatch.delenv("EXA_API_KEY", raising=False)
     monkeypatch.setattr(KirlianApp, "FACT_DELAY", 0)
     library, paths = populated(tmp_path, audio_factory)
     library.set_setting("facts", "on")
     credentials = Credentials()
-    credentials.save("key", remember=True)
+    credentials.save(PROVIDERS["exa"], "key", remember=True)
     release_first = threading.Event()
     asked = []
 
-    def fetch(track, key):
+    def fetch(provider, track, key):
         asked.append(track.title)
         if track.title == "Song 2":
             release_first.wait(timeout=10)
@@ -384,23 +384,29 @@ async def test_facts_follow_the_playing_song_and_discard_late_answers(
         assert not app.query_one("#fact-card").display
 
 
-async def test_facts_setup_stores_key_and_typing_is_not_a_shortcut(
+async def test_facts_setup_picks_a_provider_stores_its_key_and_typing_is_not_a_shortcut(
     tmp_path, audio_factory, monkeypatch
 ):
     import keyring
 
-    monkeypatch.delenv("EXA_API_KEY", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     library, _ = populated(tmp_path, audio_factory)
     player = FakePlayer()
     app = KirlianApp(library, player=player)
-    async with app.run_test(size=(120, 36)) as pilot:
+    async with app.run_test(size=(120, 40)) as pilot:
         await pilot.press("i")
         await wait_for(pilot, lambda: app.screen.query("#facts-key"))
-        await pilot.press("enter")
+        await pilot.press("enter", "down", "enter")
+        await pilot.pause()
+        assert app.screen.query_one("#facts-provider").value == "openai"
+        assert "OpenAI" in str(app.screen.query_one("#facts-hint").content)
+        await pilot.press("tab", "enter")
         assert "Enter an API key" in str(app.screen.query_one("#facts-error").content)
         await pilot.press("q", "space", "n", "o")
         await pilot.press("enter")
         await wait_for(pilot, lambda: app.facts_on)
         assert not player.calls
-        assert keyring.get_password("kirlian-terminal", "exa") == "q no"
-        assert library.setting("facts") == "on"
+        assert keyring.get_password("kirlian-terminal", "openai") == "q no"
+        assert keyring.get_password("kirlian-terminal", "exa") is None
+        assert library.setting("facts_provider") == "openai"
+        assert app.facts_provider.id == "openai"

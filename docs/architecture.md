@@ -46,7 +46,7 @@ previous browser view and position.
 | `src/kirlian_terminal/patterns.py` | The 100-pattern catalog's bounded geometry and character rendering |
 | `src/kirlian_terminal/visuals.py` | Fixed-height filament widget and responsive progress line |
 | `src/kirlian_terminal/playlists.py` | Saved playlists and ordered, duplicate-preserving entries |
-| `src/kirlian_terminal/facts.py` | Optional Exa song facts, citation matching, credentials, local fact cache |
+| `src/kirlian_terminal/facts.py` | Song-facts providers, response readers, source matching, credentials, fact cache |
 | `src/kirlian_terminal/app.py` | Browser views, search, onboarding, keyboard actions, worker messages |
 | `src/kirlian_terminal/styles.tcss` | Terminal layout and initial colors |
 | `tests/` | Generated audio, focus/navigation checks, and real-engine integration checks |
@@ -395,7 +395,7 @@ queue is still mpv's playlist, so playing a saved playlist replaces the queue
 exactly like playing an album. Playlists appear as one sidebar view rather than
 one sidebar row each, to keep the navigation list fixed.
 
-## 2026-10-26: optional song facts through Exa
+## 2026-10-26: optional song facts (first provider: Exa)
 
 The owner chose Exa as the single provider and supplied a mock for the
 "Behind the record" card. The player calls `POST https://api.exa.ai/answer` with
@@ -425,3 +425,40 @@ The card sits under the album details in the record pane and follows the
 *playing* song. It is shown only while the pane shows that song's album, so the
 fact never appears beside a different record. While it is visible the record note
 hides and the cover is sized to leave room for it.
+
+## 2026-10-26: listener-chosen facts provider
+
+The owner asked not to force Exa. The setup dialog now offers Exa, OpenAI,
+Anthropic, Perplexity, and Parallel; the choice is stored as `facts_provider`
+(default `exa`, so the earlier setup keeps working). `facts.py` holds one table of
+`Provider` records: endpoint, auth header style, default model, a request-body
+builder, and a response reader. There is no plugin mechanism; adding a provider
+means one table entry and, at most, one reader.
+
+All providers are asked the same question and asked to return the same JSON
+(`facts[]` with headline, body, `source_url`). Each reader returns that answer
+plus the pages the provider's search actually retrieved, and one shared check
+keeps only facts whose URL matches a retrieved page. This keeps the "no
+model-written URL alone" rule identical across providers:
+
+| Provider | Call (as documented 2026-10) | Structured output | Retrieved pages read from |
+| --- | --- | --- | --- |
+| Exa | `POST /answer` | `outputSchema` | `citations` |
+| OpenAI | `POST /v1/responses`, `gpt-5.4-mini`, `web_search` tool | strict `text.format` | `url_citation` annotations, `web_search_call.action.sources` (via `include`) |
+| Parallel | `POST /v1/responses`, model `parallel`, `reasoning.effort: low` | `text.format` | `url_citation` annotations, `open_page` actions |
+| Perplexity | `POST /v1/agent`, `effort: fast` | `response_format` | `search_results` output item |
+| Anthropic | `POST /v1/messages`, `claude-haiku-4-5`, `web_search_20250305` (3 uses) | prompt only; JSON taken from the final text block | `web_search_tool_result` blocks and text citations |
+
+Perplexity's Sonar chat-completions API was retired on 2026-09-27; the Agent API
+is its documented replacement. OpenAI, Parallel, and Perplexity share one reader
+because their responses use the OpenAI Responses `output[]` shape. The timeout
+rose to 60 seconds because Perplexity documents a 10-30 second delay the first
+time a schema is used and Parallel's research takes 5-10 seconds at low effort.
+Default models will age, so `KIRLIAN_FACTS_MODEL` overrides the model for OpenAI
+and Anthropic only. Gemini is not offered because its grounding returns redirect
+URLs, not the source pages the shared check needs.
+
+Keys are stored per provider (keyring user = provider id, environment variable
+per provider). Switching providers keeps the other keys; turning facts off
+removes all of them. Cached facts are keyed by song, not provider, so switching
+does not pay for songs already answered.

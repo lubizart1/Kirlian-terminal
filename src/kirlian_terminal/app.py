@@ -30,7 +30,17 @@ from .appearance import INK, OPTIONS, PALETTES, QUIET, Appearance, themes
 from .artwork import load_artwork
 from .brand import Brand
 from .cover import CoverImage, RecordPane
-from .facts import Credentials, Fact, FactCache, FactsError, fact_key, request_facts
+from .facts import (
+    PROVIDERS,
+    Credentials,
+    Fact,
+    FactCache,
+    FactsError,
+    Provider,
+    fact_key,
+    provider_named,
+    request_facts,
+)
 from .graphics import NATIVE_SUPPORTED
 from .library import Album, Library, ScanProgress, Track, albums_from, display_text
 from .palette import extract_palette
@@ -208,32 +218,37 @@ class ConfirmDialog(ModalScreen[bool]):
         self.dismiss(False)
 
 
-class FactsDialog(ModalScreen[tuple[str, str] | None]):
-    """Opt-in for song facts. Returns (choice, key); choice is keep, session, or off."""
+class FactsDialog(ModalScreen[tuple[str, str, str] | None]):
+    """Opt-in for song facts. Returns (choice, provider id, key); choice: keep, session, off."""
 
     BINDINGS = [Binding("escape", "cancel", "Cancel")]
 
-    def __init__(self, enabled: bool, key_source: str) -> None:
+    def __init__(self, enabled: bool, provider: Provider, key_sources: dict[str, str]) -> None:
         super().__init__()
         self.enabled = enabled
-        self.key_source = key_source
+        self.provider = provider
+        self.key_sources = key_sources
 
     def compose(self) -> ComposeResult:
         with Vertical(classes="dialog"):
             yield Label("Song facts · Behind the record")
             yield Static(
-                "Short, sourced notes about how the playing song was made, from Exa "
-                "(exa.ai) using your own API key. Exa may charge your account per request.\n\n"
+                "Short, sourced notes about how the playing song was made, from a web "
+                "search service you choose, using your own API key. The provider may charge "
+                "your account per request.\n\n"
                 "Sent: the song title, artist, album, and year. Never sent: audio, artwork, "
                 "or file paths. Each song is asked about once; answers are kept locally."
             )
-            hint = {
-                "environment": "Using EXA_API_KEY from the environment. Leave the field blank.",
-                "keychain": "A key is saved in your system keychain. Leave blank to keep it.",
-                "session": "A key is set for this session. Leave blank to keep it.",
-            }.get(self.key_source, "Paste an Exa API key from dashboard.exa.ai.")
-            yield Static(hint, classes="dialog-hint")
-            yield Input(password=True, placeholder="Exa API key", id="facts-key")
+            with Horizontal(classes="preference-row"):
+                yield Label("Provider")
+                yield Select(
+                    [(p.name, p.id) for p in PROVIDERS.values()],
+                    value=self.provider.id,
+                    allow_blank=False,
+                    id="facts-provider",
+                )
+            yield Static("", id="facts-hint", classes="dialog-hint")
+            yield Input(password=True, id="facts-key")
             yield Static("", id="facts-error")
             with Horizontal(classes="dialog-buttons"):
                 yield Button("Turn on", id="keep", variant="primary")
@@ -243,12 +258,32 @@ class FactsDialog(ModalScreen[tuple[str, str] | None]):
                 yield Button("Cancel", id="cancel")
 
     def on_mount(self) -> None:
-        self.query_one(Input).focus()
+        self.show_provider()
+        self.query_one(Select).focus()
 
-    def on_input_submitted(self) -> None:
+    def on_select_changed(self, event: Select.Changed) -> None:
+        event.stop()
+        if isinstance(event.value, str):
+            self.provider = PROVIDERS[event.value]
+            self.show_provider()
+
+    def show_provider(self) -> None:
+        p = self.provider
+        hint = {
+            "environment": f"Using {p.environment} from the environment. Leave the field blank.",
+            "keychain": f"Your {p.name} key is in the system keychain. Leave blank to keep it.",
+            "session": f"Your {p.name} key is set for this session. Leave blank to keep it.",
+        }.get(self.key_sources.get(p.id, ""), f"Paste your {p.name} API key from {p.signup}.")
+        self.query_one("#facts-hint", Static).update(hint)
+        self.query_one(Input).placeholder = f"{p.name} API key"
+        self.query_one("#facts-error", Static).update("")
+
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        event.stop()
         self.choose("keep")
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
+        event.stop()
         self.choose(event.button.id or "cancel")
 
     def choose(self, choice: str) -> None:
@@ -256,10 +291,10 @@ class FactsDialog(ModalScreen[tuple[str, str] | None]):
             self.dismiss(None)
             return
         key = self.query_one(Input).value.strip()
-        if choice != "off" and not key and not self.key_source:
+        if choice != "off" and not key and not self.key_sources.get(self.provider.id):
             self.query_one("#facts-error", Static).update("Enter an API key to turn facts on.")
             return
-        self.dismiss((choice, key))
+        self.dismiss((choice, self.provider.id, key))
 
     def action_cancel(self) -> None:
         self.dismiss(None)
@@ -329,7 +364,7 @@ class KirlianApp(App):
         artwork: str | None = None,
         characters: str | None = None,
         credentials: Credentials | None = None,
-        fetch_facts: Callable[[Track, str], list[Fact]] = request_facts,
+        fetch_facts: Callable[[Provider, Track, str], list[Fact]] = request_facts,
     ):
         super().__init__()
         self.library = library
@@ -340,6 +375,7 @@ class KirlianApp(App):
         self.fetch_facts_for = fetch_facts
         self.fact_cache = FactCache(library)
         self.facts_on = library.setting("facts") == "on"
+        self.facts_provider = provider_named(library.setting("facts_provider"))
         self.facts: list[Fact] = []
         self.fact_index = 0
         self.fact_path = ""
@@ -1369,13 +1405,14 @@ class KirlianApp(App):
         if facts is None:
             if key in self.facts_asked:
                 return
-            api_key = await asyncio.to_thread(self.credentials.key)
+            provider = self.facts_provider
+            api_key = await asyncio.to_thread(self.credentials.key, provider)
             if not api_key:
-                self.status("Song facts need an Exa API key. Press i to add one.")
+                self.status(f"Song facts need a {provider.name} API key. Press i to add one.")
                 return
             self.facts_asked.add(key)
             try:
-                facts = await asyncio.to_thread(self.fetch_facts_for, track, api_key)
+                facts = await asyncio.to_thread(self.fetch_facts_for, provider, track, api_key)
             except FactsError as error:
                 if revision == self.fact_revision:
                     self.status(str(error))
@@ -1428,26 +1465,37 @@ class KirlianApp(App):
 
     @work(group="facts-setup", exclusive=True)
     async def action_facts_setup(self) -> None:
-        source = await asyncio.to_thread(self.credentials.source)
-        self.push_screen(FactsDialog(self.facts_on, source), self.apply_facts_choice)
+        sources = await asyncio.to_thread(
+            lambda: {p.id: self.credentials.source(p) for p in PROVIDERS.values()}
+        )
+        self.push_screen(
+            FactsDialog(self.facts_on, self.facts_provider, sources), self.apply_facts_choice
+        )
 
     @work(group="facts-setup", exclusive=True)
-    async def apply_facts_choice(self, result: tuple[str, str] | None) -> None:
+    async def apply_facts_choice(self, result: tuple[str, str, str] | None) -> None:
         if result is None:
             return
-        choice, key = result
+        choice, provider_id, key = result
         if choice == "off":
             self.facts_on = False
             self.facts = []
-            await asyncio.to_thread(self.credentials.forget)
+            for provider in PROVIDERS.values():
+                await asyncio.to_thread(self.credentials.forget, provider)
             await asyncio.to_thread(self.library.set_setting, "facts", "off")
             self.update_context()
-            self.status("Song facts off; the stored key was removed. Saved facts stay local.")
+            self.status("Song facts off; saved keys were removed. Saved facts stay local.")
             return
-        message = "Song facts on. They appear beside the playing song's album."
-        if key and not await asyncio.to_thread(self.credentials.save, key, choice == "keep"):
+        provider = PROVIDERS[provider_id]
+        message = f"Song facts on with {provider.name}. They appear beside the playing album."
+        if key and not await asyncio.to_thread(
+            self.credentials.save, provider, key, choice == "keep"
+        ):
             message = "No system keychain is available; the key lasts for this session only."
+        self.facts_provider = provider
         self.facts_on = True
+        self.facts_asked.clear()  # A new key or provider deserves another try.
+        await asyncio.to_thread(self.library.set_setting, "facts_provider", provider.id)
         await asyncio.to_thread(self.library.set_setting, "facts", "on")
         self.status(message)
         self.fact_path = ""

@@ -5,7 +5,8 @@ A small terminal music player for people who listen to albums.
 Kirlian Terminal plays local music, keeps your place in the record, and is being
 built as a standalone companion to Kirlian. Playback is offline. No account or API
 key is required, and the player does not modify your music files or tags. Optional
-song facts use your own Exa API key and are off until you turn them on.
+song facts use your own API key for a provider you choose (Exa, OpenAI, Anthropic,
+Perplexity, or Parallel) and are off until you turn them on.
 
 **Status: local prototype with the filament listening interface.**
 Includes background indexing, album/artist/song browsing, search, an active queue,
@@ -119,24 +120,32 @@ Deleting a playlist never touches your music files.
 
 The side panel can show a short **Behind the record** note about the playing
 song: who played on it, where it was recorded, or how it came together. Each fact
-names its source, and only facts that match a page Exa actually retrieved are
-shown. `[` / `]` step through up to three facts; `o` opens the source.
+names its source, and only facts that match a page the provider's search actually
+retrieved are shown. `[` / `]` step through up to three facts; `o` opens the source.
 
-Facts are off by default. To turn them on:
+Facts are off by default and use your own API key with one of these providers:
 
-1. Create an API key at [dashboard.exa.ai](https://dashboard.exa.ai). Exa may
-   charge your account per request.
-2. Press `i` in the player, paste the key, and choose **Turn on** (saved in the
-   system credential store, such as the macOS Keychain) or **This session only**.
-   Without a usable credential store, the key lasts for the session only.
+| Provider | Get a key | Environment variable | What is called |
+| --- | --- | --- | --- |
+| Exa | [dashboard.exa.ai](https://dashboard.exa.ai) | `EXA_API_KEY` | `/answer` |
+| OpenAI | [platform.openai.com](https://platform.openai.com/api-keys) | `OPENAI_API_KEY` | Responses API, `gpt-5.4-mini` with web search |
+| Anthropic | [platform.claude.com](https://platform.claude.com) | `ANTHROPIC_API_KEY` | Messages API, `claude-haiku-4-5` with web search |
+| Perplexity | [perplexity.ai](https://www.perplexity.ai/account/api) | `PERPLEXITY_API_KEY` | Agent API, `fast` effort |
+| Parallel | [platform.parallel.ai](https://platform.parallel.ai) | `PARALLEL_API_KEY` | Responses API, `low` effort |
 
-Alternatively, export `EXA_API_KEY` before launching and press `i` to turn facts on;
-the environment key takes precedence over a saved one. **Turn off** removes the
-saved key.
+Each provider bills your account per request. To turn facts on, press `i`, choose a
+provider, paste its key, and choose **Turn on** (saved in the system credential
+store, such as the macOS Keychain) or **This session only**. Without a usable
+credential store the key lasts for the session only. Each provider's key is stored
+separately, so switching back does not require pasting it again. A key exported in
+that provider's environment variable takes precedence; press `i` to turn facts on.
+**Turn off** removes all saved keys. To try a different OpenAI or Anthropic model,
+set `KIRLIAN_FACTS_MODEL` before launching.
 
-Only the song title, artist, album, and year are sent to Exa, two seconds after a
-song starts. Audio, artwork, and file paths are never sent. Each song is asked
-about once; answers, including "nothing found", are kept in the local database.
+Only the song title, artist, album, and year are sent to the chosen provider, two
+seconds after a song starts. Audio, artwork, and file paths are never sent. Each
+song is asked about once; answers, including "nothing found", are kept in the local
+database and reused if you switch providers.
 The card appears while the side panel shows the playing song's album, so it hides
 below 110 columns. Timeouts, a rejected key, or a spent quota appear in the status
 line and never interrupt playback.
@@ -263,8 +272,8 @@ defaults, then personalize whenever you wish. No account or setup wizard is need
 
 Music, tags, and artwork are never written to. The application stores metadata,
 the chosen folder, file availability, cover display choice, appearance preferences,
-saved seeds, playlists, and fetched song facts in its own SQLite database. An Exa
-API key is kept in the system credential store, never in that database:
+saved seeds, playlists, and fetched song facts in its own SQLite database. Song-facts
+API keys are kept in the system credential store, never in that database:
 
 - macOS: `~/Library/Application Support/kirlian-terminal/`
 - Linux: `$XDG_DATA_HOME/kirlian-terminal/`, defaulting to `~/.local/share/kirlian-terminal/`
@@ -272,7 +281,7 @@ API key is kept in the system credential store, never in that database:
 `--data-dir` overrides that location. This prototype selects one music root at a
 time. Playback uses a private local socket and one owned mpv child process. There
 are no accounts, analytics, or network services. The only network request is the
-optional song-facts call to Exa described above.
+optional song-facts call to the provider you chose, described above.
 
 ## Current limits
 
@@ -285,8 +294,11 @@ optional song-facts call to Exa described above.
 - Long titles are clipped in the table; the context pane provides more space on
   wider terminals. It hides below 110 columns, taking the fact card with it. The
   minimum target is 80 × 24.
-- Song facts are tested against hand-written responses that follow Exa's documented
-  `/answer` format; no live Exa request has been made in this repository's checks.
+- Song facts are tested against hand-written responses in each provider's documented
+  format; no live request to any provider has been made in this repository's checks.
+  Default models will age; `KIRLIAN_FACTS_MODEL` overrides them.
+- Google Gemini is not offered: its grounding returns redirect links rather than
+  the source pages, which the source check cannot match.
 - Saved playlists live in the Playlists view, not as individual sidebar entries.
 - Audio quality and gapless album transitions need a human listening check.
 

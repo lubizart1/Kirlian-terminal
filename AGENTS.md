@@ -5,12 +5,14 @@ Work in this repository independently of the other Kirlian application.
 
 - Current authorized scope: local playback, the supplied visual mock, local artwork,
   the accepted filament ribbon, branding, local personalization, saved playlists,
-  and opt-in song facts through Exa. Listening-position restoration is still
+  and opt-in song facts through a provider the listener chooses (Exa, OpenAI,
+  Anthropic, Perplexity, Parallel). Listening-position restoration is still
   deferred. Maintain deliberate graphics and text fallbacks; terminal protocol
   checks are not real-terminal visual certification.
-- Keep local playback offline. The only permitted network call is the opt-in Exa
-  facts request, which sends title, artist, album, and year only, never audio,
-  artwork, or paths, and never runs before the listener turns facts on. Keep API
+- Keep local playback offline. The only permitted network call is the opt-in facts
+  request to the chosen provider, which sends title, artist, album, and year only,
+  never audio, artwork, or paths, and never runs before the listener turns facts
+  on. Only show facts whose source URL the provider's search actually retrieved. Keep API
   keys out of SQLite, logs, and the repository. Never write to music files,
   tags, or their folder organization. Treat tags, filenames, and provider text as
   untrusted text.

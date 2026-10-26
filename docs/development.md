@@ -763,5 +763,30 @@ list, which predates the GitHub remote and first commits):
 - The `checks.yml` workflow has not yet run on GitHub; confirm it passes on push.
 - A complete real-album listening pass, a Linux install/playback run, and a list
   of terminals actually checked are still required by the specification.
-- One live song-facts check with the owner's Exa key.
+- One live song-facts check with the owner's key for the chosen provider.
 - The repository is still private; making it public is the owner's step.
+
+## 2026-10-26: choose the song-facts provider
+
+The owner asked to let listeners pick their API provider instead of forcing Exa.
+The `i` dialog now has a Provider choice (Exa, OpenAI, Anthropic, Perplexity,
+Parallel) with per-provider key hints, keychain entries, and environment
+variables. `facts.py` replaces the Exa-only request with a provider table, three
+response readers, and the shared retrieved-page check. API shapes were taken from
+each provider's current documentation; Perplexity's Sonar API is retired, so the
+Agent API is used. No new dependency.
+
+Checks: `ruff check`, `ruff format --check`, and `pytest` — 125 passed. New
+parametrized tests send a request through each provider with a fake transport
+and a response in that provider's documented shape: they confirm the endpoint,
+that the key travels in the headers, that the body carries metadata but not file
+paths, and that an invented URL is dropped while a retrieved one is kept. Other
+tests cover duplicate source entries merging titles and dates, provider-named
+errors, per-provider credentials with environment and session fallbacks, and the
+dialog flow (choosing OpenAI, typing `q no` into the key field without triggering
+shortcuts, the key landing under `openai` only). A throwaway render at 120 × 40
+showed the provider list and the updated hint and placeholder.
+
+Not verified: no live request to any provider. Default model names
+(`gpt-5.4-mini`, `claude-haiku-4-5`) were current in the providers' docs on this
+date and will need updating over time.
