@@ -45,6 +45,8 @@ previous browser view and position.
 | `src/kirlian_terminal/animations.py` | Versioned seeds, Braille/ASCII generators, independent animation clock |
 | `src/kirlian_terminal/patterns.py` | The 100-pattern catalog's bounded geometry and character rendering |
 | `src/kirlian_terminal/visuals.py` | Fixed-height filament widget and responsive progress line |
+| `src/kirlian_terminal/playlists.py` | Saved playlists and ordered, duplicate-preserving entries |
+| `src/kirlian_terminal/facts.py` | Optional Exa song facts, citation matching, credentials, local fact cache |
 | `src/kirlian_terminal/app.py` | Browser views, search, onboarding, keyboard actions, worker messages |
 | `src/kirlian_terminal/styles.tcss` | Terminal layout and initial colors |
 | `tests/` | Generated audio, focus/navigation checks, and real-engine integration checks |
@@ -52,8 +54,8 @@ previous browser view and position.
 The active queue is the observed mpv playlist. Loading an album pauses the engine,
 loads its ordered files, selects the requested index, then resumes. Explicit queue
 operations share a lock so rapid actions cannot interleave a half-loaded album.
-Append preserves duplicate entries. No saved playlists or queue restoration are
-implemented at this milestone.
+Append preserves duplicate entries. Saved playlists are separate from this queue;
+see the playlist decision below. Queue restoration is not implemented.
 
 SQLite connections are opened and closed within the operation that uses them.
 Write-ahead logging lets the interface read committed batches during a scan.
@@ -68,10 +70,9 @@ Displayed metadata is plain text with terminal control characters removed.
 
 ## Deferred decisions
 
-- License: MIT is the confirmed direction; resolve dependency terms before public release.
-- Saved playlists and restoration: Milestone 2, including persistent queue-entry identity.
+- License: decided — GPL-3.0-or-later, consistent with Mutagen. See `licensing.md`.
+- Listening-position restoration: still deferred, including persistent queue-entry identity.
 - Animation catalogue: the filament is accepted; additional families remain deferred.
-- Facts provider and credentials: Milestone 4. No provider or paid API is selected here.
 - Visual reference: the owner supplied the album-view mock during the refinement pass.
 
 ## References
@@ -371,3 +372,56 @@ An accent sample, unsaved-state label, explicit Save changes action, and Ctrl+S
 make the preview/save distinction visible. Contextual text explains album-derived
 ribbon colors, paused motion, the compact header, and NO_COLOR. These explain
 existing rendering rules rather than overriding the terminal or playback state.
+
+## 2026-10-26: saved playlists
+
+The owner brought saved playlists forward. Two tables in the existing database
+hold them: `playlists(id, name)` and `playlist_entries(id, playlist_id, position,
+path)`. Each entry has its own id, so a song added twice stays two rows and one
+copy can be removed or moved without touching the other. Entries reference the
+file path, the same identity the library uses; a path that disappears from the
+library is shown as unavailable rather than deleted. Tables are created with
+`IF NOT EXISTS`, so existing libraries need no migration.
+
+Moves swap neighbouring positions inside one `BEGIN IMMEDIATE` transaction, and
+appends compute the next position inside the same transaction, so rapid key
+presses cannot reorder from a stale read. All playlist reads and writes run in
+worker threads; the UI keeps the current list and open playlist's entries in
+memory for drawing.
+
+Playing a playlist loads its available entries into mpv in saved order and
+starts at the chosen entry; missing files are skipped, not dropped. The active
+queue is still mpv's playlist, so playing a saved playlist replaces the queue
+exactly like playing an album. Playlists appear as one sidebar view rather than
+one sidebar row each, to keep the navigation list fixed.
+
+## 2026-10-26: optional song facts through Exa
+
+The owner chose Exa as the single provider and supplied a mock for the
+"Behind the record" card. The player calls `POST https://api.exa.ai/answer` with
+a plain-language question and an `outputSchema` asking for up to three facts, each
+with a headline, body, and the URL of its source. Exa's response also lists the
+pages it actually retrieved (`citations`). A fact is kept only when its URL matches
+one of those citations, ignoring scheme, `www.`, and a trailing slash; the card
+shows that citation's title, year, and URL. A model-written URL alone is never
+shown. Headlines, bodies, and titles are clipped and stripped of terminal controls.
+
+Only title, artist, album, and year are sent. The request uses `urllib` from the
+standard library with a 25-second timeout, in a worker thread. It starts two
+seconds after mpv reports a new song; a revision counter discards an answer that
+arrives after the song changed, though the answer is still cached. Answers,
+including empty ones, are stored in a `facts` table keyed by casefolded
+artist/album/title, so each song is requested once overall, not once per launch.
+Failed requests are not cached but are not retried in the same session.
+
+Facts are explicitly opt-in: the `facts` setting must be `on`, which only the
+setup dialog (`i`) sets. An `EXA_API_KEY` in the environment supplies a key but
+does not turn facts on. Keys come from the environment, then a session-only value,
+then the OS credential store through `keyring` (MIT). If no credential store is
+available, the key is held for the session only. The key never enters SQLite,
+logs, or the repository. Turning facts off forgets the stored key.
+
+The card sits under the album details in the record pane and follows the
+*playing* song. It is shown only while the pane shows that song's album, so the
+fact never appears beside a different record. While it is visible the record note
+hides and the cover is sized to leave room for it.

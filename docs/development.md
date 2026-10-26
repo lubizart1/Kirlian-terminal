@@ -716,3 +716,52 @@ permissions hint elsewhere) or the folder simply has no supported files, and poi
 to `f` to choose another folder. A regression test covers a denied subfolder.
 Smoke: scanning the real `~/Music` read-only reports one blocked folder.
 Whether granting access exposes any downloaded (non-streaming) files is unverified.
+
+## 2026-10-26: GPL license, saved playlists, and Exa song facts
+
+The owner chose GPL-3.0-or-later over MIT: the existing `LICENSE` already held the
+GPL-3.0 text and Mutagen is GPL-2.0-or-later. `pyproject.toml` now declares
+`license = "GPL-3.0-or-later"`; README, `licensing.md`, and the architecture's
+deferred list agree. The owner also brought saved playlists and song facts
+forward, chose Exa over Perplexity, and supplied the "Behind the record" mock.
+
+Changes:
+
+- `playlists.py` and the Playlists / playlist views: create, rename, delete
+  (confirmed), add songs/albums/queue items with `+`, reorder with `J`/`K`, remove
+  entries with `d`, play in saved order, append a playlist with `a`, and find
+  playlists in search. Duplicates are kept; missing files show as unavailable.
+- `facts.py`, the `i` setup dialog, and the fact card: Exa `/answer` with
+  `outputSchema`, citation-matched facts only, `keyring` credentials with
+  environment and session fallbacks, a local `facts` table, a two-second start
+  delay, and stale-answer rejection. `[`/`]` step through facts; `o` opens the
+  source. One new dependency: `keyring` 25.7.0 (MIT) with its jaraco/more-itertools
+  helpers.
+- Tests never touch the real credential store: `conftest.py` installs an
+  in-memory keyring for every test.
+
+Checks: `uv run ruff check`, `ruff format --check`, and `uv run pytest` — 120
+passed, including new playlist storage tests (order, duplicates, move boundaries,
+delete leaving files and other playlists), an app walkthrough (typing a playlist
+name with `q`/space, saved-order playback skipping a missing file, move, remove,
+confirmed delete), fact parsing (citation matching, control stripping, non-web
+URLs, string answers), request errors (401, timeout) and metadata-only payloads,
+credential precedence and keyring failure, stale-answer rejection with per-song
+caching, and key entry through the setup dialog. A throwaway Textual render at
+150 × 46 with a fake player showed the card matching the mock's layout and a
+playlist with a duplicate and an unavailable entry.
+
+Not verified: no live Exa request was made (no key in this environment), so the
+exact `/answer` structured-output shape is taken from Exa's documentation; the
+first real use should confirm facts appear. Linux credential-store behavior and
+the browser opener for `o` were not exercised. Real-terminal rendering of the card
+and dialogs, and a listening pass through a saved playlist, remain manual checks.
+
+Open before making the repository public (supersedes the 2026-10-13 checkpoint
+list, which predates the GitHub remote and first commits):
+
+- The `checks.yml` workflow has not yet run on GitHub; confirm it passes on push.
+- A complete real-album listening pass, a Linux install/playback run, and a list
+  of terminals actually checked are still required by the specification.
+- One live song-facts check with the owner's Exa key.
+- The repository is still private; making it public is the owner's step.

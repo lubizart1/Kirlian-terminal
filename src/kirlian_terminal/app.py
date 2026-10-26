@@ -8,7 +8,9 @@ import os
 import sqlite3
 import sys
 import threading
+import webbrowser
 from collections import OrderedDict
+from collections.abc import Callable
 from dataclasses import dataclass, replace
 from pathlib import Path
 
@@ -28,10 +30,12 @@ from .appearance import INK, OPTIONS, PALETTES, QUIET, Appearance, themes
 from .artwork import load_artwork
 from .brand import Brand
 from .cover import CoverImage, RecordPane
+from .facts import Credentials, Fact, FactCache, FactsError, fact_key, request_facts
 from .graphics import NATIVE_SUPPORTED
 from .library import Album, Library, ScanProgress, Track, albums_from, display_text
 from .palette import extract_palette
 from .playback import PlaybackError, PlaybackState, Player
+from .playlists import Entry, Playlist, Playlists
 from .visuals import Animation, Progress
 
 
@@ -120,6 +124,147 @@ class FolderDialog(ModalScreen[str | None]):
         self.dismiss(None)
 
 
+class NameDialog(ModalScreen[str | None]):
+    """Names are stored as typed; display_text guards them when drawn."""
+
+    BINDINGS = [Binding("escape", "cancel", "Cancel")]
+
+    def __init__(self, title: str, value: str = "") -> None:
+        super().__init__()
+        self.title_text = title
+        self.value = value
+
+    def compose(self) -> ComposeResult:
+        with Vertical(classes="dialog"):
+            yield Label(self.title_text)
+            yield Input(value=self.value, placeholder="Playlist name", id="playlist-name")
+            yield Static("Enter saves · Esc cancels", classes="dialog-hint")
+
+    def on_mount(self) -> None:
+        self.query_one(Input).focus()
+
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        if name := event.value.strip():
+            self.dismiss(name)
+
+    def action_cancel(self) -> None:
+        self.dismiss(None)
+
+
+class PlaylistPicker(ModalScreen[int | None]):
+    """Returns a playlist id, or 0 to create a new playlist."""
+
+    BINDINGS = [Binding("escape", "cancel", "Cancel")]
+
+    def __init__(self, playlists: list[Playlist], count: int) -> None:
+        super().__init__()
+        self.playlists = playlists
+        self.count = count
+
+    def compose(self) -> ComposeResult:
+        with Vertical(classes="dialog"):
+            yield Label(f"Add {self.count} {'song' if self.count == 1 else 'songs'} to…")
+            yield OptionList(
+                "+ New playlist…",
+                *(Text(display_text(p.name)) for p in self.playlists),
+                id="playlist-choices",
+            )
+            yield Static("Enter chooses · Esc cancels", classes="dialog-hint")
+
+    def on_mount(self) -> None:
+        self.query_one(OptionList).focus()
+
+    def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
+        event.stop()
+        index = event.option_index
+        self.dismiss(self.playlists[index - 1].id if index else 0)
+
+    def action_cancel(self) -> None:
+        self.dismiss(None)
+
+
+class ConfirmDialog(ModalScreen[bool]):
+    BINDINGS = [Binding("escape", "cancel", "Cancel")]
+
+    def __init__(self, message: str, confirm: str) -> None:
+        super().__init__()
+        self.message = message
+        self.confirm = confirm
+
+    def compose(self) -> ComposeResult:
+        with Vertical(classes="dialog"):
+            yield Static(Text(self.message))
+            with Horizontal(classes="dialog-buttons"):
+                yield Button(self.confirm, id="confirm", variant="error")
+                yield Button("Cancel", id="cancel")
+
+    def on_mount(self) -> None:
+        self.query_one("#cancel", Button).focus()
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        self.dismiss(event.button.id == "confirm")
+
+    def action_cancel(self) -> None:
+        self.dismiss(False)
+
+
+class FactsDialog(ModalScreen[tuple[str, str] | None]):
+    """Opt-in for song facts. Returns (choice, key); choice is keep, session, or off."""
+
+    BINDINGS = [Binding("escape", "cancel", "Cancel")]
+
+    def __init__(self, enabled: bool, key_source: str) -> None:
+        super().__init__()
+        self.enabled = enabled
+        self.key_source = key_source
+
+    def compose(self) -> ComposeResult:
+        with Vertical(classes="dialog"):
+            yield Label("Song facts · Behind the record")
+            yield Static(
+                "Short, sourced notes about how the playing song was made, from Exa "
+                "(exa.ai) using your own API key. Exa may charge your account per request.\n\n"
+                "Sent: the song title, artist, album, and year. Never sent: audio, artwork, "
+                "or file paths. Each song is asked about once; answers are kept locally."
+            )
+            hint = {
+                "environment": "Using EXA_API_KEY from the environment. Leave the field blank.",
+                "keychain": "A key is saved in your system keychain. Leave blank to keep it.",
+                "session": "A key is set for this session. Leave blank to keep it.",
+            }.get(self.key_source, "Paste an Exa API key from dashboard.exa.ai.")
+            yield Static(hint, classes="dialog-hint")
+            yield Input(password=True, placeholder="Exa API key", id="facts-key")
+            yield Static("", id="facts-error")
+            with Horizontal(classes="dialog-buttons"):
+                yield Button("Turn on", id="keep", variant="primary")
+                yield Button("This session only", id="session")
+                if self.enabled:
+                    yield Button("Turn off", id="off")
+                yield Button("Cancel", id="cancel")
+
+    def on_mount(self) -> None:
+        self.query_one(Input).focus()
+
+    def on_input_submitted(self) -> None:
+        self.choose("keep")
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        self.choose(event.button.id or "cancel")
+
+    def choose(self, choice: str) -> None:
+        if choice == "cancel":
+            self.dismiss(None)
+            return
+        key = self.query_one(Input).value.strip()
+        if choice != "off" and not key and not self.key_source:
+            self.query_one("#facts-error", Static).update("Enter an API key to turn facts on.")
+            return
+        self.dismiss((choice, key))
+
+    def action_cancel(self) -> None:
+        self.dismiss(None)
+
+
 class LibraryTable(DataTable):
     def on_resize(self) -> None:
         self.app.call_after_refresh(self.app.size_columns)
@@ -135,6 +280,7 @@ class LibraryTable(DataTable):
 class KirlianApp(App):
     TITLE = "Kirlian Terminal"
     ENABLE_COMMAND_PALETTE = False
+    FACT_DELAY = 2.0
     CSS_PATH = "styles.tcss"
     BINDINGS = [
         Binding("j", "down", "Down"),
@@ -147,6 +293,15 @@ class KirlianApp(App):
         Binding("slash", "search", "Search"),
         Binding("escape", "back", "Back"),
         Binding("a", "append", "Append"),
+        Binding("plus", "playlist_add", "Add to playlist"),
+        Binding("e", "playlist_rename", "Rename playlist"),
+        Binding("d", "playlist_delete", "Remove"),
+        Binding("J", "playlist_move(1)", "Move down"),
+        Binding("K", "playlist_move(-1)", "Move up"),
+        Binding("i", "facts_setup", "Song facts"),
+        Binding("left_square_bracket", "fact(-1)", "Previous fact"),
+        Binding("right_square_bracket", "fact(1)", "Next fact"),
+        Binding("o", "fact_source", "Open fact source"),
         Binding("n", "next", "Next"),
         Binding("N", "previous", "Previous"),
         Binding("H", "seek(-5)", "Seek back"),
@@ -173,9 +328,23 @@ class KirlianApp(App):
         player: Player | None = None,
         artwork: str | None = None,
         characters: str | None = None,
+        credentials: Credentials | None = None,
+        fetch_facts: Callable[[Track, str], list[Fact]] = request_facts,
     ):
         super().__init__()
         self.library = library
+        self.playlists = Playlists(library)
+        self.playlist_list: list[Playlist] = []
+        self.playlist_entries: list[Entry] = []
+        self.credentials = credentials or Credentials()
+        self.fetch_facts_for = fetch_facts
+        self.fact_cache = FactCache(library)
+        self.facts_on = library.setting("facts") == "on"
+        self.facts: list[Fact] = []
+        self.fact_index = 0
+        self.fact_path = ""
+        self.fact_revision = 0
+        self.facts_asked: set[str] = set()
         self.artwork_mode = (
             artwork
             or library.setting("artwork_mode")
@@ -256,6 +425,12 @@ class KirlianApp(App):
                 yield Static("", id="cover-placeholder")
                 yield Static("LOCAL MUSIC", id="record-details")
                 yield Static("", id="record-note")
+                with Vertical(id="fact-card"):
+                    with Horizontal(id="fact-heading"):
+                        yield Static("BEHIND THE RECORD", id="fact-label")
+                        yield Static("✳", id="fact-spark")
+                    yield Static("", id="fact-text")
+                    yield Static("", id="fact-source")
         with Vertical(id="personalization"):
             yield Static("Make it yours", id="appearance-heading")
             with VerticalScroll(id="appearance-fields"):
@@ -303,6 +478,7 @@ class KirlianApp(App):
         self.query_one("#search").display = False
         self.query_one("#personalization").display = False
         self.query_one("#status").display = False
+        self.query_one("#fact-card").display = False
         if self.artwork_mode == "off":
             self.query_one(CoverImage).display = False
             self.query_one("#cover-placeholder").display = False
@@ -336,8 +512,20 @@ class KirlianApp(App):
         self.tracks = await asyncio.to_thread(self.library.tracks)
         self.by_path = {track.path: track for track in self.tracks}
         self.albums = albums_from(self.tracks)
+        await self.refresh_playlists()
+
+    async def refresh_playlists(self) -> None:
+        """Reload saved playlists, and the open playlist's entries, off the UI loop."""
+        self.playlist_list = await asyncio.to_thread(self.playlists.all)
+        if self.view == "playlist":
+            self.playlist_entries = await asyncio.to_thread(
+                self.playlists.entries, int(self.view_value)
+            )
         if self.is_running:
             self.render_rows()
+
+    def playlist(self, playlist_id: str) -> Playlist | None:
+        return next((p for p in self.playlist_list if str(p.id) == playlist_id), None)
 
     def check_action(self, action: str, parameters: tuple[object, ...]) -> bool | None:
         if isinstance(self.focused, Input) and action not in {
@@ -391,6 +579,8 @@ class KirlianApp(App):
                 if self.view in {"albums", "artist"}
                 else "ARTIST"
                 if self.view == "artists"
+                else "PLAYLIST"
+                if self.view == "playlists"
                 else "SONG"
             )
             table.columns["title"].label = Text("#" if in_album else title)
@@ -401,6 +591,8 @@ class KirlianApp(App):
                 if self.searching
                 else ""
                 if self.view == "artists"
+                else "SONGS"
+                if self.view == "playlists"
                 else "ARTIST"
             )
             table.columns["time"].label = Text("TIME", justify="right")
@@ -426,12 +618,18 @@ class KirlianApp(App):
         row = self.selected()
         state = getattr(self, "display_state", self.player.state)
         hint = [
-            ("enter", "open" if row and row.kind in {"album", "artist"} else "play"),
+            ("enter", "open" if row and row.kind in {"album", "artist", "playlist"} else "play"),
             ("space", "pause" if not (state.paused or state.idle) else "play"),
-            ("x", "pattern"),
-            ("?", "help"),
-            ("q", "quit"),
         ]
+        if row and row.kind in {"track", "album", "entry", "queue"}:
+            hint.append(("+", "playlist"))
+        if self.view == "playlists" and row and row.kind == "playlist":
+            hint += [("e", "rename"), ("d", "delete")]
+        elif self.view == "playlist" and row:
+            hint += [("J/K", "move"), ("d", "remove")]
+        else:
+            hint.append(("x", "pattern"))
+        hint += [("?", "help"), ("q", "quit")]
         if self.searching:
             hint = [("enter", "open/play"), ("tab", "results"), ("esc", "back")]
         if self.personalizing:
@@ -482,6 +680,11 @@ class KirlianApp(App):
                     for t in self.tracks
                     if query in f"{t.title} {t.artist} {t.album}".casefold()
                 )
+                rows.extend(
+                    Row("playlist", str(p.id), display_text(p.name), "Playlist")
+                    for p in self.playlist_list
+                    if query in p.name.casefold()
+                )
         elif self.view == "albums":
             rows = [
                 Row("album", a.id, a.title, a.artist, clock(sum(t.duration for t in a.tracks)))
@@ -510,6 +713,23 @@ class KirlianApp(App):
                 for a in self.albums
                 if any(t.artist == self.view_value for t in a.tracks)
             ]
+        elif self.view == "playlists":
+            rows = [Row("new-playlist", "", "+ New playlist", "")]
+            rows.extend(
+                Row("playlist", str(p.id), display_text(p.name), f"{p.size}")
+                for p in self.playlist_list
+            )
+        elif self.view == "playlist":
+            playlist = self.playlist(self.view_value)
+            heading = display_text(playlist.name) if playlist else "Playlist unavailable"
+            for entry in self.playlist_entries if playlist else []:
+                track = self.by_path.get(entry.path)
+                if track:
+                    row = self.track_row(track)
+                    rows.append(replace(row, kind="entry", value=str(entry.id)))
+                else:
+                    name = display_text(Path(entry.path).name)
+                    rows.append(Row("entry", str(entry.id), f"{name} [unavailable]", ""))
         elif self.view == "queue":
             for index, item in enumerate(self.player.state.playlist):
                 track = self.by_path.get(item["filename"])
@@ -560,25 +780,41 @@ class KirlianApp(App):
             table.move_cursor(row=min(max(0, target), len(rows) - 1))
         self.query_one("#heading", Static).update(Text(heading))
         album = self.album(self.view_value) if self.view == "album" and not self.searching else None
+        playlist = (
+            self.playlist(self.view_value)
+            if self.view == "playlist" and not self.searching
+            else None
+        )
         breadcrumb = self.query_one("#breadcrumb", Static)
-        breadcrumb.update(Text(f"Albums / {album.artist}" if album else ""))
-        breadcrumb.display = album is not None
-        self.query_one("#collection-detail", Static).update(
-            Text(
+        breadcrumb.update(
+            Text(f"Albums / {album.artist}" if album else "Playlists" if playlist else "")
+        )
+        breadcrumb.display = album is not None or playlist is not None
+        if album:
+            detail = (
                 f"{album.tracks[0].year + ' · ' if album.tracks[0].year else ''}"
                 f"{len(album.tracks)} {'song' if len(album.tracks) == 1 else 'songs'} · "
                 f"{clock(sum(t.duration for t in album.tracks))}"
-                if album
-                else f"{len(rows)} {'results' if self.searching else self.view}"
             )
-        )
+        elif playlist:
+            seconds = sum(
+                self.by_path[e.path].duration
+                for e in self.playlist_entries
+                if e.path in self.by_path
+            )
+            detail = f"{len(rows)} {'song' if len(rows) == 1 else 'songs'} · {clock(seconds)}"
+        elif self.view == "playlists" and not self.searching:
+            detail = f"{len(self.playlist_list)} playlists"
+        else:
+            detail = f"{len(rows)} {'results' if self.searching else self.view}"
+        self.query_one("#collection-detail", Static).update(Text(detail))
         empty = self.query_one("#empty", Static)
         empty.display = not rows
         empty.update(
-            "Saved playlists aren't available yet. Use Queue to line up your music."
-            if self.view == "playlists"
-            else "No matching music."
+            "No matching music."
             if self.searching
+            else "This playlist is empty. Select a song or album elsewhere and press +."
+            if self.view == "playlist"
             else "Queue is empty. Append with a, or play a track."
             if self.view == "queue"
             else "No music here yet. Press f to choose a folder, or r to rescan."
@@ -600,6 +836,9 @@ class KirlianApp(App):
         if row:
             if row.kind == "track":
                 track = self.by_path.get(row.value)
+            elif row.kind == "entry":
+                entry = next((e for e in self.playlist_entries if str(e.id) == row.value), None)
+                track = self.by_path.get(entry.path) if entry else None
             elif row.kind == "queue":
                 index = int(row.value)
                 playlist = self.player.state.playlist
@@ -631,7 +870,8 @@ class KirlianApp(App):
         self.query_one("#record-details", Static).update(details)
         record_note = self.query_one("#record-note", Static)
         record_note.update(note)
-        record_note.display = bool(note.plain) and self.size.height >= 48
+        card = self.update_fact_card(album)
+        record_note.display = bool(note.plain) and self.size.height >= 48 and not card
         if not self.query_one("#context").display or self.query_one(CoverImage).mode == "off":
             return
         key = album.id if album else ""
@@ -681,6 +921,8 @@ class KirlianApp(App):
         self.update_footer()
 
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
+        if event.option_list.id != "nav":
+            return
         self.searching = False
         self.query_one("#search").display = False
         self.view = ("albums", "artists", "songs", "playlists", "queue")[event.option_index]
@@ -721,7 +963,146 @@ class KirlianApp(App):
                 self.perform(self.player.play(paths, paths.index(track.path)))
         elif row.kind == "queue":
             self.perform(self.player.jump(int(row.value)))
+        elif row.kind == "playlist":
+            self.searching = False
+            self.query_one("#search").display = False
+            self.open_playlist(row.value)
+        elif row.kind == "new-playlist":
+            self.push_screen(NameDialog("New playlist"), self.create_playlist)
+        elif row.kind == "entry":
+            self.play_playlist(row.value)
         self.query_one(DataTable).focus()
+
+    @work(group="playlists")
+    async def open_playlist(self, playlist_id: str) -> None:
+        self.view, self.view_value = "playlist", playlist_id
+        self.playlist_entries = []
+        await self.refresh_playlists()
+        self.query_one(DataTable).move_cursor(row=0)
+
+    def play_playlist(self, entry_id: str) -> None:
+        """Play the saved order from this entry. Missing files are skipped, not dropped."""
+        playable = [
+            e for e in self.playlist_entries if (t := self.by_path.get(e.path)) and t.available
+        ]
+        start = next((i for i, e in enumerate(playable) if str(e.id) == entry_id), None)
+        if start is None:
+            self.status("This file is unavailable. Restore it and rescan, or remove it with d.")
+            return
+        self.perform(self.player.play([e.path for e in playable], start))
+
+    @work(group="playlists")
+    async def create_playlist(self, name: str | None) -> None:
+        if not name:
+            return
+        await asyncio.to_thread(self.playlists.create, name)
+        await self.refresh_playlists()
+        self.status(f"Created {display_text(name)}. Select songs or albums and press + to add.")
+
+    def selected_paths(self) -> list[str]:
+        row = self.selected()
+        if not row:
+            return []
+        if row.kind == "track":
+            return [row.value]
+        if row.kind == "album" and (album := self.album(row.value)):
+            return [t.path for t in album.tracks]
+        if row.kind == "entry":
+            return [e.path for e in self.playlist_entries if str(e.id) == row.value]
+        if row.kind == "queue":
+            playlist = self.player.state.playlist
+            index = int(row.value)
+            return [playlist[index]["filename"]] if index < len(playlist) else []
+        return []
+
+    def action_playlist_add(self) -> None:
+        paths = self.selected_paths()
+        if not paths:
+            self.status("Select a song or album to add it to a playlist.")
+            return
+
+        def chosen(playlist_id: int | None) -> None:
+            if playlist_id == 0:
+                self.push_screen(
+                    NameDialog("New playlist"), lambda name: self.add_to_playlist(paths, None, name)
+                )
+            elif playlist_id is not None:
+                self.add_to_playlist(paths, playlist_id, None)
+
+        self.push_screen(PlaylistPicker(self.playlist_list, len(paths)), chosen)
+
+    @work(group="playlists")
+    async def add_to_playlist(
+        self, paths: list[str], playlist_id: int | None, name: str | None
+    ) -> None:
+        if playlist_id is None:
+            if not name:
+                return
+            playlist_id = await asyncio.to_thread(self.playlists.create, name)
+        await asyncio.to_thread(self.playlists.add, playlist_id, paths)
+        await self.refresh_playlists()
+        playlist = self.playlist(str(playlist_id))
+        label = display_text(playlist.name) if playlist else "the playlist"
+        self.status(f"Added {len(paths)} {'song' if len(paths) == 1 else 'songs'} to {label}.")
+
+    def action_playlist_rename(self) -> None:
+        row = self.selected()
+        playlist_id = (
+            row.value
+            if row and row.kind == "playlist" and not self.searching
+            else self.view_value
+            if self.view == "playlist"
+            else None
+        )
+        if playlist_id and (playlist := self.playlist(playlist_id)):
+            self.push_screen(
+                NameDialog("Rename playlist", playlist.name),
+                lambda name: self.rename_playlist(playlist.id, name),
+            )
+
+    @work(group="playlists")
+    async def rename_playlist(self, playlist_id: int, name: str | None) -> None:
+        if name:
+            await asyncio.to_thread(self.playlists.rename, playlist_id, name)
+            await self.refresh_playlists()
+
+    def action_playlist_delete(self) -> None:
+        row = self.selected()
+        if not row or self.searching:
+            return
+        if row.kind == "entry":
+            self.remove_entry(int(row.value))
+        elif row.kind == "playlist" and (playlist := self.playlist(row.value)):
+            self.push_screen(
+                ConfirmDialog(
+                    f"Delete the playlist “{display_text(playlist.name)}”? "
+                    "Your music files are not touched.",
+                    "Delete",
+                ),
+                lambda confirmed: confirmed and self.delete_playlist(playlist.id),
+            )
+
+    @work(group="playlists")
+    async def remove_entry(self, entry_id: int) -> None:
+        await asyncio.to_thread(self.playlists.remove, entry_id)
+        await self.refresh_playlists()
+
+    @work(group="playlists")
+    async def delete_playlist(self, playlist_id: int) -> None:
+        await asyncio.to_thread(self.playlists.delete, playlist_id)
+        await self.refresh_playlists()
+        self.status("Playlist deleted. No music files were changed.")
+
+    def action_playlist_move(self, offset: int) -> None:
+        row = self.selected()
+        if row and row.kind == "entry" and not self.searching:
+            self.move_entry(int(row.value), offset)
+
+    @work(group="playlists", exclusive=True)
+    async def move_entry(self, entry_id: int, offset: int) -> None:
+        moved = await asyncio.to_thread(self.playlists.move, int(self.view_value), entry_id, offset)
+        if moved:
+            await self.refresh_playlists()
 
     @work(group="playback")
     async def perform(self, operation) -> None:
@@ -754,6 +1135,11 @@ class KirlianApp(App):
             self.view, self.view_value, position = self.saved_view
             self.render_rows(position)
             self.update_footer()
+        elif self.view == "playlist":
+            ids = [str(p.id) for p in self.playlist_list]
+            position = 1 + ids.index(self.view_value) if self.view_value in ids else 0
+            self.view, self.view_value = "playlists", ""
+            self.render_rows(position)
         else:
             self.view, self.view_value = "albums", ""
             self.render_rows(0)
@@ -775,13 +1161,19 @@ class KirlianApp(App):
 
     def action_append(self) -> None:
         row = self.selected()
-        paths = []
-        if row and row.kind == "track":
-            paths = [row.value]
-        elif row and row.kind == "album" and (album := self.album(row.value)):
-            paths = [t.path for t in album.tracks]
+        if row and row.kind == "playlist":
+            self.append_playlist(int(row.value))
+        elif row and row.kind != "queue" and (paths := self.selected_paths()):
+            self.append_paths(paths)
+
+    @work(group="playlists")
+    async def append_playlist(self, playlist_id: int) -> None:
+        entries = await asyncio.to_thread(self.playlists.entries, playlist_id)
+        paths = [e.path for e in entries if (t := self.by_path.get(e.path)) and t.available]
         if paths:
             self.append_paths(paths)
+        else:
+            self.status("This playlist has no available songs to append.")
 
     @work(group="playback")
     async def append_paths(self, paths: list[str]) -> None:
@@ -894,6 +1286,7 @@ class KirlianApp(App):
         self.update_ribbon_palette(state)
         if animation.clock.serial != previous_serial and not self.scanning:
             self.status("")
+        self.observe_fact_song(state)
         key = (
             state.path,
             state.index,
@@ -944,6 +1337,122 @@ class KirlianApp(App):
             self.palette_cache.popitem(last=False)
         self.query_one(Animation).set_palette(colors)
 
+    def observe_fact_song(self, state: PlaybackState) -> None:
+        """Facts follow the playing song once it has actually started."""
+        if state.loading:
+            return
+        path = state.path if state.path and not state.idle else ""
+        if path == self.fact_path:
+            return
+        self.fact_path = path
+        self.facts = []
+        self.fact_index = 0
+        self.fact_revision += 1
+        self.update_context()
+        track = self.by_path.get(path)
+        if track is None:
+            return
+        if self.facts_on:
+            self.load_facts(track, self.fact_revision)
+        elif not self.library.setting("facts"):
+            self.library.set_setting("facts", "invited")
+            self.status("Optional: press i for short notes on how each song was made.")
+
+    @work(group="facts")
+    async def load_facts(self, track: Track, revision: int) -> None:
+        # Wait out rapid skipping. A late answer is cached but never shown for another song.
+        await asyncio.sleep(self.FACT_DELAY)
+        if revision != self.fact_revision:
+            return
+        key = fact_key(track)
+        facts = await asyncio.to_thread(self.fact_cache.get, key)
+        if facts is None:
+            if key in self.facts_asked:
+                return
+            api_key = await asyncio.to_thread(self.credentials.key)
+            if not api_key:
+                self.status("Song facts need an Exa API key. Press i to add one.")
+                return
+            self.facts_asked.add(key)
+            try:
+                facts = await asyncio.to_thread(self.fetch_facts_for, track, api_key)
+            except FactsError as error:
+                if revision == self.fact_revision:
+                    self.status(str(error))
+                return
+            await asyncio.to_thread(self.fact_cache.put, key, facts)
+        if not self.is_running or revision != self.fact_revision:
+            return
+        self.facts = facts
+        self.fact_index = 0
+        self.update_context()
+
+    def update_fact_card(self, album: Album | None) -> bool:
+        """Show the playing song's fact while the side panel shows its album."""
+        card = self.query_one("#fact-card")
+        playing = self.by_path.get(self.fact_path)
+        show = bool(self.facts) and playing is not None
+        show = show and (album is None or album.id == playing.album_id)
+        if show:
+            fact = self.facts[self.fact_index % len(self.facts)]
+            self.query_one("#fact-text", Static).update(
+                Text.assemble((fact.headline, f"bold {INK}"), "\n\n", (fact.body, INK))
+            )
+            source = Text.assemble(("Source: ", QUIET), (fact.source_label, INK), "\n\n")
+            if len(self.facts) > 1:
+                source.append("[ ]", self.appearance.accent)
+                source.append(f" more facts {self.fact_index + 1}/{len(self.facts)}   ", QUIET)
+            source.append("o", self.appearance.accent)
+            source.append(" source", QUIET)
+            self.query_one("#fact-source", Static).update(source)
+        if card.display != show:
+            card.display = show
+            self.call_after_refresh(self.query_one(RecordPane).on_resize)
+        return show
+
+    def action_fact(self, step: int) -> None:
+        if len(self.facts) > 1:
+            self.fact_index = (self.fact_index + step) % len(self.facts)
+            self.update_context()
+
+    def action_fact_source(self) -> None:
+        if self.facts and self.query_one("#fact-card").display:
+            self.open_url(self.facts[self.fact_index].source_url)
+
+    @work(thread=True, group="browser")
+    def open_url(self, url: str) -> None:
+        opened = webbrowser.open(url)
+        self.call_from_thread(
+            self.status, "Opened the source in your browser." if opened else f"Source: {url}"
+        )
+
+    @work(group="facts-setup", exclusive=True)
+    async def action_facts_setup(self) -> None:
+        source = await asyncio.to_thread(self.credentials.source)
+        self.push_screen(FactsDialog(self.facts_on, source), self.apply_facts_choice)
+
+    @work(group="facts-setup", exclusive=True)
+    async def apply_facts_choice(self, result: tuple[str, str] | None) -> None:
+        if result is None:
+            return
+        choice, key = result
+        if choice == "off":
+            self.facts_on = False
+            self.facts = []
+            await asyncio.to_thread(self.credentials.forget)
+            await asyncio.to_thread(self.library.set_setting, "facts", "off")
+            self.update_context()
+            self.status("Song facts off; the stored key was removed. Saved facts stay local.")
+            return
+        message = "Song facts on. They appear beside the playing song's album."
+        if key and not await asyncio.to_thread(self.credentials.save, key, choice == "keep"):
+            message = "No system keychain is available; the key lasts for this session only."
+        self.facts_on = True
+        await asyncio.to_thread(self.library.set_setting, "facts", "on")
+        self.status(message)
+        self.fact_path = ""
+        self.observe_fact_song(getattr(self, "display_state", self.player.state))
+
     def apply_appearance(self) -> None:
         self.theme = f"kirlian-{self.appearance.palette}"
         self.query_one(Animation).configure(self.appearance)
@@ -953,6 +1462,9 @@ class KirlianApp(App):
         progress.refresh()
         self.query_one(Brand).configure(
             self.appearance.logo, self.size.height < 30, self.appearance.characters == "ascii"
+        )
+        self.query_one("#fact-spark", Static).update(
+            "*" if self.appearance.characters == "ascii" else "✳"
         )
         if self.is_running:
             self.on_player_update(PlayerUpdate(getattr(self, "display_state", self.player.state)))
@@ -1143,7 +1655,9 @@ class KirlianApp(App):
             "/ search · Esc back · f folder · p personalize · r rescan · q quit\n"
             "x shuffle animation · v motion on/off · s save · S recall saved\n"
             "c switch cover display (remembered)\n"
-            "Typing in search or folder fields never triggers playback shortcuts.",
+            "+ add to playlist · in a playlist: J/K move · d remove · e rename\n"
+            "i song facts setup · [ ] more facts · o open the fact's source\n"
+            "Typing in search, name, or key fields never triggers playback shortcuts.",
             title="Keyboard controls",
             timeout=12,
         )

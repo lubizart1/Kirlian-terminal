@@ -103,9 +103,15 @@ class RecordPane(Vertical):
     """Size covers after this pane receives its actual layout dimensions."""
 
     def on_resize(self) -> None:
+        # Keep room for the complete caption, plus the fact card when it is shown.
+        reserve = 7
+        for card in self.query("#fact-card"):
+            if card.display:
+                reserve += max(12, card.outer_size.height)
         for cover in self.query(CoverImage):
-            # Keep room for the complete caption. App resize events arrive
-            # before pane geometry updates, so measuring there can be stale.
+            # App resize events arrive before pane geometry updates, so measuring
+            # there can be stale.
             cover.fit(
-                min(34, self.content_size.width), min(17, max(4, self.content_size.height - 7))
+                min(34, self.content_size.width),
+                min(17, max(4, self.content_size.height - reserve)),
             )

@@ -4,12 +4,13 @@ A small terminal music player for people who listen to albums.
 
 Kirlian Terminal plays local music, keeps your place in the record, and is being
 built as a standalone companion to Kirlian. Playback is offline. No account or API
-key is required, and the player does not modify your music files or tags.
+key is required, and the player does not modify your music files or tags. Optional
+song facts use your own Exa API key and are off until you turn them on.
 
 **Status: local prototype with the filament listening interface.**
 Includes background indexing, album/artist/song browsing, search, an active queue,
-keyboard playback controls, local covers, a filament ribbon, the Kirlian header,
-and local appearance preferences.
+saved playlists, keyboard playback controls, local covers, a filament ribbon, the
+Kirlian header, local appearance preferences, and optional sourced song facts.
 See the [verification record](docs/development.md)
 for actual checks and remaining limitations. macOS and Linux are the intended platforms.
 
@@ -55,10 +56,11 @@ testing, add `--data-dir .local/tryout`. Run `uv run kirlian --help` for options
 | `h` / `l`, left / right arrows | Back / open |
 | `Enter` | Open a collection or play a track |
 | `Space` | Play / pause; start an idle queue |
-| `/` | Search songs, albums, and artists |
+| `/` | Search songs, albums, artists, and playlists |
 | `Esc` | Leave search or go back |
 | `Tab` / `Shift+Tab` | Change pane |
 | `a` | Append selected song or album without interrupting playback |
+| `+` | Add the selected song, album, or queue item to a playlist |
 | `n` / `N` | Next / previous track |
 | `H` / `L` | Seek backward / forward five seconds |
 | `-` / `=` | Lower / raise volume |
@@ -69,6 +71,9 @@ testing, add `--data-dir .local/tryout`. Run `uv run kirlian --help` for options
 | `f` / `r` | Choose folder / rescan |
 | `p` | Preview and save appearance preferences |
 | `?` | Keyboard help |
+| `i` | Set up, change, or turn off song facts |
+| `[` / `]` | Previous / next fact for the playing song |
+| `o` | Open the shown fact's source in your browser |
 | `q` | Quit and stop this player's audio |
 
 The bottom row shows the current Enter and Space actions, pattern, help, quit,
@@ -76,7 +81,8 @@ and volume. Search and personalization stay in the header; Help lists the other
 controls. Collection headings and counts share a row, and status messages appear
 only when there is something to report.
 
-Typing in search or the folder field takes priority over these shortcuts.
+Typing in search, the folder field, playlist names, or the API key field takes
+priority over these shortcuts.
 Search does not stop playback; Escape restores the previous view and selection.
 Playing a search result starts its album queue at that song. Enter on a Queue
 item jumps to it. `>` marks the current track; the highlighted row is your selection.
@@ -88,6 +94,52 @@ finds no music, the status line says whether folders were permission-denied. On
 macOS, the Music app's library inside `~/Music` is protected: allow your terminal
 under System Settings › Privacy & Security › Files and Folders, or press `f` to
 choose a different folder.
+
+## Playlists
+
+Press `+` on a song, album, or Queue item, then choose a playlist or
+**+ New playlist…**. Open **Playlists** in the sidebar (or search for a playlist
+by name) to see them all; the first row creates an empty one.
+
+| Where | Key | Action |
+| --- | --- | --- |
+| Playlists list | `Enter` | Open a playlist, or create one from the first row |
+| Playlists list | `e` / `d` | Rename / delete (asks first) |
+| Playlists list | `a` | Append the whole playlist to the queue |
+| Inside a playlist | `Enter` | Play the playlist in saved order from that song |
+| Inside a playlist | `J` / `K` | Move the song down / up |
+| Inside a playlist | `d` | Remove that entry |
+| Inside a playlist | `e` | Rename |
+
+A song can appear more than once on purpose. If a file goes missing, its entry
+stays and is marked `[unavailable]`; playback skips it, and `d` removes it.
+Deleting a playlist never touches your music files.
+
+## Song facts
+
+The side panel can show a short **Behind the record** note about the playing
+song: who played on it, where it was recorded, or how it came together. Each fact
+names its source, and only facts that match a page Exa actually retrieved are
+shown. `[` / `]` step through up to three facts; `o` opens the source.
+
+Facts are off by default. To turn them on:
+
+1. Create an API key at [dashboard.exa.ai](https://dashboard.exa.ai). Exa may
+   charge your account per request.
+2. Press `i` in the player, paste the key, and choose **Turn on** (saved in the
+   system credential store, such as the macOS Keychain) or **This session only**.
+   Without a usable credential store, the key lasts for the session only.
+
+Alternatively, export `EXA_API_KEY` before launching and press `i` to turn facts on;
+the environment key takes precedence over a saved one. **Turn off** removes the
+saved key.
+
+Only the song title, artist, album, and year are sent to Exa, two seconds after a
+song starts. Audio, artwork, and file paths are never sent. Each song is asked
+about once; answers, including "nothing found", are kept in the local database.
+The card appears while the side panel shows the playing song's album, so it hides
+below 110 columns. Timeouts, a rejected key, or a spent quota appear in the status
+line and never interrupt playback.
 
 ## Covers and the filament ribbon
 
@@ -210,28 +262,32 @@ defaults, then personalize whenever you wish. No account or setup wizard is need
 ## Local data and privacy
 
 Music, tags, and artwork are never written to. The application stores metadata,
-the chosen folder, file availability, cover display choice, appearance preferences, and saved seeds in its
-own SQLite database:
+the chosen folder, file availability, cover display choice, appearance preferences,
+saved seeds, playlists, and fetched song facts in its own SQLite database. An Exa
+API key is kept in the system credential store, never in that database:
 
 - macOS: `~/Library/Application Support/kirlian-terminal/`
 - Linux: `$XDG_DATA_HOME/kirlian-terminal/`, defaulting to `~/.local/share/kirlian-terminal/`
 
 `--data-dir` overrides that location. This prototype selects one music root at a
 time. Playback uses a private local socket and one owned mpv child process. There
-are no accounts, analytics, network services, or paid API calls in Milestone 1.
+are no accounts, analytics, or network services. The only network request is the
+optional song-facts call to Exa described above.
 
 ## Current limits
 
-- Saved playlist editing, optional song facts, and listening-position restoration
-  are not implemented. The Playlists view states this; Queue is available for the
-  current session.
+- Listening-position restoration is not implemented.
 - Relaunching retains the library, but clears the active queue and starts stopped.
 - Album identity uses tags and release folders. Discs in `CD 1` / `Disc 2` style
   subfolders share the parent folder. Distinct editions with identical tags in one
   flat folder cannot reliably be separated. Unknown artists in untagged mixed
   folders also need better source organization for accurate grouping.
 - Long titles are clipped in the table; the context pane provides more space on
-  wider terminals. It hides below 110 columns. The minimum target is 80 × 24.
+  wider terminals. It hides below 110 columns, taking the fact card with it. The
+  minimum target is 80 × 24.
+- Song facts are tested against hand-written responses that follow Exa's documented
+  `/answer` format; no live Exa request has been made in this repository's checks.
+- Saved playlists live in the Playlists view, not as individual sidebar entries.
 - Audio quality and gapless album transitions need a human listening check.
 
 ## Project notes
@@ -244,13 +300,14 @@ are no accounts, analytics, network services, or paid API calls in Milestone 1.
 - [Contributing](CONTRIBUTING.md): development and documentation expectations.
 
 The first milestone covers local indexing, album browsing, search, and playback.
-The owner has brought artwork, the filament ribbon, branding, and personalization forward. Saved
-playlist editing and optional sourced song facts follow separately. Streaming,
-downloads, lyrics, cloud sync, and visual generation are outside this release.
+The owner has since brought artwork, the filament ribbon, branding,
+personalization, saved playlists, and optional sourced song facts forward.
+Streaming, downloads, lyrics, cloud sync, and visual generation are outside this
+release.
 
 ## License
 
-MIT is the intended direction, confirmed by the owner; no license has been applied
-yet. Mutagen, the current metadata reader, is GPL-2.0-or-later. An MIT-only distribution cannot be assumed
-from a license on our own source. See the [license review](docs/licensing.md) for
-dependency terms and the unresolved decision before publishing.
+Kirlian Terminal is free software under the GNU General Public License, version 3
+or later (`GPL-3.0-or-later`); see [LICENSE](LICENSE). The player uses Mutagen
+(GPL-2.0-or-later) to read tags. Dependency terms are summarized in the
+[license review](docs/licensing.md).

@@ -1,12 +1,14 @@
-# License review — pending
+# License
 
-The owner confirmed MIT as the intended direction. No project license has been applied yet. Local development
-can continue while the distribution decision is resolved.
+Kirlian Terminal is licensed under the GNU General Public License, version 3 or
+(at your option) any later version (`GPL-3.0-or-later`). The full text is in
+`LICENSE`; `pyproject.toml` declares the same SPDX expression.
 
-MIT permits reuse, modification, and redistribution, including commercial and
-closed-source derivatives, while preserving copyright and license notices.
-GPL also permits commercial use, but distributing a combined or modified GPL
-application generally carries corresponding source and GPL licensing obligations.
+The owner first leaned toward MIT, then chose GPL after this review: the player
+imports Mutagen, which is GPL-2.0-or-later, so a GPL license keeps the combined
+application consistent without replacing the metadata reader. GPL permits
+commercial use and private modification; redistributing a modified version
+requires offering its source under the same terms.
 A public repository and an open-source license are separate decisions.
 
 ## Dependencies currently selected
@@ -18,18 +20,16 @@ A public repository and an open-source license are separate decisions.
 | Pillow | 12.3.0 | MIT-CMU | Image decoding and resizing |
 | textual-image | 0.14.1 | LGPL-3.0-or-later | Terminal graphics and character-cell image rendering |
 | platformdirs | 4.13.0 | MIT | Application data location |
+| keyring | 25.7.0 | MIT | Optional Exa API key in the system credential store |
 | mpv | External installation | Depends on build; see mpv's license | Separate playback process |
 
 This table records direct dependencies, not a completed distribution audit.
 Transitive dependencies and bundled binary components also need their notices
 checked for whatever packaging format is eventually published.
 
-The current Python application imports Mutagen directly. Putting MIT on our own
-files does not eliminate obligations for a distributed combined application that
-uses GPL code. If MIT is the intended distribution direction, first evaluate a
-permissively licensed metadata/cover reader and verify format/tag compatibility.
-Retaining Mutagen and choosing an appropriate GPL license is the other direction.
-No metadata replacement has been selected or implemented.
+The application imports Mutagen directly. GPL-3.0-or-later on our own code is
+compatible with Mutagen's GPL-2.0-or-later grant. Moving to a permissive license
+later would first require replacing Mutagen and agreement from any contributors.
 
 LGPL has different conditions from GPL: it permits use by differently licensed
 applications when its requirements are met, including library notices, source
@@ -43,7 +43,7 @@ not bundle its binary. Any future bundled release requires a separate review of
 the exact mpv/FFmpeg build and their redistribution terms.
 
 Music and cover art read from the listener's folder are not repository assets and
-are not covered by a future code license. Do not commit test collections or their
+are not covered by the code license. Do not commit test collections or their
 artwork. Local verification screenshots are ignored for the same reason.
 
 ## References
