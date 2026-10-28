@@ -86,13 +86,13 @@ def test_every_translation_formats_with_its_values(code):
             assert _(source, **values)
 
 
-async def test_saved_language_translates_the_interface_and_changes_apply_on_relaunch(
+async def test_saved_language_switches_the_running_interface_and_keeps_the_view(
     tmp_path, audio_factory
 ):
     import json
 
     from test_app import FakePlayer, populated
-    from textual.widgets import OptionList, Select
+    from textual.widgets import DataTable, OptionList, Select
 
     from kirlian_terminal.app import KirlianApp
     from kirlian_terminal.appearance import Appearance
@@ -101,28 +101,31 @@ async def test_saved_language_translates_the_interface_and_changes_apply_on_rela
     library.set_setting("appearance", json.dumps({"language": "es"}))
     player = FakePlayer()
     app = KirlianApp(library, player=player)
+
+    def first_section():
+        return str(app.query_one("#nav", OptionList).get_option_at_index(0).prompt)
+
     async with app.run_test(size=(80, 24)) as pilot:
         await pilot.pause()
-        nav = app.query_one("#nav", OptionList)
-        assert str(nav.get_option_at_index(0).prompt) == "Álbumes"
+        assert first_section() == "Álbumes"
+        await pilot.press("enter", "j")  # Open the album, select the second song.
+        assert app.view == "album"
         await pilot.press("p")
         app.query_one("#pref-language", Select).value = "ja"
         await pilot.pause()
+        assert "保存" not in str(app.query_one("#appearance-context").content)
         await pilot.press("ctrl+s")
-        await pilot.pause()
+        for _attempt in range(40):
+            await pilot.pause(0.02)
+            if not app.personalizing and first_section() == "アルバム":
+                break
+        assert first_section() == "アルバム"
         assert Appearance.load(library).language == "ja"
-        # The running interface stays Spanish; the change is announced instead.
-        assert str(nav.get_option_at_index(0).prompt) == "Álbumes"
-        saved = _("Language saved. It applies the next time you open Kirlian.")
-        assert saved.startswith("Idioma")
-        assert str(app.query_one("#status").content) == saved
+        assert app.view == "album" and app.query_one(DataTable).cursor_row == 1
+        assert str(app.query_one("#status").content) == _(
+            "Language changed. Your music kept playing."
+        )
         assert not player.calls
-
-    relaunched = KirlianApp(library, player=FakePlayer())
-    async with relaunched.run_test(size=(80, 24)) as pilot:
-        await pilot.pause()
-        prompt = str(relaunched.query_one("#nav", OptionList).get_option_at_index(0).prompt)
-        assert prompt == "アルバム"
 
 
 def test_notes_are_requested_and_cached_per_language(tmp_path):

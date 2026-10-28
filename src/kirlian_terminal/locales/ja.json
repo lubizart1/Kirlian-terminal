@@ -99,9 +99,7 @@
   "Notes off. Keys are kept.": "ノートをオフにしました。キーは保持されます。",
   "Color is disabled by NO_COLOR; the palette will display in grayscale.": "NO_COLOR によりカラーが無効です。配色はグレースケールで表示されます。",
   "The ribbon moves during playback; it stays still while paused or stopped.": "リボンは再生中に動き、一時停止中や停止中は止まります。",
-  "The interface language changes the next time you open Kirlian. Song notes switch then too.": "表示言語は次に Kirlian を開いたときに切り替わります。曲ノートも同時に切り替わります。",
   "Could not save. Your preview is here; retry or Cancel.": "保存できませんでした。プレビューはそのままです。もう一度試すか「キャンセル」を押してください。",
-  "Language saved. It applies the next time you open Kirlian.": "言語を保存しました。次に Kirlian を開いたときに適用されます。",
   "Motion on.": "モーションをオンにしました。",
   "Motion off. Press v to enable.": "モーションをオフにしました。v でオンにできます。",
   "No saved animations yet. Press s to keep the current one.": "保存したアニメーションはまだありません。s で今のアニメーションを保存できます。",
@@ -282,5 +280,7 @@
   "Cannot play this file: {reason}": "このファイルを再生できません：{reason}",
   "The playback connection closed.": "再生エンジンとの接続が切れました。",
   "unsupported or unreadable": "非対応か、読み取れません",
-  "i song notes settings · [ ] more notes · o open the note's source": "i 曲ノートの設定 · [ ] ほかのノート · o ノートの出典を開く"
+  "i song notes settings · [ ] more notes · o open the note's source": "i 曲ノートの設定 · [ ] ほかのノート · o ノートの出典を開く",
+  "The interface and song notes switch to this language when you save.": "保存すると、画面と曲ノートがこの言語に切り替わります。",
+  "Language changed. Your music kept playing.": "言語を変更しました。再生はそのまま続いています。"
 }

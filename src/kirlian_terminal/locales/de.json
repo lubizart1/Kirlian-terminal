@@ -99,9 +99,7 @@
   "Notes off. Keys are kept.": "Notizen aus. Schlüssel bleiben erhalten.",
   "Color is disabled by NO_COLOR; the palette will display in grayscale.": "Farbe ist durch NO_COLOR deaktiviert; die Palette erscheint in Graustufen.",
   "The ribbon moves during playback; it stays still while paused or stopped.": "Das Band bewegt sich während der Wiedergabe; bei Pause oder Stopp steht es still.",
-  "The interface language changes the next time you open Kirlian. Song notes switch then too.": "Die Sprache der Oberfläche ändert sich beim nächsten Start von Kirlian. Die Song-Notizen wechseln dann ebenfalls.",
   "Could not save. Your preview is here; retry or Cancel.": "Speichern fehlgeschlagen. Deine Vorschau bleibt; versuche es erneut oder wähle Abbrechen.",
-  "Language saved. It applies the next time you open Kirlian.": "Sprache gespeichert. Sie gilt ab dem nächsten Start von Kirlian.",
   "Motion on.": "Bewegung an.",
   "Motion off. Press v to enable.": "Bewegung aus. Drücke v zum Einschalten.",
   "No saved animations yet. Press s to keep the current one.": "Noch keine gespeicherten Animationen. Drücke s, um die aktuelle zu behalten.",
@@ -282,5 +280,7 @@
   "Balanced: good stories and readings at moderate cost": "Ausgewogen: gute Geschichten und Deutungen zu moderaten Kosten",
   "Fastest and cheapest; plainer notes": "Am schnellsten und günstigsten; schlichtere Notizen",
   "Most thorough; slowest and most expensive": "Am gründlichsten; am langsamsten und teuersten",
-  "i song notes settings · [ ] more notes · o open the note's source": "i Song-Notizen einrichten · [ ] weitere Notizen · o Quelle der Notiz öffnen"
+  "i song notes settings · [ ] more notes · o open the note's source": "i Song-Notizen einrichten · [ ] weitere Notizen · o Quelle der Notiz öffnen",
+  "The interface and song notes switch to this language when you save.": "Oberfläche und Song-Notizen wechseln beim Speichern in diese Sprache.",
+  "Language changed. Your music kept playing.": "Sprache geändert. Deine Musik lief weiter."
 }

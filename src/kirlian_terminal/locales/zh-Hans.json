@@ -99,9 +99,7 @@
   "Notes off. Keys are kept.": "笔记已关闭。密钥仍会保留。",
   "Color is disabled by NO_COLOR; the palette will display in grayscale.": "NO_COLOR 已禁用颜色；配色将以灰度显示。",
   "The ribbon moves during playback; it stays still while paused or stopped.": "光带在播放时流动；暂停或停止时保持静止。",
-  "The interface language changes the next time you open Kirlian. Song notes switch then too.": "界面语言将在下次打开 Kirlian 时更改，歌曲笔记也会同时切换。",
   "Could not save. Your preview is here; retry or Cancel.": "无法保存。预览仍保留；请重试或取消。",
-  "Language saved. It applies the next time you open Kirlian.": "语言已保存，将在下次打开 Kirlian 时生效。",
   "Motion on.": "动效已开启。",
   "Motion off. Press v to enable.": "动效已关闭。按 v 开启。",
   "No saved animations yet. Press s to keep the current one.": "还没有已存的动画。按 s 保留当前动画。",
@@ -282,5 +280,7 @@
   "mpv could not start. Check your mpv installation.": "mpv 无法启动。请检查 mpv 的安装。",
   "Cannot play this file: {reason}": "无法播放此文件：{reason}",
   "The playback connection closed.": "播放连接已关闭。",
-  "unsupported or unreadable": "格式不受支持或无法读取"
+  "unsupported or unreadable": "格式不受支持或无法读取",
+  "The interface and song notes switch to this language when you save.": "保存后，界面和歌曲笔记会切换为此语言。",
+  "Language changed. Your music kept playing.": "语言已更改，音乐仍在继续播放。"
 }

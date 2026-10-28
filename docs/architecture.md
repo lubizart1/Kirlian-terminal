@@ -592,10 +592,23 @@ placeholder fails CI rather than raising in the UI.
 
 The language resolves at launch: a saved choice, else `LC_ALL`/`LC_MESSAGES`/`LANG`
 (`pt_*` maps to pt-BR; `zh_CN`/`zh_SG` to Simplified Chinese; Traditional Chinese
-and unlisted languages to English). Switching applies on next launch rather than
-live: compose-time widgets would otherwise need rebuilding, and recomposing the
-running app would risk playback, queue, and selection state. Song notes are asked
+and unlisted languages to English). Switching was first deferred to the next launch
+(superseded below). Song notes are asked
 for in the active language and cached per language (English keeps its earlier
 keys). The CLI, `--check-facts` output, Textual binding descriptions, and key
 names remain English. Translations were drafted by AI agents per language and
 need native review; the development record lists their flagged judgment calls.
+
+## 2026-10-28: switch language without relaunching
+
+The owner saved a new language and saw no change, since it waited for the next
+launch. Saving a different language now calls `apply_language()`: it sets the
+catalog, recomposes the screen (widgets hold text built in the old language), and
+reruns `prepare_screen()`, the same setup `on_mount` uses, minus `boot()`. Playback
+is unaffected because mpv, the queue, the library, the current view, and caches
+live on the app, not in widgets; the view, selected row, sidebar section, player
+labels, ribbon palette, and cover (from the in-memory cache) are redrawn. The
+playing song's notes are requested again in the new language. Table columns are
+added before the appearance is applied, because applying it can redraw rows.
+The time column now widens to its translated header ("DURACIÓN"), and the
+sidebar is two columns wider for "File d'attente".

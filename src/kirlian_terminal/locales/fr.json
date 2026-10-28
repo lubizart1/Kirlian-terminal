@@ -99,9 +99,7 @@
   "Notes off. Keys are kept.": "Notes désactivées. Les clés sont conservées.",
   "Color is disabled by NO_COLOR; the palette will display in grayscale.": "La couleur est désactivée par NO_COLOR ; la palette s'affichera en niveaux de gris.",
   "The ribbon moves during playback; it stays still while paused or stopped.": "Le ruban bouge pendant la lecture ; il reste immobile en pause ou à l'arrêt.",
-  "The interface language changes the next time you open Kirlian. Song notes switch then too.": "La langue de l'interface changera à la prochaine ouverture de Kirlian. Les notes de morceaux aussi.",
   "Could not save. Your preview is here; retry or Cancel.": "Enregistrement impossible. Votre aperçu est conservé ; réessayez ou choisissez Annuler.",
-  "Language saved. It applies the next time you open Kirlian.": "Langue enregistrée. Elle s'appliquera à la prochaine ouverture de Kirlian.",
   "Motion on.": "Mouvement activé.",
   "Motion off. Press v to enable.": "Mouvement désactivé. Appuyez sur v pour l'activer.",
   "No saved animations yet. Press s to keep the current one.": "Aucune animation gardée pour l'instant. Appuyez sur s pour garder l'actuelle.",
@@ -282,5 +280,7 @@
   "mpv could not start. Check your mpv installation.": "mpv n'a pas pu démarrer. Vérifiez votre installation de mpv.",
   "Cannot play this file: {reason}": "Impossible de lire ce fichier : {reason}",
   "The playback connection closed.": "La connexion de lecture s'est fermée.",
-  "unsupported or unreadable": "non pris en charge ou illisible"
+  "unsupported or unreadable": "non pris en charge ou illisible",
+  "The interface and song notes switch to this language when you save.": "L'interface et les notes de morceaux passent dans cette langue à l'enregistrement.",
+  "Language changed. Your music kept playing.": "Langue modifiée. Votre musique a continué de jouer."
 }

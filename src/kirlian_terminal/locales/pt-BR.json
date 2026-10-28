@@ -99,9 +99,7 @@
   "Notes off. Keys are kept.": "Notas desativadas. As chaves foram mantidas.",
   "Color is disabled by NO_COLOR; the palette will display in grayscale.": "As cores estão desativadas por NO_COLOR; a paleta aparecerá em tons de cinza.",
   "The ribbon moves during playback; it stays still while paused or stopped.": "A fita se move durante a reprodução e fica imóvel quando pausada ou parada.",
-  "The interface language changes the next time you open Kirlian. Song notes switch then too.": "O idioma da interface muda na próxima vez que você abrir o Kirlian. As notas das músicas mudam junto.",
   "Could not save. Your preview is here; retry or Cancel.": "Não foi possível salvar. Sua prévia continua aqui; tente de novo ou use Cancelar.",
-  "Language saved. It applies the next time you open Kirlian.": "Idioma salvo. Vale a partir da próxima vez que você abrir o Kirlian.",
   "Motion on.": "Movimento ativado.",
   "Motion off. Press v to enable.": "Movimento desativado. Pressione v para ativar.",
   "No saved animations yet. Press s to keep the current one.": "Nenhuma animação salva ainda. Pressione s para guardar a atual.",
@@ -282,5 +280,7 @@
   "Cannot play this file: {reason}": "Não é possível tocar este arquivo: {reason}",
   "The playback connection closed.": "A conexão de reprodução foi encerrada.",
   "unsupported or unreadable": "sem suporte ou ilegível",
-  "i song notes settings · [ ] more notes · o open the note's source": "i configura as notas · [ ] mais notas · o abre a fonte da nota"
+  "i song notes settings · [ ] more notes · o open the note's source": "i configura as notas · [ ] mais notas · o abre a fonte da nota",
+  "The interface and song notes switch to this language when you save.": "A interface e as notas das músicas mudam para este idioma quando você salvar.",
+  "Language changed. Your music kept playing.": "Idioma alterado. Sua música continuou tocando."
 }

@@ -4,7 +4,7 @@ Screen { background: $k-surface; color: $k-ink; text-style: none; }
 #brand { width: auto; height: 1; margin-right: 2; }
 #search-hint { width: 1fr; height: 1; color: $k-quiet; text-align: right; }
 #body { height: 1fr; }
-#navigation { width: 16; border-right: solid $k-edge; padding: 1 1 0 1; }
+#navigation { width: 18; border-right: solid $k-edge; padding: 1 1 0 1; }
 #nav-heading { height: 2; color: $k-quiet; }
 #nav { height: 1fr; border: none; background: $k-surface; padding: 0; }
 #browser { width: 1fr; padding: 1 2 0 2; }

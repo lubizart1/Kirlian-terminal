@@ -902,3 +902,19 @@ change that applies only after relaunch (Japanese), and per-language notes
 prompt and cache keys. The wheel contains all eight catalogs. Headless renders of
 Japanese and German at 120 × 40 showed the main screen, fact card, and settings
 fitting; CJK width and font fallback in a real terminal are unverified.
+
+## 2026-10-28: live language switch
+
+Owner report: the language did not change after saving. The saved setting was
+`fr` and a relaunch showed French, so the cause was the deferred apply, not the
+catalogs. Saving now switches immediately (see architecture). Also fixed in the
+same pass: the French "File d'attente" wrapped in the sidebar, and translated
+time headers were cut off ("DURACI").
+
+Checks: full `pytest` — 162 passed. The language test now opens an album, selects
+the second song, switches Spanish to Japanese with Ctrl+S, and checks the sidebar
+is Japanese, the album view and selection are kept, the status confirms, and no
+playback command was sent. A headless run against a copy of the owner's library
+(French, a song "playing" at 0:30 with a block cover) switched to Spanish with the
+cover, progress, and player line intact. Not checked: the switch in a real
+terminal with native images and live mpv.

@@ -99,9 +99,7 @@
   "Notes off. Keys are kept.": "Note disattivate. Le chiavi restano salvate.",
   "Color is disabled by NO_COLOR; the palette will display in grayscale.": "Colore disattivato da NO_COLOR; la palette verrà mostrata in scala di grigi.",
   "The ribbon moves during playback; it stays still while paused or stopped.": "Il nastro si muove durante la riproduzione; resta immobile in pausa o da fermo.",
-  "The interface language changes the next time you open Kirlian. Song notes switch then too.": "La lingua dell'interfaccia cambierà alla prossima apertura di Kirlian. Anche le note sui brani cambieranno allora.",
   "Could not save. Your preview is here; retry or Cancel.": "Impossibile salvare. L'anteprima resta qui; riprova o Annulla.",
-  "Language saved. It applies the next time you open Kirlian.": "Lingua salvata. Verrà applicata alla prossima apertura di Kirlian.",
   "Motion on.": "Movimento attivato.",
   "Motion off. Press v to enable.": "Movimento disattivato. Premi v per attivarlo.",
   "No saved animations yet. Press s to keep the current one.": "Ancora nessuna animazione salvata. Premi s per conservare quella attuale.",
@@ -282,5 +280,7 @@
   "Deeper reading of sources; costs more": "Legge le fonti più a fondo; costa di più",
   "Balanced: good stories and readings at moderate cost": "Equilibrato: buone storie e interpretazioni a costo moderato",
   "Fastest and cheapest; plainer notes": "Il più veloce ed economico; note più semplici",
-  "Most thorough; slowest and most expensive": "Il più accurato; il più lento e costoso"
+  "Most thorough; slowest and most expensive": "Il più accurato; il più lento e costoso",
+  "The interface and song notes switch to this language when you save.": "L'interfaccia e le note sui brani passano a questa lingua quando salvi.",
+  "Language changed. Your music kept playing.": "Lingua cambiata. La musica ha continuato a suonare."
 }

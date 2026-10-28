@@ -303,8 +303,8 @@ retains its height when hidden. Patterns are generated locally without model cal
 The interface is available in English, Español, Français, Deutsch, Italiano,
 Português (Brasil), 日本語, 한국어, and 简体中文. By default it follows your system
 locale (`LC_ALL`, `LC_MESSAGES`, or `LANG`); other locales, including Traditional
-Chinese, use English. Choose a language under `p` › **Language**; it applies the next
-time you open Kirlian. Song notes are requested in the same language, with titles,
+Chinese, use English. Choose a language under `p` › **Language** and save: the screen
+switches right away, and the music, queue, and open album stay as they were. Song notes are requested in the same language, with titles,
 names, and quoted lyrics kept in the original. Album, artist, and song names always
 appear exactly as tagged. Key names (`enter`, `space`, `esc`) stay in English, as do
 the command-line options and `--check-facts` output.

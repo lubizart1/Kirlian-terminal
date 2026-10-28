@@ -774,6 +774,11 @@ class KirlianApp(App):
             yield Static(_("vol {percent}%", percent=50), id="volume")
 
     def on_mount(self) -> None:
+        self.prepare_screen()
+        self.boot()
+
+    def prepare_screen(self) -> None:
+        """Initial widget state; also used after rebuilding the screen in a new language."""
         self.query_one("#search").display = False
         self.query_one("#personalization").display = False
         self.query_one("#status").display = False
@@ -781,16 +786,40 @@ class KirlianApp(App):
         if self.artwork_mode == "off":
             self.query_one(CoverImage).display = False
             self.query_one("#cover-placeholder").display = False
-        self.apply_appearance()
+        # Columns first: applying the appearance can redraw rows into this table.
         table = self.query_one(DataTable)
         table.add_column(_("Record / song"), key="title", width=28)
         table.add_column(_("Artist / detail"), key="detail", width=18)
         table.add_column(_("Time"), key="time", width=6)
+        self.apply_appearance()
         self.query_one("#nav", OptionList).highlighted = 0
         table.focus()
         self.update_footer()
         self.on_resize()
-        self.boot()
+
+    async def apply_language(self) -> None:
+        """Rebuild the screen in the saved language, keeping playback and the open view.
+
+        Widgets hold text composed in the old language, so they are recomposed; the
+        player, queue, library, and view state live on the app and are redrawn.
+        """
+        position = self.query_one(DataTable).cursor_row
+        set_language(resolve(self.appearance.language))
+        self.personalizing = False
+        self.cover_key = None
+        self.palette_key = None
+        self.last_player_key = None
+        self._column_layout = None
+        await self.recompose()
+        self.prepare_screen()
+        sections = ("albums", "artists", "songs", "playlists", "queue")
+        section = {"album": "albums", "artist": "artists", "playlist": "playlists"}.get(
+            self.view, self.view
+        )
+        self.query_one("#nav", OptionList).highlighted = sections.index(section)
+        self.render_rows(position)
+        self.on_player_update(PlayerUpdate(getattr(self, "display_state", self.player.state)))
+        self.facts_settings_closed()  # Ask for the playing song's notes in the new language.
 
     @work
     async def boot(self) -> None:
@@ -858,14 +887,18 @@ class KirlianApp(App):
         if not self.is_running or not self.query("#tracks"):
             return
         table = self.query_one(DataTable)
+        # Room for the translated time header, e.g. "DURACIÓN"; at least "12:34".
+        time_label = Text(_("TIME"), justify="right")
+        time_width = max(6, time_label.cell_len)
         # Reserve padding, the time column, and a vertical scrollbar at 80 columns.
-        available = max(16, table.size.width - 14)
+        available = max(16, table.size.width - 8 - time_width)
         if table.columns:
             key = (available, self.view, self.searching)
             if key == getattr(self, "_column_layout", None):
                 return
             self._column_layout = key
             in_album = self.view == "album" and not self.searching
+            table.columns["time"].width = time_width
             table.columns["title"].width = 6 if in_album else int(available * 0.65)
             table.columns["detail"].width = available - table.columns["title"].width
             title = (
@@ -891,7 +924,7 @@ class KirlianApp(App):
                 if self.view == "playlists"
                 else _("ARTIST")
             )
-            table.columns["time"].label = Text(_("TIME"), justify="right")
+            table.columns["time"].label = time_label
             table.refresh_columns()
 
     def status(self, message: str) -> None:
@@ -2054,12 +2087,7 @@ class KirlianApp(App):
                 _("The ribbon moves during playback; it stays still while paused or stopped.")
             )
         if self.language_pending():
-            notes.append(
-                _(
-                    "The interface language changes the next time you open Kirlian. "
-                    "Song notes switch then too."
-                )
-            )
+            notes.append(_("The interface and song notes switch to this language when you save."))
         context = self.query_one("#appearance-context", Static)
         content = "\n".join(notes)
         if context.content != content:
@@ -2141,17 +2169,20 @@ class KirlianApp(App):
             self.update_appearance_feedback()
             self.query_one("#appearance-keep", Button).focus()
         else:
-            self.close_personalization(True)
+            changed = self.language_pending()
+            if changed:
+                await self.apply_language()
+            self.close_personalization(True, language_changed=changed)
 
-    def close_personalization(self, saved: bool) -> None:
+    def close_personalization(self, saved: bool, language_changed: bool = False) -> None:
         self.personalizing = False
         self.apply_appearance()
         self.query_one("#personalization").display = False
         self.query_one("#body").display = True
         self.query_one(DataTable).focus()
         self.update_footer()
-        if saved and self.language_pending():
-            self.status(_("Language saved. It applies the next time you open Kirlian."))
+        if language_changed:
+            self.status(_("Language changed. Your music kept playing."))
         elif saved:
             self.status(_("Appearance saved for next time."))
         else:
