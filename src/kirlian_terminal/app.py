@@ -29,7 +29,7 @@ from textual.widgets import Button, DataTable, Input, Label, OptionList, Select,
 from .animations import Variation
 from .appearance import INK, OPTIONS, PALETTES, QUIET, Appearance, themes
 from .artwork import load_artwork
-from .brand import Brand
+from .brand import ASCII_SPARK, SPARK, Brand
 from .cover import CoverImage, RecordPane
 from .facts import (
     PROVIDERS,
@@ -655,7 +655,7 @@ class KirlianApp(App):
 
     def compose(self) -> ComposeResult:
         with Horizontal(id="masthead"):
-            yield Brand(self.appearance.logo, id="brand")
+            yield Brand(id="brand")
             yield Static("", id="search-hint")
         yield Input(placeholder="Search songs, albums, artists…", id="search")
         with Horizontal(id="body"):
@@ -677,7 +677,7 @@ class KirlianApp(App):
                 with Vertical(id="fact-card"):
                     with Horizontal(id="fact-heading"):
                         yield Static("BEHIND THE RECORD", id="fact-label")
-                        yield Static("✳", id="fact-spark")
+                        yield Static(SPARK, id="fact-spark")
                     yield Static("", id="fact-text")
                     yield TitleRhythm(id="fact-pulse")
                     yield Static("", id="fact-source")
@@ -689,7 +689,6 @@ class KirlianApp(App):
                     ("palette", "Interface palette"),
                     ("motion", "Motion"),
                     ("characters", "Characters"),
-                    ("logo", "Header"),
                 ):
                     with Horizontal(classes="preference-row"):
                         yield Label(label)
@@ -799,12 +798,9 @@ class KirlianApp(App):
             size = event.size if event else self.size
             width = size.width
             self.query_one("#body").screen.set_class(size.height < 30, "compact")
-            self.query_one(Brand).configure(
-                self.appearance.logo, size.height < 30, self.appearance.characters == "ascii"
-            )
             self.query_one("#context").display = width >= 110
             if self.personalizing:
-                self.update_appearance_feedback(height=size.height)
+                self.update_appearance_feedback()
             self.call_after_refresh(self.size_columns)
             self.call_after_refresh(self.update_context)
 
@@ -1859,12 +1855,9 @@ class KirlianApp(App):
         progress.accent = self.appearance.accent
         progress.ascii = self.appearance.characters == "ascii"
         progress.refresh()
-        self.query_one(Brand).configure(
-            self.appearance.logo, self.size.height < 30, self.appearance.characters == "ascii"
-        )
-        self.query_one("#fact-spark", Static).update(
-            "*" if self.appearance.characters == "ascii" else "✳"
-        )
+        ascii = self.appearance.characters == "ascii"
+        self.query_one(Brand).configure(ascii)
+        self.query_one("#fact-spark", Static).update(ASCII_SPARK if ascii else SPARK)
         if self.is_running:
             self.on_player_update(PlayerUpdate(getattr(self, "display_state", self.player.state)))
 
@@ -1887,7 +1880,7 @@ class KirlianApp(App):
             **{name: self.query_one(f"#pref-{name}", Select).value for name in OPTIONS}
         )
 
-    def update_appearance_feedback(self, height: int | None = None) -> None:
+    def update_appearance_feedback(self) -> None:
         accent, selected = PALETTES[self.appearance.palette]
         preview = Text.assemble(
             (f" {self.appearance.palette.title()} ", f"{INK} on {selected}"),
@@ -1903,8 +1896,6 @@ class KirlianApp(App):
             notes.append(
                 "The ribbon moves during playback; it stays still while paused or stopped."
             )
-        if (self.size.height if height is None else height) < 30 and self.appearance.logo == "auto":
-            notes.append("This window uses the small header. The drawn logo needs 30 rows.")
         context = self.query_one("#appearance-context", Static)
         content = "\n".join(notes)
         if context.content != content:

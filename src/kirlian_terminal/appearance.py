@@ -23,7 +23,6 @@ OPTIONS = {
     "palette": [("Aubergine", "aubergine"), ("Sage", "sage"), ("Amber", "amber")],
     "motion": [("Gentle", "gentle"), ("Still", "still"), ("Off", "off")],
     "characters": [("Fine dots", "dots"), ("Plain ASCII", "ascii")],
-    "logo": [("Drawn wordmark", "auto"), ("Simple wordmark", "text")],
 }
 
 
@@ -32,7 +31,6 @@ class Appearance:
     palette: str = "aubergine"
     motion: str = "gentle"
     characters: str = "dots"
-    logo: str = "auto"
 
     @property
     def accent(self) -> str:

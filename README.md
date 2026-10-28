@@ -223,11 +223,9 @@ switching to blocks or quitting releases the native images. Nothing is written
 to your music folder. See the [performance checks](docs/development.md#2026-10-13-cover-latency-and-interface-responsiveness)
 for measured results and their limits.
 
-The header is drawn entirely with terminal characters: an open sunburst and
-lowercase dotted lettering, using the same Braille grid as the filament. It needs
-no image support or custom font. Plain ASCII pairs a punctuation emblem with
-ordinary lettering; short windows use a one-line mark. Choose Drawn or Simple
-wordmark under `p`.
+The header is one line of ordinary terminal type: a spark (`✺`) and **kirlian**
+in bold, matching the album-view mock. It needs no image support or custom font
+and looks the same at every window size. Plain ASCII uses `*`.
 
 Owner-provided screenshots confirm sharp covers in the standalone Ghostty app
 and block covers in Herdr. After the Herdr setup work, the owner reports success
@@ -302,7 +300,7 @@ retains its height when hidden. Patterns are generated locally without model cal
 ## Make it yours
 
 Press `p` to preview aubergine, sage, or amber for the interface; gentle, still, or no motion; fine
-dots or plain ASCII; and the drawn or simple character wordmark. The current
+dots or plain ASCII for the ribbon and header. The current
 song and queue keep playing. **Save changes** or `Ctrl+S` saves locally; **Cancel**
 or Escape restores the previous appearance. **Reset** previews the defaults without
 saving them. The screen labels unsaved previews and confirms a successful save.

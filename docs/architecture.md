@@ -551,3 +551,19 @@ providers without a model choice, no `d` without a saved key). The model column
 is "Writes notes with". The model picker is a list of suggested models, each with
 what to expect, plus "Another model…" for a typed name; it states that the model
 affects song notes only. Choosing the default removes the override.
+
+## 2026-10-28: type mark replaces the drawn wordmark
+
+The owner found the header wonky: two rows of Braille dots tracing a serif
+wordmark read as noisy at that size. Choosing between the real wordmark image
+(sharp only with terminal graphics, earlier blank in some hosts, and needing
+font/brand rights confirmed) and a type mark, the owner chose the type mark from
+the album-view mock: `✺  kirlian`, glyph in ink and name in bold ink, one line at
+every size. `✺` (U+273A) replaces `✳` (U+2733) here and on the fact card because
+U+2733 has an emoji form that macOS can substitute with a color emoji when the
+terminal font lacks it. ASCII characters use `*`.
+
+The drawn Braille letter paths, the Drawn/Simple "Header" preference, the
+"needs 30 rows" note, and the two-row masthead are removed; the masthead is three
+rows (two in compact layouts). An `appearance` value saved with the old `logo`
+key is ignored on load, since unknown keys were already dropped.

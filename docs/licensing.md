@@ -62,8 +62,9 @@ are not covered by the code license. Do not commit test collections or their
 artwork; local verification screenshots are ignored for the same reason. Facts
 text returned by a provider belongs to its sources and is shown with attribution.
 
-The header is drawn from original character strokes; no font binary or
-font-derived graphic is distributed. The Kirlian name and brand identity are
+The header is a Unicode spark and the name set in the listener's terminal font;
+no font binary or font-derived graphic is distributed. The serif wordmark image
+(Canela-derived) is not part of the repository. The Kirlian name and brand identity are
 separate from the code license: the GPL grants rights to the code, not to the
 name.
 

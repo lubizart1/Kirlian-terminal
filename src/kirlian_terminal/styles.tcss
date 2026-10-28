@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 Screen { background: $k-surface; color: $k-ink; text-style: none; }
-#masthead { height: 4; border-bottom: solid $k-edge; padding: 1 2 0 2; align-vertical: middle; }
-#brand { width: 24; }
+#masthead { height: 3; border-bottom: solid $k-edge; padding: 1 2 0 2; }
+#brand { width: auto; height: 1; margin-right: 2; }
 #search-hint { width: 1fr; height: 1; color: $k-quiet; text-align: right; }
 #body { height: 1fr; }
 #navigation { width: 16; border-right: solid $k-edge; padding: 1 1 0 1; }
@@ -83,7 +83,6 @@ Select:focus > SelectCurrent { border: tall $k-accent; }
 #appearance-buttons { height: 3; }
 #appearance-buttons Button { margin-right: 1; min-width: 12; }
 Screen.compact #masthead { height: 2; padding: 0 2; }
-Screen.compact #brand { height: 1; width: 20; }
 Screen.compact #navigation, Screen.compact #browser { padding-top: 0; }
 Screen.compact #breadcrumb { margin-bottom: 0; }
 Screen.compact #collection-header, Screen.compact #footer { height: 1; }

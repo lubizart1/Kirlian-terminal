@@ -865,3 +865,14 @@ selection moved, place OpenAI first with `1`, pick Haiku from the list and then
 the default again (override removed), turn notes off, and reload the saved order.
 Headless renders at 120 × 42 checked the table, detail line, and model list.
 Not checked in a real terminal.
+
+## 2026-10-28: header type mark
+
+Replaced the drawn Braille wordmark with a one-line type mark (`✺  kirlian`) and
+removed the Header preference (see architecture). Checks: `ruff`, full `pytest` —
+131 passed. Brand tests now check the mark is one line and stays clear of the
+search hint at 120 × 36, 80 × 24, and 160 × 48 for native, block, and no artwork;
+ASCII characters give `*  kirlian` and an ASCII fact spark; and an appearance
+saved with the old `logo` key loads without it. A headless 120 × 30 render showed
+the mark centered in the shorter masthead. Glyph rendering in the owner's
+terminal font is not yet checked.

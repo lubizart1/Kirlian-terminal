@@ -105,7 +105,7 @@ async def test_keyboard_preview_save_reopen_and_reset_cancel(
     library, _ = populated(tmp_path, audio_factory)
     player = FakePlayer()
     app = KirlianApp(library, player=player, artwork="off")
-    expected = Appearance(palette="sage", motion="still", characters="ascii", logo="text")
+    expected = Appearance(palette="sage", motion="still", characters="ascii")
     async with app.run_test(size=size) as pilot:
         await pilot.press("p", "enter", "down", "enter")
         await pilot.pause()
@@ -117,9 +117,7 @@ async def test_keyboard_preview_save_reopen_and_reset_cancel(
         palette = app.query_one("#pref-palette")
         assert palette.region.y >= fields.region.y
         assert palette.region.bottom <= fields.region.bottom
-        if size[1] < 30:
-            assert "30 rows" in str(app.query_one("#appearance-context", Static).content)
-        for _ in range(3):
+        for _ in range(2):
             await pilot.press("tab", "enter", "down", "enter")
         await pilot.press("ctrl+s")
         await pilot.pause()
@@ -205,6 +203,3 @@ async def test_color_disabled_and_paused_motion_are_explained(tmp_path, audio_fa
         context = str(app.query_one("#appearance-context", Static).content)
         assert "NO_COLOR" in context
         assert "stays still" in context
-        assert "30 rows" in context
-        await pilot.resize_terminal(120, 36)
-        assert "30 rows" not in str(app.query_one("#appearance-context", Static).content)

@@ -48,6 +48,9 @@ Both the sunburst and lowercase lettering are now hand-drawn as two rows of
 Braille characters. The open center and radiating strokes echo the supplied mark;
 the dotted line weight relates to the filament. No rasterized font or image is
 used. Plain ASCII uses a punctuation emblem with monospace lettering; short windows use one line.
+*(Superseded 2026-10-28: the owner found the two-row Braille lettering wonky. The
+header is now a spark glyph and bold "kirlian" in the terminal's own type, as in
+the album-view mock; see architecture.)*
 Drawn and Simple options preview in the existing appearance panel. The header
 stays still and works independently of cover display or graphics support.
 
@@ -63,7 +66,6 @@ Implemented appearance controls:
 - Motion: gentle, still, or off. Pause freezes motion; stopped playback does not
   show a pause indicator. Respect reduced-motion preferences where available.
 - Character drawing: fine dots or plain ASCII.
-- Wordmark: drawn or simple, using the selected character style.
 - Keep a liked pattern; preserve the existing seed-based behavior.
 
 Changes should preview immediately and preserve playback, queue, and selection.
