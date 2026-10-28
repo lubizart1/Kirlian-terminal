@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Command-line entry point with readable prerequisite failures."""
 
 import argparse
@@ -15,7 +16,12 @@ from .library import Library
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Kirlian Terminal — local, album-first listening")
-    parser.add_argument("--version", action="version", version=__version__)
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"kirlian-terminal {__version__}\nLicense: GPL-3.0-or-later. "
+        "This is free software; there is NO WARRANTY.",
+    )
     parser.add_argument("--music", type=Path, help="Music folder to index on launch")
     parser.add_argument("--data-dir", type=Path, help="Override application data directory")
     parser.add_argument(
@@ -34,14 +40,45 @@ def main() -> None:
         type=Path,
         help="Save --check-artwork results as local JSON at this path",
     )
+    facts = parser.add_argument_group("song facts check")
+    facts.add_argument(
+        "--check-facts",
+        nargs="?",
+        const="",
+        metavar="PROVIDER",
+        help="Make one live song-facts request and show what passes the source check. "
+        "PROVIDER is exa, openai, anthropic, perplexity, parallel, or all (keys found); "
+        "default: the provider chosen in the player",
+    )
+    facts.add_argument("--artist", default="John Cale", help="Artist for --check-facts")
+    facts.add_argument("--title", default="Paris 1919", help="Song title for --check-facts")
+    facts.add_argument("--album", default="Paris 1919", help="Album for --check-facts")
+    facts.add_argument("--year", default="1973", help="Year for --check-facts")
+    facts.add_argument(
+        "--facts-report", type=Path, help="Save --check-facts responses as local JSON"
+    )
     args = parser.parse_args()
     if args.artwork_report and not args.check_artwork:
         parser.error("--artwork-report requires --check-artwork")
+    if args.facts_report and args.check_facts is None:
+        parser.error("--facts-report requires --check-facts")
     if args.check_artwork:
         from .artwork_check import run_artwork_check
 
         run_artwork_check(args.artwork_report)
         return
+    data = args.data_dir or user_data_path("kirlian-terminal", appauthor=False)
+    if args.check_facts is not None:
+        from .facts_check import run_facts_check
+
+        configured = None
+        database = data.expanduser() / "library.sqlite3"
+        if database.exists():
+            configured = Library(database).setting("facts_provider")
+        song = (args.artist, args.title, args.album, args.year)
+        raise SystemExit(
+            run_facts_check(args.check_facts or None, configured, song, args.facts_report)
+        )
     if not shutil.which("mpv"):
         print(
             "Kirlian needs mpv for audio playback.\n"
@@ -52,7 +89,7 @@ def main() -> None:
             file=sys.stderr,
         )
         raise SystemExit(1)
-    data = args.data_dir or user_data_path("kirlian-terminal", appauthor=False)
+
     try:
         library = Library(data.expanduser() / "library.sqlite3")
     except (OSError, sqlite3.Error) as error:

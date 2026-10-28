@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 import pytest
 from test_app import FakePlayer, populated
 from textual.widgets import Select

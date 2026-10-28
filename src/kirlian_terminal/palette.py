@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Small, deterministic color studies from local album artwork."""
 
 from __future__ import annotations

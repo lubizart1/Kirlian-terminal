@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 from kirlian_terminal.library import Library
 from kirlian_terminal.playlists import Playlists
 

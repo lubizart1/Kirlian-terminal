@@ -95,7 +95,8 @@ final run does not erase what was learned during implementation.
 
 ## Review boundary and open checks
 
-- The owner must select a repository license before public release.
+- The owner must select a repository license before public release. *(Resolved
+  2026-10-26: GPL-3.0-or-later.)*
 - The referenced visual mockup was absent at this checkpoint; supplied in the refinement below.
 - A complete real-album listening pass, including audible gap checks, remains
   required. The supplied collection contains partial albums, so indexing it does
@@ -125,10 +126,10 @@ columns retaining their previous widths after resize. The compact layout and
 Table resize handler address those issues. This review does not establish native
 terminal graphics compatibility or human preference for the animation designs.
 
-Licensing remains pending. The owner confirmed MIT as the intended direction; the GPL metadata
-dependency and the new image dependency's LGPL terms are documented in
-`licensing.md`. No replacement, license selection, publication, or commit was made
-as part of this visual refinement.
+Licensing was pending at this point, with MIT as the intended direction. *(Superseded
+2026-10-26: the project is GPL-3.0-or-later and keeps Mutagen; see `licensing.md`.)*
+No replacement, license selection, publication, or commit was made as part of
+this visual refinement.
 
 Additional findings during verification:
 
@@ -144,11 +145,12 @@ Additional findings during verification:
 - Cover sizing preserves image proportions, rather than stretching to fill the
   available rectangle. The selected-track detail hides in shorter layouts.
 
-The owner confirmed MIT as the intended direction. An isolated, read-only TinyTag
-2.3.2 comparison read all 65 local tracks and matched the current normalized
-metadata fields and all 62 embedded covers byte-for-byte. Maximum duration delta
-was about 0.073 seconds. This sample covers MP3/M4A only. Runtime dependencies are
-unchanged by that investigation; remaining replacement checks are in `licensing.md`.
+With MIT then the intended direction, an isolated, read-only TinyTag 2.3.2
+comparison read all 65 local tracks and matched the current normalized metadata
+fields and all 62 embedded covers byte-for-byte. Maximum duration delta was about
+0.073 seconds; the sample covered MP3/M4A only. Runtime dependencies were
+unchanged. *(Superseded 2026-10-26: Mutagen is kept under GPL; no replacement is
+planned.)*
 
 ### Refinement verification results
 
@@ -178,12 +180,11 @@ screenshots and music used for local checks remain outside the public package.
 ## 2026-10-13: replacement format scope clarified
 
 The owner confirmed that a metadata replacement must support all of Kirlian
-Terminal's formats. Recorded explicit acceptance requirements in `licensing.md`,
-separating complete player format coverage from Mutagen's broader editing and
-stream-manipulation features. The seven existing decoder checks and the MP3/M4A
-TinyTag comparison are partial evidence; ALAC-in-M4A and standalone raw AAC need
-explicit attention in the replacement review. This clarification changes
+Terminal's formats, and acceptance requirements were recorded, separating complete
+player format coverage from Mutagen's broader editing features. This changed
 requirements documentation only; no runtime dependency was replaced.
+*(Superseded 2026-10-26: with GPL chosen, the replacement review was closed and
+those requirements removed from `licensing.md`.)*
 
 ## 2026-10-13: blank artwork in Ghostty
 
@@ -790,3 +791,30 @@ showed the provider list and the updated hint and placeholder.
 Not verified: no live request to any provider. Default model names
 (`gpt-5.4-mini`, `claude-haiku-4-5`) were current in the providers' docs on this
 date and will need updating over time.
+
+## 2026-10-26: license surfaces, facts loading rhythm, and `--check-facts`
+
+License: removed the MIT/TinyTag replacement sections from `licensing.md` and
+rewrote it around the settled GPL-3.0-or-later decision, with a table of every
+place the license is stated. Added `SPDX-License-Identifier: GPL-3.0-or-later`
+headers to all 37 Python and TCSS source, test, and script files; `--version`
+now prints the license and no-warranty line; CONTRIBUTING states contribution
+terms; the architecture intro no longer says licensing is under review. Earlier
+dated entries here that assumed MIT are kept as history, marked superseded.
+
+Loading indicator: while a facts request is in flight, the card shows the playing
+title as a step pattern with a walking playhead (see architecture). Live check:
+`kirlian --check-facts [PROVIDER|all]` makes one real request and reports pages
+retrieved and each fact's pass/fail.
+
+Checks: `ruff check`, `ruff format --check`, `pytest` — 127 passed. New tests
+cover the title-to-rhythm mapping (syllables, digits, rests, 16-step cap, empty
+titles), the card switching from rhythm to fact with the timer stopped, and the
+live check's output and report with a fake transport (kept/dropped facts, a
+provider error body printed, the key absent from output and report). A headless
+render showed the playhead advancing across "Paris 1919". `kirlian --check-facts
+exa` without a key and with an unknown provider exited 1 and 2 with readable
+messages.
+
+Not verified: a live request to any provider (the owner is testing with a key);
+the rhythm's timing and look in a real terminal.

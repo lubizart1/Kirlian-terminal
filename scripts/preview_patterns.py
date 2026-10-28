@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Render the actual pattern catalog to a shareable SVG, without opening music.
 
 uv run python scripts/preview_patterns.py --output .local/patterns.svg

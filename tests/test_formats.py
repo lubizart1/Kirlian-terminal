@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Optional codec smoke checks: generated audio, no network or personal music."""
 
 import asyncio

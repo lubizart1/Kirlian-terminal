@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """A byte-level tmux envelope model; not a terminal renderer."""
 
 import re

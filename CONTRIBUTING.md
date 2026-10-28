@@ -17,5 +17,10 @@ credentials, local databases, or personal filesystem paths. When reporting a
 problem, include the OS, terminal, Python and mpv versions, steps, expected result,
 and actual result. Replace private metadata and paths in logs.
 
-The owner has not selected a license yet. Settle that before accepting external
-contributions or advertising the repository as open source.
+## License
+
+Kirlian Terminal is licensed under GPL-3.0-or-later (see `LICENSE`). By
+contributing, you agree that your contribution is licensed under the same terms.
+New source files start with `# SPDX-License-Identifier: GPL-3.0-or-later`
+(`/* … */` in `.tcss`). Do not add dependencies whose licenses are incompatible
+with GPL-3.0-or-later; record any new dependency in `docs/licensing.md`.

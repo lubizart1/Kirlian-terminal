@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Album browsing and playback UI. Filesystem and player work run in workers."""
 
 from __future__ import annotations
@@ -46,7 +47,7 @@ from .library import Album, Library, ScanProgress, Track, albums_from, display_t
 from .palette import extract_palette
 from .playback import PlaybackError, PlaybackState, Player
 from .playlists import Entry, Playlist, Playlists
-from .visuals import Animation, Progress
+from .visuals import Animation, Progress, TitleRhythm
 
 
 def clock(seconds: float) -> str:
@@ -381,6 +382,7 @@ class KirlianApp(App):
         self.fact_path = ""
         self.fact_revision = 0
         self.facts_asked: set[str] = set()
+        self.fact_loading = False
         self.artwork_mode = (
             artwork
             or library.setting("artwork_mode")
@@ -466,6 +468,7 @@ class KirlianApp(App):
                         yield Static("BEHIND THE RECORD", id="fact-label")
                         yield Static("✳", id="fact-spark")
                     yield Static("", id="fact-text")
+                    yield TitleRhythm(id="fact-pulse")
                     yield Static("", id="fact-source")
         with Vertical(id="personalization"):
             yield Static("Make it yours", id="appearance-heading")
@@ -1382,6 +1385,7 @@ class KirlianApp(App):
             return
         self.fact_path = path
         self.facts = []
+        self.fact_loading = False
         self.fact_index = 0
         self.fact_revision += 1
         self.update_context()
@@ -1411,12 +1415,18 @@ class KirlianApp(App):
                 self.status(f"Song facts need a {provider.name} API key. Press i to add one.")
                 return
             self.facts_asked.add(key)
+            self.fact_loading = True
+            self.update_context()
             try:
                 facts = await asyncio.to_thread(self.fetch_facts_for, provider, track, api_key)
             except FactsError as error:
                 if revision == self.fact_revision:
                     self.status(str(error))
                 return
+            finally:
+                if self.is_running and revision == self.fact_revision:
+                    self.fact_loading = False
+                    self.update_context()
             await asyncio.to_thread(self.fact_cache.put, key, facts)
         if not self.is_running or revision != self.fact_revision:
             return
@@ -1425,12 +1435,32 @@ class KirlianApp(App):
         self.update_context()
 
     def update_fact_card(self, album: Album | None) -> bool:
-        """Show the playing song's fact while the side panel shows its album."""
+        """Show the playing song's fact, or its title rhythm while asking for one."""
         card = self.query_one("#fact-card")
+        pulse = self.query_one(TitleRhythm)
         playing = self.by_path.get(self.fact_path)
-        show = bool(self.facts) and playing is not None
+        show = (bool(self.facts) or self.fact_loading) and playing is not None
         show = show and (album is None or album.id == playing.album_id)
-        if show:
+        loading = show and not self.facts
+        if loading:
+            self.query_one("#fact-text", Static).update(
+                Text.assemble(
+                    ("Asking ", QUIET),
+                    (self.facts_provider.name, INK),
+                    (" while the title keeps time", QUIET),
+                )
+            )
+            pulse.play(
+                playing.title,
+                self.appearance.accent,
+                self.appearance.characters == "ascii",
+                self.appearance.motion == "gentle" and self.query_one("#context").display,
+            )
+        else:
+            pulse.stop()
+        pulse.display = loading
+        self.query_one("#fact-source").display = show and not loading
+        if show and not loading:
             fact = self.facts[self.fact_index % len(self.facts)]
             self.query_one("#fact-text", Static).update(
                 Text.assemble((fact.headline, f"bold {INK}"), "\n\n", (fact.body, INK))
@@ -1480,6 +1510,8 @@ class KirlianApp(App):
         if choice == "off":
             self.facts_on = False
             self.facts = []
+            self.fact_loading = False
+            self.fact_revision += 1  # Drop any answer still on its way.
             for provider in PROVIDERS.values():
                 await asyncio.to_thread(self.credentials.forget, provider)
             await asyncio.to_thread(self.library.set_setting, "facts", "off")

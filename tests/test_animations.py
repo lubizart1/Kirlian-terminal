@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 import hashlib
 from dataclasses import replace
 
@@ -182,3 +183,14 @@ def test_ribbon_is_bounded_deterministic_and_changes_with_time(width, characters
         assert frame.isascii()
     else:
         assert all(0x2800 <= ord(c) <= 0x28FF for c in frame if c != "\n")
+
+
+def test_title_rhythm_hits_syllables_rests_between_words_and_stays_bounded():
+    from kirlian_terminal.visuals import ACCENT, REST, WEAK, rhythm
+
+    # Pa-ris: accent + weak; each digit of 1919 is its own hit.
+    assert rhythm("Paris 1919") == [ACCENT, WEAK, REST, ACCENT, WEAK, WEAK, WEAK, REST]
+    # Vowel groups count once; a vowel-less word still lands one hit.
+    assert rhythm("Queen's Rhythm") == [ACCENT, REST, ACCENT, REST]
+    assert len(rhythm("a " * 40)) == 16
+    assert rhythm("") == rhythm("—") == [ACCENT, REST, WEAK, REST]

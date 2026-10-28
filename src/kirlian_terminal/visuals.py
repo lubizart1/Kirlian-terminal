@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """A continuous filament and a separate, truthful playback progress line."""
 
 from __future__ import annotations
@@ -130,3 +131,93 @@ class Progress(Static):
             ("o" if self.ascii else "●", self.accent),
             (("-" if self.ascii else "─") * (width - filled - 1), "#49424c"),
         )
+
+
+VOWELS = set("aeiouyàáâäãåæèéêëìíîïòóôöõøùúûüýÿœ")
+REST, WEAK, ACCENT = 0, 1, 2
+RHYTHM_STEPS = 16
+RHYTHM_STEP_SECONDS = 0.15
+
+
+def rhythm(title: str) -> list[int]:
+    """Turn a song title into a step pattern: one hit per syllable, a rest per word gap.
+
+    Syllables are approximated by vowel groups; the first syllable of each word is
+    accented, and every digit is its own hit. The pattern loops, capped at 16 steps.
+    """
+    steps: list[int] = []
+    for word in title.casefold().split():
+        hits = 0
+        previous_vowel = False
+        for char in word:
+            if char.isdigit():
+                hits += 1
+                previous_vowel = False
+            elif char.isalpha():
+                vowel = char in VOWELS
+                hits += vowel and not previous_vowel
+                previous_vowel = vowel
+        if any(c.isalnum() for c in word):
+            hits = max(1, hits)
+            steps += [ACCENT] + [WEAK] * (hits - 1) + [REST]
+    return steps[:RHYTHM_STEPS] or [ACCENT, REST, WEAK, REST]
+
+
+class TitleRhythm(Static):
+    """Loading indicator: the playing title, read as a drum pattern with a walking playhead."""
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.steps: list[int] = []
+        self.position = 0
+        self.timer: Timer | None = None
+        self.accent = INK
+        self.ascii = False
+        self.key: tuple = ()
+
+    def play(self, title: str, accent: str, ascii: bool, moving: bool) -> None:
+        key = (title, accent, ascii, moving)
+        if key == self.key:
+            return
+        if not self.key or self.key[0] != title:
+            self.steps = rhythm(title)
+            self.position = 0
+        self.key = key
+        self.accent, self.ascii = accent, ascii
+        if moving and self.timer is None:
+            self.timer = self.set_interval(RHYTHM_STEP_SECONDS, self.advance)
+        elif not moving:
+            self.stop_timer()
+        self.draw()
+
+    def stop(self) -> None:
+        self.stop_timer()
+        self.key = ()
+
+    def stop_timer(self) -> None:
+        if self.timer is not None:
+            self.timer.stop()
+            self.timer = None
+
+    def advance(self) -> None:
+        self.position = (self.position + 1) % len(self.steps)
+        self.draw()
+
+    def draw(self) -> None:
+        marks = (".", "x", "X") if self.ascii else ("·", "•", "●")
+        moving = self.timer is not None
+        text = Text()
+        for index, step in enumerate(self.steps):
+            if index:
+                text.append(" ")
+            if moving and index == self.position:
+                style = f"bold {self.accent}"
+            elif moving and index == (self.position - 1) % len(self.steps) and step:
+                style = INK  # The last hit lingers for one step.
+            else:
+                style = "#6f6772" if step == REST else "#a29a9f"
+            text.append(marks[step], style)
+        self.update(text, layout=False)
+
+    def on_unmount(self) -> None:
+        self.stop_timer()

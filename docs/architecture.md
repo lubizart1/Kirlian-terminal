@@ -3,8 +3,9 @@
 ## 2026-10-13: an independent local application
 
 The supplied handoff selects Python 3.12+, Textual, mpv JSON IPC, Mutagen, SQLite,
-platformdirs, and uv. Keep these choices unless a documented owner decision changes them; licensing of
-the metadata dependency is now under review. The application does not import or call
+platformdirs, and uv. Keep these choices unless a documented owner decision changes
+them. The project is GPL-3.0-or-later, consistent with Mutagen's GPL-2.0-or-later
+license (see `licensing.md`). The application does not import or call
 the existing Kirlian backend. Playback needs neither a network connection nor a key.
 
 One owned mpv process handles the entire queue and transitions. A persistent IPC
@@ -47,6 +48,7 @@ previous browser view and position.
 | `src/kirlian_terminal/visuals.py` | Fixed-height filament widget and responsive progress line |
 | `src/kirlian_terminal/playlists.py` | Saved playlists and ordered, duplicate-preserving entries |
 | `src/kirlian_terminal/facts.py` | Song-facts providers, response readers, source matching, credentials, fact cache |
+| `src/kirlian_terminal/facts_check.py` | `--check-facts`: one live request per provider, explained |
 | `src/kirlian_terminal/app.py` | Browser views, search, onboarding, keyboard actions, worker messages |
 | `src/kirlian_terminal/styles.tcss` | Terminal layout and initial colors |
 | `tests/` | Generated audio, focus/navigation checks, and real-engine integration checks |
@@ -462,3 +464,32 @@ Keys are stored per provider (keyring user = provider id, environment variable
 per provider). Switching providers keeps the other keys; turning facts off
 removes all of them. Cached facts are keyed by song, not provider, so switching
 does not pay for songs already answered.
+
+## 2026-10-26: title rhythm as the facts loading state
+
+The owner asked for a loading indicator that is not a shimmer, spinner, or
+"thinking" text, prompted by the Oblique Strategy "convert a melodic element into
+a rhythmic element". The melodic element is the playing song's title: `rhythm()`
+in `visuals.py` reads it as a step pattern (vowel groups approximate syllables;
+first syllable of each word accented; each digit a hit; a rest between words;
+at most 16 steps), and `TitleRhythm` walks a playhead across it every 0.15 s, with
+the previous hit lingering one step. It uses the interface accent and the
+existing character choice (`● • ·` or `X x .`).
+
+It appears only while a provider request is in flight (not during the two-second
+skip delay or for cached songs), in place of the fact text and source line. The
+timer exists only in that state: it is not started under Still/Off motion or when
+the side pane is hidden, and it stops when the answer or an error arrives, the
+song changes, or facts are turned off. Turning facts off now also advances the
+fact revision, so an answer still in flight is discarded.
+
+## 2026-10-26: `--check-facts`
+
+Provider response shapes are the untested part of song facts, so a live check
+mirrors `--check-artwork`: it runs before mpv and the UI, makes one request with
+the saved/exported key (or one typed with `getpass`, never stored), and reports
+timing, retrieved pages, and per-fact pass/fail against the same source check
+the player uses. `fetch_payload()` was split from `request_facts()` for this;
+`FactsError.detail` carries the provider's own error body (clipped, controls
+stripped) for the check, while the player still shows only the short message.
+The optional JSON report stores the provider response but never the key.

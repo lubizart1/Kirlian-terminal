@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 import threading
 from pathlib import Path
 
@@ -367,8 +368,14 @@ async def test_facts_follow_the_playing_song_and_discard_late_answers(
             await pilot.press("enter")
             play(paths[0], 1)
             await wait_for(pilot, lambda: asked == ["Song 2"])
+            # While Song 2's request is open, the card keeps time with its title.
+            await wait_for(pilot, lambda: app.query_one("#fact-pulse").display)
+            assert "Asking Exa" in card_text()
+            assert not app.query_one("#fact-source").display
             play(paths[1], 2)
             await wait_for(pilot, lambda: card_text() and "About Song 10" in card_text())
+            assert not app.query_one("#fact-pulse").display
+            assert app.query_one("#fact-pulse").timer is None
         finally:
             release_first.set()
         await wait_for(pilot, lambda: app.fact_cache.get("artist\x1falbum\x1fsong 2"))

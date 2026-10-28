@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Bounded terminal identity checks, before Textual takes ownership of input."""
 
 import os

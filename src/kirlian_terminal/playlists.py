@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Saved playlists in the application database. Entries reference files by path."""
 
 from __future__ import annotations

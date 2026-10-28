@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Read-only music discovery and application-owned library storage."""
 
 from __future__ import annotations

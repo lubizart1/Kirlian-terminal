@@ -150,6 +150,33 @@ The card appears while the side panel shows the playing song's album, so it hide
 below 110 columns. Timeouts, a rejected key, or a spent quota appear in the status
 line and never interrupt playback.
 
+While a request is open, the card shows the playing title as a beat: each syllable
+is a hit (the first of each word accented, every digit its own hit), each gap
+between words a rest, and a playhead walks the pattern. "Paris 1919" becomes
+`● • · ● • • • ·`. It holds still under the Still or Off motion setting and stops
+as soon as the answer, or an error, arrives.
+
+### Checking your key
+
+To try a provider and key outside the player, make one live request:
+
+```sh
+uv run kirlian --check-facts            # the provider chosen in the player
+uv run kirlian --check-facts openai     # a specific provider
+uv run kirlian --check-facts all        # every provider with a saved or exported key
+uv run kirlian --check-facts exa --artist "Talk Talk" --title "New Grass" \
+  --album "Laughing Stock" --year 1991
+```
+
+It uses the saved or exported key; if there is none, it asks for one without
+echoing it and does not save it. The key is never printed. Output shows the
+response time, how many pages the provider retrieved, and each proposed fact
+marked ✓ (shown) or ✗ (its source was not a retrieved page). Provider error
+messages, such as an unknown model, are printed as returned. Add
+`--facts-report report.json` to keep the full response for inspection; the report
+contains no key. The default song is John Cale's "Paris 1919". Each check is a
+billed request.
+
 ## Covers and the filament ribbon
 
 The record pane reads embedded covers first, then `cover`, `folder`, `front`,

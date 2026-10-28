@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """A hand-drawn terminal wordmark, independent of image protocols.
 
 The drawn mark uses the same Braille dot grid as the filament ribbon. Paths below

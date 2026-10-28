@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Read local cover art without changing tags, downloading, or persisting images."""
 
 from __future__ import annotations

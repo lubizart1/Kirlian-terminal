@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """An isolated, local check of native images and the character fallback."""
 
 import base64

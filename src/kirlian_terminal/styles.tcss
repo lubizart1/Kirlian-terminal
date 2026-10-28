@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
 Screen { background: $k-surface; color: $k-ink; text-style: none; }
 #masthead { height: 4; border-bottom: solid $k-edge; padding: 1 2 0 2; align-vertical: middle; }
 #brand { width: 24; }
@@ -29,6 +30,7 @@ DataTable > .datatable--cursor, DataTable:focus > .datatable--cursor { backgroun
 #fact-label { width: 1fr; color: $k-quiet; }
 #fact-spark { width: auto; color: $k-accent; }
 #fact-text { height: auto; color: $k-ink; }
+#fact-pulse { height: 1; margin: 1 0; text-wrap: nowrap; }
 #fact-source { height: auto; border-top: solid $k-edge; margin-top: 1; padding-top: 1; color: $k-quiet; }
 #empty { height: auto; max-height: 4; color: $k-quiet; }
 #status { height: 1; padding: 0 2; color: $k-quiet; }

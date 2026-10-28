@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Optional sourced song facts. Only title, artist, album, and year leave the machine.
 
 Each provider is asked the same question and returns facts with a source URL plus
@@ -52,7 +53,11 @@ Source = dict[str, str]  # url, title, published
 
 
 class FactsError(Exception):
-    """A readable reason the provider gave no facts."""
+    """A readable reason the provider gave no facts. `detail` is the provider's own reply."""
+
+    def __init__(self, message: str, detail: str = "") -> None:
+        super().__init__(message)
+        self.detail = detail
 
 
 @dataclass(frozen=True)
@@ -318,16 +323,17 @@ def provider_named(provider_id: str | None) -> Provider:
     return PROVIDERS.get(provider_id or "", PROVIDERS[DEFAULT_PROVIDER])
 
 
-def request_facts(
-    provider: Provider, track: Track, key: str, timeout: float = TIMEOUT
-) -> list[Fact]:
-    """Blocking; run off the UI loop."""
+def model_for(provider: Provider) -> str:
     # Only OpenAI and Anthropic take a model name; the others select by effort or product.
     override = os.environ.get(MODEL_ENVIRONMENT, "").strip()
-    model = override if override and provider.id in {"openai", "anthropic"} else provider.model
+    return override if override and provider.id in {"openai", "anthropic"} else provider.model
+
+
+def fetch_payload(provider: Provider, track: Track, key: str, timeout: float = TIMEOUT) -> dict:
+    """Blocking provider call. Raises FactsError with a listener-readable message."""
     request = urllib.request.Request(
         provider.endpoint,
-        data=json.dumps(provider.body(question(track), model)).encode(),
+        data=json.dumps(provider.body(question(track), model_for(provider))).encode(),
         headers=provider.headers(key),
         method="POST",
     )
@@ -336,18 +342,30 @@ def request_facts(
         with urllib.request.urlopen(request, timeout=timeout) as response:
             payload = json.load(response)
     except urllib.error.HTTPError as error:
+        detail = ""
+        with contextlib.suppress(OSError, ValueError):
+            detail = clip(error.read(2000).decode("utf-8", "replace"), 400)
         if error.code in {401, 403}:
-            raise FactsError(f"{name} rejected the API key. Press i to replace it.") from None
-        if error.code in {402, 429}:
-            raise FactsError(f"{name} rate limit or credits reached; facts paused.") from None
-        raise FactsError(f"{name} returned HTTP {error.code}; no fact for this song.") from None
+            message = f"{name} rejected the API key. Press i to replace it."
+        elif error.code in {402, 429}:
+            message = f"{name} rate limit or credits reached; facts paused."
+        else:
+            message = f"{name} returned HTTP {error.code}; no fact for this song."
+        raise FactsError(message, detail) from None
     except (urllib.error.URLError, TimeoutError, OSError):
         raise FactsError(f"Could not reach {name}; no fact for this song.") from None
     except ValueError:
         raise FactsError(f"{name} sent an unreadable response.") from None
     if not isinstance(payload, dict):
-        return []
-    return verified_facts(*provider.read(payload))
+        raise FactsError(f"{name} sent an unreadable response.")
+    return payload
+
+
+def request_facts(
+    provider: Provider, track: Track, key: str, timeout: float = TIMEOUT
+) -> list[Fact]:
+    """Blocking; run off the UI loop."""
+    return verified_facts(*provider.read(fetch_payload(provider, track, key, timeout)))
 
 
 class Credentials:

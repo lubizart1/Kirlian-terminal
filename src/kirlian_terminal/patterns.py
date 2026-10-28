@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Ten quiet ribbon motifs, each with ten stable, locally generated variations.
 
 Render directly into Braille cell masks: no images, simulation history, or IO.

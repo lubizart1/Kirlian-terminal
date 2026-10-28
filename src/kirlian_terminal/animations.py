@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Small, deterministic ASCII studies. Animation time is independent of audio time."""
 
 from __future__ import annotations

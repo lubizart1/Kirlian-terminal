@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Small compatibility adapter for textual-image's Kitty renderer.
 
 Placeholder foreground colors are protocol data, not presentation colors.

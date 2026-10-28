@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Measure pure frame generation; excludes Textual, terminal output and music IO."""
 
 import json

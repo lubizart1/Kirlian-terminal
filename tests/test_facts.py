@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 import io
 import json
 import urllib.error
@@ -180,3 +181,35 @@ def test_credentials_are_per_provider_with_environment_and_session_fallbacks(mon
     credentials.forget(openai)
     assert credentials.key(openai) == ""
     assert credentials.key(exa) == "exa-key"
+
+
+def test_live_check_explains_kept_and_dropped_facts_without_revealing_the_key(
+    tmp_path, monkeypatch
+):
+    from kirlian_terminal.facts_check import SAMPLE, run_facts_check
+
+    monkeypatch.setenv("PERPLEXITY_API_KEY", "sk-secret-value")
+    monkeypatch.setattr(
+        facts.urllib.request,
+        "urlopen",
+        lambda request, timeout: io.BytesIO(json.dumps(PAYLOADS["perplexity"]).encode()),
+    )
+    out = io.StringIO()
+    report = tmp_path / "report.json"
+    assert run_facts_check("perplexity", None, SAMPLE, report, out) == 0
+    text = out.getvalue()
+    assert "Facts proposed: 2 · shown after the source check: 1" in text
+    assert "✓ Little Feat in the room" in text
+    assert "✗ Invented" in text
+    assert "sk-secret-value" not in text + report.read_text()
+    assert json.loads(report.read_text())["results"][0]["retrieved_pages"] == [URL]
+
+    def rejected(request, timeout):
+        raise urllib.error.HTTPError(
+            request.full_url, 400, "bad", {}, io.BytesIO(b'{"error": "unknown model"}')
+        )
+
+    monkeypatch.setattr(facts.urllib.request, "urlopen", rejected)
+    out = io.StringIO()
+    assert run_facts_check("perplexity", None, SAMPLE, None, out) == 1
+    assert "unknown model" in out.getvalue()

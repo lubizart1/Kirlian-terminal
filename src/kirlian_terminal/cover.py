@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Cover display with a portable alternative to terminal graphics."""
 
 from collections import OrderedDict

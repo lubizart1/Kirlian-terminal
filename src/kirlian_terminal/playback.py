@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """One owned mpv process, a persistent JSON connection, and observed state."""
 
 from __future__ import annotations
