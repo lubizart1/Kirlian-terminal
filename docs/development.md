@@ -942,3 +942,33 @@ Checks: `pytest` — 164 passed, including one retry after a dropped connection,
 no retry after a timeout, the reason in the message, and an app test where a
 failed song is retried on its next play and Anthropic is suggested but not
 called. The exact cause of the original drop is not known.
+
+## 2026-10-28: amp and audio-reactive ribbon
+
+Built the amp (`w`) and made the ribbon respond to measured audio (see
+architecture). Feasibility was checked first against the installed mpv 0.41 and
+its FFmpeg: `af-metadata` returned astats and aspectralstats values over IPC;
+`af-command` with a filter-instance target changed a band by +12 dB live (the
+`all` target fails); `volume@pre` and `stereotools@bal` responded (balance hard
+left dropped the right channel to silence; preamp -6 dB lowered RMS by 6 dB).
+
+Smoke runs with the real mpv: a generated stereo test file played with the amp
+open, meters received levels (about -28/-32 dB), presets, sliders, and ReplayGain
+reached mpv, and turning the equalizer off left only the meter in the filter list.
+A two-song run confirmed the tuned gain was in mpv's filter list after moving to
+the next song. Sampling 10 s of two of the owner's tracks (read-only) set the
+energy range and produced about 15 sparks each.
+
+Checks: `ruff`, catalogs ("All catalogs cover 290 strings", 42 new strings per
+language, AI-translated, unreviewed), `pytest` — 172 passed. New tests cover the
+filter list (absent when off, ten bands, preamp, balance), settings clamping and
+bad storage, mono and missing levels, the reaction's speed and sparks, the amp's
+keys (arrows stay in the amp, first change installs the chain, later changes tune
+single stages, preset and ReplayGain cycling, off removes the chain, settings
+persist, no playback commands), levels reaching meters and ribbon only while
+playing, and layout at 80 × 24 and 120 × 44.
+
+Not verified: listening. Equalizer curves and presets were not checked by ear,
+nor whether rebuilding the filter list on enable or between songs is audible.
+The big clock and scrolling title from the first sketch were not built; true
+per-band spectrum bars remain out of scope.

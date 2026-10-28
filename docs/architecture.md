@@ -621,3 +621,43 @@ resent. `FactsError.transient` marks connection failures: those are removed from
 the session's asked set so the song is tried again on its next play, while
 rejected keys and quota errors stay blocked. A provider with a key that is not in
 the order is suggested in the status line, never used without being chosen.
+
+## 2026-10-28: the amp and a ribbon that hears the music
+
+The owner asked for more from the bottom visuals and a Winamp-like amp toggle.
+Both use mpv's own audio filters, so playback stays in the owned mpv process and
+no audio is decoded by the app.
+
+**Levels.** mpv starts with `--af=@meter:lavfi=[astats…,aspectralstats…]`:
+per-frame RMS and peak per channel, spectral centroid, and spectral flux, read
+through the `af-metadata/meter` property. Both filters pass audio through
+unchanged. A worker polls about 20 times a second, only while a song plays and
+the ribbon moves or the amp is open. `Levels` maps RMS from -40 to -6 dB to an
+energy of 0 to 1 (sampled real tracks sat between -25 and -8 dB) and the centroid
+from 200 Hz to 8 kHz to brightness.
+
+**Ribbon.** `Reaction` smooths energy and brightness. Energy sets the animation
+clock's rate (0.45 to 1.85 times, changed without jumping the frame); brightness
+lifts the ribbon toward white by up to 22%; flux above 2.2 times its running
+average while the music is loud starts a spark that lights nearby ribbon cells
+and fades in 0.4 s. On two sampled tracks this gave about 1.5 sparks per second.
+This supersedes the specification's "decorative, does not visualize audio":
+the motion is now driven by measurements, while the shapes stay the catalog's.
+
+**Equalizer.** `AmpSettings` holds ten band gains, preamp, balance, preset,
+ReplayGain mode, and whether the amp is open (settings key `amp`). When on, mpv's
+filter list is `@eq:lavfi=[equalizer@b0…b9, volume@pre, stereotools@bal]`
+followed by the meter, so meters show what plays. Turning it on or off rebuilds
+the list with `af set`; when off, the `@eq` stage is absent, not neutral. Moving a
+slider uses `af-command eq <command> <value> <filter>` so the running audio
+changes without a rebuild. Because mpv recreates filters from the installed list
+when audio reinitializes, the list is reinstalled while the next song loads if it
+differs from what was tuned. ReplayGain is mpv's `replaygain` property. Codec,
+bitrate, sample rate, and channel count come from observed mpv properties.
+
+**Panel.** `AmpPanel` draws meters (peak hold one second, then 20 dB per second),
+a balance slider, ReplayGain modes, and Winamp-style vertical sliders for the
+preamp and ten bands; below 36 rows the sliders become one row of block bars. It
+owns arrow keys and Escape while focused (the app's priority arrow bindings are
+disabled for it); the app owns the settings and talks to mpv. Saving waits 0.3 s
+so a held key writes once. Strings are translated in all nine languages.

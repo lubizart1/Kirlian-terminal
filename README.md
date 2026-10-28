@@ -67,6 +67,7 @@ testing, add `--data-dir .local/tryout`. Run `uv run kirlian --help` for options
 | `-` / `=` | Lower / raise volume |
 | `v` | Turn animation off / on; remembered between launches |
 | `x` | Choose a new animation without changing the song |
+| `w` | Open or close the amp: level meters, equalizer, balance, ReplayGain |
 | `s` / `S` | Save the current animation / cycle through saved animations |
 | `c` | Switch cover display between terminal graphics and compatible blocks; remembered |
 | `f` / `r` | Choose folder / rescan |
@@ -203,6 +204,31 @@ messages, such as an unknown model, are printed as returned. Add
 contains no key. The default song is John Cale's "Paris 1919". Each check is a
 billed request.
 
+## The amp
+
+Press `w` for a Winamp-style amp above the ribbon. It shows the playing file's
+codec, bitrate, sample rate, and channels; live left/right level meters with peak
+marks that hold for a second (`CLIP` when a peak reaches full scale); a ten-band
+equalizer (31 Hz to 16 kHz, ±12 dB) with a preamp; a balance slider; and
+ReplayGain. While the amp has focus:
+
+| Key | Action |
+| --- | --- |
+| `←` / `→` (or `h` / `l`) | Choose the preamp, a band, or balance |
+| `↑` / `↓` (or `k` / `j`) | Raise or lower it by 1 dB (balance by 10%) |
+| `0` | Reset the selected slider |
+| `e` | Equalizer on / off |
+| `,` / `.` | Previous / next preset: Flat, Bass, Rock, Pop, Jazz, Classical, Dance, Vocal, Treble |
+| `g` | ReplayGain: off, track, album |
+| `w` or `Esc` | Close the amp |
+
+Moving a slider turns the equalizer on. When it is off, its filters are removed,
+so you hear the file exactly as before. Boosting bands can clip; lower the preamp
+if `CLIP` appears. ReplayGain uses loudness tags already in your files and does
+nothing for files without them. The equalizer, preset, balance, ReplayGain, and
+whether the amp is open are remembered. Short windows show the equalizer as a
+single row of bars. Everything runs inside mpv; your files are never changed.
+
 ## Covers and the filament ribbon
 
 The record pane reads embedded covers first, then `cover`, `folder`, `front`,
@@ -297,6 +323,12 @@ their original drawings.
 Seeking keeps the pattern; pause freezes it. Motion runs at most 10 times per
 second and stops ticking when paused, loading, idle, still, or off. The region
 retains its height when hidden. Patterns are generated locally without model calls.
+
+The ribbon now moves with the music: it speeds up in loud passages and slows in
+quiet ones, brightens when the sound is bright, and flashes along its length on
+hits. These come from levels mpv measures as it plays, not from guesses; the
+pattern itself still comes from the catalog. With Still or Off motion the ribbon
+does not react.
 
 ## Language
 

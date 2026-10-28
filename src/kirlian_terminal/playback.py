@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from .audio import METER, AmpSettings, Levels
 from .i18n import _
 
 
@@ -33,6 +34,10 @@ class PlaybackState:
     path: str = ""
     playlist: list[dict[str, Any]] = field(default_factory=list)
     error: str = ""
+    codec: str = ""
+    bitrate: int = 0
+    samplerate: int = 0
+    channels: int = 0
 
     def consume(self, event: dict[str, Any]) -> None:
         if event.get("event") == "property-change":
@@ -54,6 +59,14 @@ class PlaybackState:
                 self.path = str(value or "")
             elif name == "playlist":
                 self.playlist = value or []
+            elif name == "audio-codec-name":
+                self.codec = str(value or "")
+            elif name == "audio-bitrate":
+                self.bitrate = int(value or 0)
+            elif name == "audio-params":
+                params = value if isinstance(value, dict) else {}
+                self.samplerate = int(params.get("samplerate") or 0)
+                self.channels = int(params.get("channel-count") or 0)
         elif event.get("event") == "start-file":
             self.loading = True
             self.position = self.duration = 0
@@ -112,6 +125,7 @@ class Player:
                 "--volume=50",
                 "--loop-playlist=no",
                 "--loop-file=no",
+                f"--af={METER}",
                 f"--input-ipc-server={socket}",
                 *self.extra_args,
                 stdout=asyncio.subprocess.DEVNULL,
@@ -145,6 +159,9 @@ class Player:
                     "playlist-pos",
                     "path",
                     "playlist",
+                    "audio-codec-name",
+                    "audio-bitrate",
+                    "audio-params",
                 ),
                 1,
             ):
@@ -236,6 +253,23 @@ class Player:
                 await self.command("set_property", "pause", False)
             else:
                 await self.command("cycle", "pause")
+
+    async def levels(self) -> Levels | None:
+        """The latest measured frame, or None when nothing is playing."""
+        try:
+            return Levels.parse(await self.command("get_property", "af-metadata/meter"))
+        except PlaybackError:
+            return None
+
+    async def apply_amp(self, amp: AmpSettings) -> None:
+        """Install or remove the equalizer chain and set ReplayGain."""
+        async with self.lock:
+            await self.command("af", "set", amp.filters())
+            await self.command("set_property", "replaygain", amp.replaygain)
+
+    async def tune(self, target: str, command: str, value: str) -> None:
+        """Adjust one stage of the running equalizer without rebuilding it."""
+        await self.command("af-command", "eq", command, value, target)
 
     async def close(self) -> None:
         self.closing = True

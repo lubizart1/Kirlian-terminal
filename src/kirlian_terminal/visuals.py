@@ -1,5 +1,10 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""A continuous filament and a separate, truthful playback progress line."""
+"""A filament that moves with the playing audio, and a truthful progress line.
+
+The ribbon's speed follows loudness, its light follows the brightness of the
+sound, and hits flash along it. All three come from levels mpv measures; when
+they are unavailable the ribbon keeps its own steady motion.
+"""
 
 from __future__ import annotations
 
@@ -11,6 +16,7 @@ from textual.widgets import Static
 
 from .animations import AnimationClock, Variation
 from .appearance import INK, Appearance
+from .audio import Levels, Reaction
 from .palette import mix, ribbon_color
 from .playback import PlaybackState
 
@@ -26,6 +32,8 @@ class Animation(Static):
         self.album_colors: tuple[str, ...] = ()
         self.color_key = None
         self.color_bands: list[tuple[str, str]] = []
+        self.reaction = Reaction()
+        self.last_draw = time.monotonic()
 
     @property
     def enabled(self) -> bool:
@@ -37,9 +45,19 @@ class Animation(Static):
         self.schedule()
         self.draw()
 
+    def react(self, levels: Levels) -> None:
+        """Feed one measured frame; only moving ribbons respond."""
+        if not (self.playing and self.appearance.motion == "gentle"):
+            return
+        self.reaction.feed(levels)
+        self.clock.set_rate(self.reaction.rate, time.monotonic())
+
     def observe(self, state: PlaybackState) -> None:
         before = (self.playing, self.clock.serial, self.fraction)
         self.playing = not (state.paused or state.idle or state.loading)
+        if not self.playing:
+            self.reaction.quiet()
+            self.clock.set_rate(1.0, time.monotonic())
         self.fraction = min(1, max(0, state.position / state.duration)) if state.duration else 0
         serial = state.started_serial if not state.loading and not state.idle else 0
         self.clock.observe(
@@ -83,16 +101,37 @@ class Animation(Static):
                 color = ribbon_color(colors, start / max(1, width - 1))
                 highlight = mix(color, "#ffffff", 0.3) if self.album_colors else INK
                 self.color_bands.append((color, highlight))
+        now = time.monotonic()
+        self.reaction.decay(now - self.last_draw)
+        self.last_draw = now
+        bands = [
+            self.lit(band, color, highlight, width)
+            for band, (color, highlight) in enumerate(self.color_bands)
+        ]
         for index, line in enumerate(frame.splitlines()):
             if index:
                 text.append("\n")
             for band, start in enumerate(range(0, len(line), 4)):
                 end = min(start + 4, len(line))
                 split = max(start, min(end, played))
-                color, highlight = self.color_bands[band]
+                color, highlight = bands[band]
                 text.append(line[start:split], highlight)
                 text.append(line[split:end], color)
         self.update(text, layout=False)
+
+    def lit(self, band: int, color: str, highlight: str, width: int) -> tuple[str, str]:
+        """Lift a band toward white for bright sound and for nearby sparks."""
+        reaction = self.reaction
+        lift = reaction.brightness * 0.22
+        center = (band * 4 + 2) / max(1, width)
+        for position, strength in reaction.sparks:
+            distance = abs(center - position)
+            if distance < 0.07:
+                lift += strength * 0.65 * (1 - distance / 0.07)
+        if lift <= 0.01:
+            return color, highlight
+        lift = min(0.85, lift)
+        return mix(color, "#ffffff", lift), mix(highlight, "#ffffff", lift)
 
     def set_palette(self, colors: tuple[str, ...]) -> None:
         self.album_colors = colors

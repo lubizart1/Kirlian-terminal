@@ -40,6 +40,10 @@ DataTable > .datatable--cursor, DataTable:focus > .datatable--cursor { backgroun
 #playing-label { width: 1fr; height: 2; text-wrap: nowrap; text-overflow: ellipsis; }
 #playing-time { width: 18; height: 1; text-align: right; color: $k-quiet; }
 #animation { width: 100%; height: 3; text-wrap: nowrap; }
+#amp { height: 13; margin-bottom: 1; text-wrap: nowrap; }
+#amp.compact { height: 9; }
+#amp:focus { background-tint: transparent; }
+Screen.amp-open #playback { height: auto; }
 #progress { height: 1; }
 #footer { height: 2; padding: 0 2; color: $k-quiet; }
 #volume { width: 12; height: 1; text-align: right; }

@@ -162,6 +162,7 @@ class AnimationClock:
     elapsed: float = 0
     anchor: float | None = None
     serial: int = 0
+    rate: float = 1.0
     deck: PatternDeck = field(default_factory=PatternDeck, repr=False)
 
     def __post_init__(self) -> None:
@@ -170,7 +171,15 @@ class AnimationClock:
             self.deck.remaining = [v for v in CATALOG if v != self.variation]
 
     def time(self, now: float) -> float:
-        return self.elapsed + (max(0, now - self.anchor) if self.anchor is not None else 0)
+        running = max(0, now - self.anchor) if self.anchor is not None else 0
+        return self.elapsed + running * self.rate
+
+    def set_rate(self, rate: float, now: float) -> None:
+        """Change speed from now on without jumping the current frame."""
+        self.elapsed = self.time(now)
+        if self.anchor is not None:
+            self.anchor = now
+        self.rate = rate
 
     def running(self, active: bool, now: float) -> None:
         self.elapsed = self.time(now)

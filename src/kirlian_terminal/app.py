@@ -27,9 +27,11 @@ from textual.screen import ModalScreen
 from textual.widgets import Button, DataTable, Input, Label, OptionList, Select, Static
 
 from . import i18n
+from .amp import COLUMNS, AmpPanel
 from .animations import Variation
 from .appearance import INK, OPTIONS, PALETTES, QUIET, Appearance, themes
 from .artwork import load_artwork
+from .audio import PREAMP_RANGE, PRESETS, REPLAYGAIN, AmpSettings, clamp
 from .brand import ASCII_SPARK, SPARK, Brand
 from .cover import CoverImage, RecordPane
 from .facts import (
@@ -598,6 +600,7 @@ class KirlianApp(App):
         Binding("minus", "volume(-5)", "Quieter"),
         Binding("equals_sign", "volume(5)", "Louder"),
         Binding("v", "animation_toggle", "Animation on/off"),
+        Binding("w", "amp", "Amp"),
         Binding("x", "animation_shuffle", "Shuffle animation"),
         Binding("s", "animation_save", "Save animation"),
         Binding("S", "animation_recall", "Recall animation"),
@@ -689,6 +692,8 @@ class KirlianApp(App):
         self.palette_key: str | None = None
         self.palette_revision = 0
         self.palette_cache: OrderedDict[str, tuple[str, ...]] = OrderedDict()
+        self.amp = AmpSettings.load(library)
+        self.amp_installed = ""  # The filter list mpv last rebuilt from.
         self.saved_animations: list[Variation] = []
         self.recalled_index = -1
         try:
@@ -767,6 +772,7 @@ class KirlianApp(App):
                     id="playing-label",
                 )
                 yield Static("", id="playing-time")
+            yield AmpPanel(id="amp")
             yield Animation(id="animation")
             yield Progress(id="progress")
         with Horizontal(id="footer"):
@@ -829,6 +835,10 @@ class KirlianApp(App):
             await self.player.start()
             self.ready = True
             self.status("")
+            if self.amp.enabled or self.amp.replaygain != "no":
+                await self.player.apply_amp(self.amp)
+                self.amp_installed = self.amp.filters()
+            self.watch_levels()
         except PlaybackError as error:
             self.status(str(error))
         if self.initial_folder:
@@ -870,13 +880,18 @@ class KirlianApp(App):
             if self.appearance_saving:
                 return action in {"focus_next", "focus_previous"}
             return action in {"back", "focus_next", "focus_previous"}
-        return True
+        # Arrows and Escape belong to the amp while it has focus.
+        amp_keys = {"navigate_back", "open", "back"}
+        return not (isinstance(self.focused, AmpPanel) and action in amp_keys)
 
     def on_resize(self, event: events.Resize | None = None) -> None:
         if self.is_mounted and self.query("#body"):
             size = event.size if event else self.size
             width = size.width
             self.query_one("#body").screen.set_class(size.height < 30, "compact")
+            amp = self.query_one(AmpPanel)
+            amp.compact = size.height < 36
+            amp.set_class(amp.compact, "compact")
             self.query_one("#context").display = width >= 110
             if self.personalizing:
                 self.update_appearance_feedback()
@@ -960,7 +975,7 @@ class KirlianApp(App):
         elif self.view == "playlist" and row:
             hint += [("J/K", _("move")), ("d", _("remove"))]
         else:
-            hint.append(("x", _("pattern")))
+            hint += [("x", _("pattern")), ("w", _("amp"))]
         hint += [("?", _("help")), ("q", _("quit"))]
         if self.searching:
             hint = [("enter", _("open/play")), ("tab", _("results")), ("esc", _("back"))]
@@ -1674,6 +1689,12 @@ class KirlianApp(App):
         animation = self.query_one(Animation)
         previous_serial = animation.clock.serial
         animation.observe(state)
+        self.query_one(AmpPanel).observe(state)
+        if state.loading and self.amp.enabled and self.amp.filters() != self.amp_installed:
+            # Live tuning changes running filters only; mpv rebuilds from the installed list
+            # when audio reinitializes, so refresh it while the next song loads.
+            self.amp_installed = self.amp.filters()
+            self.reinstall_amp(self.amp)
         self.update_ribbon_palette(state)
         if animation.clock.serial != previous_serial and not self.scanning:
             self.status("")
@@ -2047,6 +2068,112 @@ class KirlianApp(App):
             screen, _("Notes on.") if self.facts_on else _("Notes off. Keys are kept.")
         )
 
+    @work(group="levels", exclusive=True)
+    async def watch_levels(self) -> None:
+        """Read what mpv is playing about 20 times a second, only while someone looks."""
+        read = getattr(self.player, "levels", None)
+        if read is None:
+            return
+        while self.is_running:
+            state = getattr(self, "display_state", self.player.state)
+            playing = not (state.paused or state.idle or state.loading)
+            moving = self.appearance.motion == "gentle"
+            if not playing or not (moving or self.amp.visible):
+                await asyncio.sleep(0.25)
+                continue
+            levels = await read()
+            if levels is not None and self.is_running:
+                self.query_one(Animation).react(levels)
+                if self.amp.visible:
+                    self.query_one(AmpPanel).measure(levels)
+            await asyncio.sleep(0.05)
+
+    def action_amp(self) -> None:
+        self.amp = replace(self.amp, visible=not self.amp.visible)
+        self.apply_appearance()
+        panel = self.query_one(AmpPanel)
+        if self.amp.visible:
+            panel.focus()
+        else:
+            self.query_one(DataTable).focus()
+        self.save_amp()
+
+    def change_amp(self, amp: AmpSettings, message: str = "") -> None:
+        before, self.amp = self.amp, amp
+        self.query_one(AmpPanel).show(amp)
+        self.send_amp(before, amp)
+        self.save_amp()
+        if message:
+            self.status(message)
+
+    @work(group="amp-audio")
+    async def send_amp(self, before: AmpSettings, after: AmpSettings) -> None:
+        """Tune the running equalizer stage by stage; rebuild only when it turns on or off."""
+        try:
+            if before.enabled != after.enabled:
+                await self.player.apply_amp(after)
+                self.amp_installed = after.filters()
+                return
+            if before.replaygain != after.replaygain:
+                await self.player.control("set_property", "replaygain", after.replaygain)
+            if not after.enabled:
+                return
+            for index, (old, new) in enumerate(zip(before.gains, after.gains, strict=True)):
+                if old != new:
+                    await self.player.tune(f"equalizer@b{index}", "gain", f"{new:g}")
+            if before.preamp != after.preamp:
+                await self.player.tune("volume@pre", "volume", f"{after.preamp:g}dB")
+            if before.balance != after.balance:
+                await self.player.tune("stereotools@bal", "balance_out", f"{after.balance:g}")
+        except PlaybackError as error:
+            self.status(str(error))
+        except AttributeError:
+            pass  # A test double without an equalizer.
+
+    @work(group="amp-audio")
+    async def reinstall_amp(self, amp: AmpSettings) -> None:
+        try:
+            await self.player.apply_amp(amp)
+        except (PlaybackError, AttributeError):
+            self.amp_installed = ""
+
+    @work(group="amp-save", exclusive=True)
+    async def save_amp(self) -> None:
+        await asyncio.sleep(0.3)  # Holding an arrow key saves once, not per step.
+        await asyncio.to_thread(self.amp.save, self.library)
+
+    def amp_adjust(self, column: int, step: int | None) -> None:
+        """Move the selected slider one step, or back to zero when step is None."""
+        amp = self.amp
+        if column == 0:
+            value = 0.0 if step is None else clamp(amp.preamp + step, *PREAMP_RANGE)
+            self.change_amp(replace(amp, preamp=value, enabled=True))
+        elif column == COLUMNS - 1:
+            value = 0.0 if step is None else clamp(round(amp.balance + step * 0.1, 1), -1, 1)
+            self.change_amp(replace(amp, balance=value, enabled=True))
+        else:
+            band = column - 1
+            gain = 0.0 if step is None else amp.gains[band] + step
+            self.change_amp(amp.with_gain(band, gain))
+
+    def amp_toggle_equalizer(self) -> None:
+        enabled = not self.amp.enabled
+        self.change_amp(
+            replace(self.amp, enabled=enabled),
+            _("Equalizer on.") if enabled else _("Equalizer off: you hear the file as it is."),
+        )
+
+    def amp_preset(self, step: int) -> None:
+        names = list(PRESETS)
+        current = names.index(self.amp.preset) if self.amp.preset in names else -1
+        name = names[(current + step) % len(names)]
+        self.change_amp(self.amp.with_preset(name), _("Preset: {name}", name=i18n._(name)))
+
+    def amp_replaygain(self) -> None:
+        mode = REPLAYGAIN[(REPLAYGAIN.index(self.amp.replaygain) + 1) % len(REPLAYGAIN)]
+        label = {"no": _("off"), "track": _("track"), "album": _("album")}[mode]
+        self.change_amp(replace(self.amp, replaygain=mode), _("ReplayGain: {mode}", mode=label))
+
     def apply_appearance(self) -> None:
         self.theme = f"kirlian-{self.appearance.palette}"
         self.query_one(Animation).configure(self.appearance)
@@ -2057,6 +2184,11 @@ class KirlianApp(App):
         ascii = self.appearance.characters == "ascii"
         self.query_one(Brand).configure(ascii)
         self.query_one("#fact-spark", Static).update(ASCII_SPARK if ascii else SPARK)
+        amp = self.query_one(AmpPanel)
+        amp.accent, amp.ascii = self.appearance.accent, ascii
+        amp.show(self.amp)
+        amp.display = self.amp.visible
+        self.screen.set_class(self.amp.visible, "amp-open")
         if self.is_running:
             self.on_player_update(PlayerUpdate(getattr(self, "display_state", self.player.state)))
 
@@ -2278,6 +2410,7 @@ class KirlianApp(App):
                     _("c switch cover display (remembered)"),
                     _("+ add to playlist · in a playlist: J/K move · d remove · e rename"),
                     _("i song notes settings · [ ] more notes · o open the note's source"),
+                    _("w amp: level meters, equalizer, balance, ReplayGain"),
                     _("Typing in search, name, or key fields never triggers playback shortcuts."),
                 )
             ),
