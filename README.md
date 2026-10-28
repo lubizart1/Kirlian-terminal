@@ -167,7 +167,8 @@ line says which failed. A key exported in a provider's environment variable take
 precedence over a saved one; unset it in your shell to stop using it. Without a
 usable system credential store, saved keys last for the session only.
 
-Only the song title, artist, album, and year are sent, two seconds after a song
+Only the song title, artist, album, year, and the language to write in are sent, two
+seconds after a song
 starts. Audio, artwork, and file paths are never sent. Each provider is asked about
 each song once; answers, including "nothing found", are kept locally per provider,
 so reordering providers lets you compare them on songs you have already heard.
@@ -297,10 +298,24 @@ Seeking keeps the pattern; pause freezes it. Motion runs at most 10 times per
 second and stops ticking when paused, loading, idle, still, or off. The region
 retains its height when hidden. Patterns are generated locally without model calls.
 
+## Language
+
+The interface is available in English, Español, Français, Deutsch, Italiano,
+Português (Brasil), 日本語, 한국어, and 简体中文. By default it follows your system
+locale (`LC_ALL`, `LC_MESSAGES`, or `LANG`); other locales, including Traditional
+Chinese, use English. Choose a language under `p` › **Language**; it applies the next
+time you open Kirlian. Song notes are requested in the same language, with titles,
+names, and quoted lyrics kept in the original. Album, artist, and song names always
+appear exactly as tagged. Key names (`enter`, `space`, `esc`) stay in English, as do
+the command-line options and `--check-facts` output.
+
+The translations were written with AI assistance and have not yet been reviewed by
+native speakers. Corrections are welcome; see [Contributing](CONTRIBUTING.md).
+
 ## Make it yours
 
 Press `p` to preview aubergine, sage, or amber for the interface; gentle, still, or no motion; fine
-dots or plain ASCII for the ribbon and header. The current
+dots or plain ASCII for the ribbon and header; and the interface language. The current
 song and queue keep playing. **Save changes** or `Ctrl+S` saves locally; **Cancel**
 or Escape restores the previous appearance. **Reset** previews the defaults without
 saving them. The screen labels unsaved previews and confirms a successful save.

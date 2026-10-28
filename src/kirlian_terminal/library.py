@@ -17,6 +17,8 @@ from pathlib import Path
 
 import mutagen
 
+from .i18n import _
+
 EXTENSIONS = {".mp3", ".flac", ".m4a", ".aac", ".ogg", ".oga", ".opus", ".wav"}
 DISC_FOLDER = re.compile(r"(?:cd|disc|disk)[\s._-]*\d+", re.IGNORECASE)
 
@@ -153,7 +155,7 @@ class Library:
     ) -> None:
         root = root.expanduser().resolve()
         if not root.is_dir() or not os.access(root, os.R_OK | os.X_OK):
-            report(ScanProgress(0, 0, True, "Choose a readable music folder."))
+            report(ScanProgress(0, 0, True, _("Choose a readable music folder.")))
             return
         indexed = skipped = blocked = 0
         seen: set[str] = set()
@@ -167,7 +169,7 @@ class Library:
         try:
             self.set_setting("music_folder", str(root))
             with self.connect() as db:
-                for directory, _, files in os.walk(root, onerror=walk_error):
+                for directory, _dirs, files in os.walk(root, onerror=walk_error):
                     for filename in sorted(files):
                         if stop.is_set():
                             db.commit()
@@ -203,7 +205,8 @@ class Library:
                 )
             report(ScanProgress(indexed, skipped, True, blocked=blocked))
         except (OSError, sqlite3.Error) as error:
-            report(ScanProgress(indexed, skipped, True, f"Could not finish indexing: {error}"))
+            message = _("Could not finish indexing: {error}", error=error)
+            report(ScanProgress(indexed, skipped, True, message))
 
 
 def albums_from(tracks: list[Track]) -> list[Album]:

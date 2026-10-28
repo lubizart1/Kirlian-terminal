@@ -48,6 +48,8 @@ previous browser view and position.
 | `src/kirlian_terminal/visuals.py` | Fixed-height filament widget and responsive progress line |
 | `src/kirlian_terminal/playlists.py` | Saved playlists and ordered, duplicate-preserving entries |
 | `src/kirlian_terminal/facts.py` | Song-facts providers, response readers, source matching, credentials, fact cache |
+| `src/kirlian_terminal/i18n.py` | Interface language: locale detection, catalogs, `_`/`n_` lookup with English fallback |
+| `src/kirlian_terminal/locales/` | One JSON catalog per language, English source to translation |
 | `src/kirlian_terminal/facts_check.py` | `--check-facts`: one live request per provider, explained |
 | `src/kirlian_terminal/app.py` | Browser views, search, onboarding, keyboard actions, worker messages |
 | `src/kirlian_terminal/styles.tcss` | Terminal layout and initial colors |
@@ -567,3 +569,33 @@ The drawn Braille letter paths, the Drawn/Simple "Header" preference, the
 "needs 30 rows" note, and the two-row masthead are removed; the masthead is three
 rows (two in compact layouts). An `appearance` value saved with the old `logo`
 key is ignored on load, since unknown keys were already dropped.
+
+## 2026-10-28: interface languages
+
+The owner asked for multilingual support with common languages by default. The
+interface ships in English plus Spanish, French, German, Italian, Brazilian
+Portuguese, Japanese, Korean, and Simplified Chinese.
+
+No gettext toolchain or new dependency: `i18n.py` loads one JSON catalog per
+language, keyed by the English source string, so code stays readable and a
+missing entry falls back to English instead of breaking. Placeholders use named
+`str.format` fields; `n_` covers count-dependent wording with a per-language
+rule (one/other for most; French and Portuguese treat 0 as one; Japanese, Korean,
+and Chinese have one form). Sentences are translated whole; styled text is built by
+translating the full sentence and splitting it at the placeholder. Tags, file
+names, provider text, model and provider names are always inserted values.
+
+`scripts/i18n_catalog.py` extracts literal arguments of `_`, `n_`, and `N_` with
+`ast` and checks every catalog for missing and stale keys and placeholder
+mismatches; tests run it for each language and format every string, so a broken
+placeholder fails CI rather than raising in the UI.
+
+The language resolves at launch: a saved choice, else `LC_ALL`/`LC_MESSAGES`/`LANG`
+(`pt_*` maps to pt-BR; `zh_CN`/`zh_SG` to Simplified Chinese; Traditional Chinese
+and unlisted languages to English). Switching applies on next launch rather than
+live: compose-time widgets would otherwise need rebuilding, and recomposing the
+running app would risk playback, queue, and selection state. Song notes are asked
+for in the active language and cached per language (English keeps its earlier
+keys). The CLI, `--check-facts` output, Textual binding descriptions, and key
+names remain English. Translations were drafted by AI agents per language and
+need native review; the development record lists their flagged judgment calls.

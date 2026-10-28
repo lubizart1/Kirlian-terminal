@@ -26,6 +26,7 @@ from textual.message import Message
 from textual.screen import ModalScreen
 from textual.widgets import Button, DataTable, Input, Label, OptionList, Select, Static
 
+from . import i18n
 from .animations import Variation
 from .appearance import INK, OPTIONS, PALETTES, QUIET, Appearance, themes
 from .artwork import load_artwork
@@ -43,6 +44,8 @@ from .facts import (
     request_facts,
 )
 from .graphics import NATIVE_SUPPORTED
+from .i18n import _, n_, resolve, set_language
+from .i18n import language as active_language
 from .library import Album, Library, ScanProgress, Track, albums_from, display_text
 from .palette import extract_palette
 from .playback import PlaybackError, PlaybackState, Player
@@ -59,21 +62,38 @@ def scan_message(progress: ScanProgress) -> str:
     if progress.error:
         return progress.error
     if not progress.done or progress.indexed:
-        return (
-            f"{'Indexed' if progress.done else 'Indexing'} {progress.indexed} files · "
-            f"{progress.skipped} unreadable files/folders skipped"
+        if progress.done:
+            return n_(
+                "Indexed {n} file · {skipped} unreadable files/folders skipped",
+                "Indexed {n} files · {skipped} unreadable files/folders skipped",
+                progress.indexed,
+                skipped=progress.skipped,
+            )
+        return n_(
+            "Indexing {n} file · {skipped} unreadable files/folders skipped",
+            "Indexing {n} files · {skipped} unreadable files/folders skipped",
+            progress.indexed,
+            skipped=progress.skipped,
         )
     if progress.blocked:
-        where = (
-            "allow your terminal in System Settings › Privacy & Security › Files and Folders"
-            if sys.platform == "darwin"
-            else "check the folder permissions"
+        if sys.platform == "darwin":
+            return n_(
+                "No music indexed: permission denied for {n} folder. Press f to choose another "
+                "folder, or allow your terminal in System Settings › Privacy & Security › Files "
+                "and Folders and press r.",
+                "No music indexed: permission denied for {n} folders. Press f to choose another "
+                "folder, or allow your terminal in System Settings › Privacy & Security › Files "
+                "and Folders and press r.",
+                progress.blocked,
+            )
+        return n_(
+            "No music indexed: permission denied for {n} folder. Press f to choose another "
+            "folder, or check the folder permissions and press r.",
+            "No music indexed: permission denied for {n} folders. Press f to choose another "
+            "folder, or check the folder permissions and press r.",
+            progress.blocked,
         )
-        return (
-            f"No music indexed: permission denied for {progress.blocked} folder(s). "
-            f"Press f to choose another folder, or {where} and press r."
-        )
-    return "No music files found in this folder. Press f to choose another folder."
+    return _("No music files found in this folder. Press f to choose another folder.")
 
 
 @dataclass(frozen=True)
@@ -102,12 +122,14 @@ class FolderDialog(ModalScreen[str | None]):
 
     def compose(self) -> ComposeResult:
         with Vertical(id="folder-dialog"):
-            yield Label("Kirlian · Your music, locally")
-            yield Static("Choose a folder to begin. Make it yours later with p.")
-            yield Static("Your files and tags stay untouched. Indexing happens in the background.")
+            yield Label(_("Kirlian · Your music, locally"))
+            yield Static(_("Choose a folder to begin. Make it yours later with p."))
+            yield Static(
+                _("Your files and tags stay untouched. Indexing happens in the background.")
+            )
             yield Input(placeholder="~/Music", id="folder-path")
             yield Static("", id="folder-error")
-            yield Button("Open folder", variant="primary")
+            yield Button(_("Open folder"), variant="primary")
 
     def on_mount(self) -> None:
         self.query_one(Input).focus()
@@ -127,7 +149,7 @@ class FolderDialog(ModalScreen[str | None]):
         except (OSError, ValueError):
             valid = False
         if not valid:
-            self.query_one("#folder-error", Static).update("Enter an existing, readable folder.")
+            self.query_one("#folder-error", Static).update(_("Enter an existing, readable folder."))
             return
         self.dismiss(str(folder))
 
@@ -148,8 +170,8 @@ class NameDialog(ModalScreen[str | None]):
     def compose(self) -> ComposeResult:
         with Vertical(classes="dialog"):
             yield Label(self.title_text)
-            yield Input(value=self.value, placeholder="Playlist name", id="playlist-name")
-            yield Static("Enter saves · Esc cancels", classes="dialog-hint")
+            yield Input(value=self.value, placeholder=_("Playlist name"), id="playlist-name")
+            yield Static(_("Enter saves · Esc cancels"), classes="dialog-hint")
 
     def on_mount(self) -> None:
         self.query_one(Input).focus()
@@ -174,13 +196,13 @@ class PlaylistPicker(ModalScreen[int | None]):
 
     def compose(self) -> ComposeResult:
         with Vertical(classes="dialog"):
-            yield Label(f"Add {self.count} {'song' if self.count == 1 else 'songs'} to…")
+            yield Label(n_("Add {n} song to…", "Add {n} songs to…", self.count))
             yield OptionList(
-                "+ New playlist…",
+                _("+ New playlist…"),
                 *(Text(display_text(p.name)) for p in self.playlists),
                 id="playlist-choices",
             )
-            yield Static("Enter chooses · Esc cancels", classes="dialog-hint")
+            yield Static(_("Enter chooses · Esc cancels"), classes="dialog-hint")
 
     def on_mount(self) -> None:
         self.query_one(OptionList).focus()
@@ -207,7 +229,7 @@ class ConfirmDialog(ModalScreen[bool]):
             yield Static(Text(self.message))
             with Horizontal(classes="dialog-buttons"):
                 yield Button(self.confirm, id="confirm", variant="error")
-                yield Button("Cancel", id="cancel")
+                yield Button(_("Cancel"), id="cancel")
 
     def on_mount(self) -> None:
         self.query_one("#cancel", Button).focus()
@@ -232,20 +254,32 @@ class KeyDialog(ModalScreen[tuple[str, bool] | None]):
     def compose(self) -> ComposeResult:
         p = self.provider
         with Vertical(classes="dialog"):
-            yield Label(f"{p.name} API key")
+            yield Label(_("{provider} API key", provider=p.name))
             note = {
-                "environment": f"{p.environment} is set in your environment and takes "
-                "precedence; a key saved here is used once it is unset.",
-                "keychain": "Replacing the saved key. The old one is overwritten.",
-                "session": "Replacing this session's key.",
-            }.get(self.source, f"Create one at {p.signup}. {p.name} bills your account.")
+                "environment": _(
+                    "{variable} is set in your environment and takes precedence; a key saved "
+                    "here is used once it is unset.",
+                    variable=p.environment,
+                ),
+                "keychain": _("Replacing the saved key. The old one is overwritten."),
+                "session": _("Replacing this session's key."),
+            }.get(
+                self.source,
+                _(
+                    "Create one at {signup}. {provider} bills your account.",
+                    signup=p.signup,
+                    provider=p.name,
+                ),
+            )
             yield Static(note, classes="dialog-hint")
-            yield Input(password=True, placeholder=f"{p.name} API key", id="facts-key")
+            yield Input(
+                password=True, placeholder=_("{provider} API key", provider=p.name), id="facts-key"
+            )
             yield Static("", id="facts-error")
             with Horizontal(classes="dialog-buttons"):
-                yield Button("Save to keychain", id="keep", variant="primary")
-                yield Button("This session only", id="session")
-                yield Button("Cancel", id="cancel")
+                yield Button(_("Save to keychain"), id="keep", variant="primary")
+                yield Button(_("This session only"), id="session")
+                yield Button(_("Cancel"), id="cancel")
 
     def on_mount(self) -> None:
         self.query_one(Input).focus()
@@ -264,7 +298,7 @@ class KeyDialog(ModalScreen[tuple[str, bool] | None]):
             return
         key = self.query_one(Input).value.strip()
         if not key:
-            self.query_one("#facts-error", Static).update("Paste a key, or press Esc.")
+            self.query_one("#facts-error", Static).update(_("Paste a key, or press Esc."))
             return
         self.dismiss((key, choice == "keep"))
 
@@ -285,29 +319,34 @@ class ModelDialog(ModalScreen[str | None]):
     def compose(self) -> ComposeResult:
         p = self.provider
         with Vertical(classes="dialog"):
-            yield Label(f"Which {p.name} model writes your notes?")
+            yield Label(_("Which {provider} model writes your notes?", provider=p.name))
             yield Static(
-                f"{p.name} searches the web, then this model reads the pages and writes the "
-                "notes. Larger models usually find better stories and readings, take longer, "
-                "and cost more per song. This changes song notes only.",
+                _(
+                    "{provider} searches the web, then this model reads the pages and writes "
+                    "the notes. Larger models usually find better stories and readings, take "
+                    "longer, and cost more per song. This changes song notes only.",
+                    provider=p.name,
+                ),
                 classes="dialog-hint",
             )
             options = [
                 Text.assemble(
                     ("● " if model == self.current else "  ", self.app.appearance.accent),
                     (model, f"bold {INK}"),
-                    ("  default" if model == p.model else "", QUIET),
-                    f"\n    {about}",
+                    ("  " + _("default") if model == p.model else "", QUIET),
+                    "\n    " + i18n._(about),
                 )
                 for model, about in p.models
             ]
-            options.append(Text("  Another model…\n    Type any model name it offers"))
+            options.append(
+                Text("  " + _("Another model…") + "\n    " + _("Type any model name it offers"))
+            )
             yield OptionList(*options, id="model-choices")
-            yield Input(placeholder=f"{p.name} model name", id="facts-model")
+            yield Input(placeholder=_("{provider} model name", provider=p.name), id="facts-model")
 
     def on_mount(self) -> None:
         choices = self.query_one(OptionList)
-        names = [model for model, _ in self.provider.models]
+        names = [model for model, _about in self.provider.models]
         known = self.current in names
         choices.highlighted = names.index(self.current) if known else len(names)
         model_input = self.query_one(Input)
@@ -366,12 +405,14 @@ class FactsSettings(ModalScreen[None]):
 
     def compose(self) -> ComposeResult:
         with Vertical(classes="dialog", id="facts-settings"):
-            yield Label("Song notes · Behind the record")
+            yield Label(_("Song notes · Behind the record"))
             yield Static("", id="facts-state")
             yield Static(
-                "Providers are asked from the top. The primary answers every new song; a "
-                "fallback is asked only if the ones above it fail. Sent: title, artist, "
-                "album, year. Never: audio, artwork, or file paths.",
+                _(
+                    "Providers are asked from the top. The primary answers every new song; a "
+                    "fallback is asked only if the ones above it fail. Sent: title, artist, "
+                    "album, year. Never: audio, artwork, or file paths."
+                ),
                 classes="dialog-hint",
             )
             yield DataTable(id="facts-providers", cursor_type="row", zebra_stripes=False)
@@ -381,7 +422,7 @@ class FactsSettings(ModalScreen[None]):
 
     def on_mount(self) -> None:
         table = self.query_one(DataTable)
-        for label in ("Role", "Provider", "Key", "Writes notes with"):
+        for label in (_("Role"), _("Provider"), _("Key"), _("Writes notes with")):
             table.add_column(label)
         self.app.refresh_facts_settings(self)
         table.focus()
@@ -393,16 +434,16 @@ class FactsSettings(ModalScreen[None]):
     def role(self, provider_id: str) -> str:
         order = self.config.order
         if provider_id not in order:
-            return "Not used"
+            return _("Not used")
         position = order.index(provider_id)
-        return "Primary" if position == 0 else f"Fallback {position}"
+        return _("Primary") if position == 0 else _("Fallback {position}", position=position)
 
     def key_label(self, p: Provider) -> str:
         return {
-            "keychain": "Saved in keychain",
-            "session": "This session only",
-            "environment": f"From shell ({p.environment})",
-        }.get(self.sources.get(p.id, ""), "No key")
+            "keychain": _("Saved in keychain"),
+            "session": _("This session only"),
+            "environment": _("From shell ({variable})", variable=p.environment),
+        }.get(self.sources.get(p.id, ""), _("No key"))
 
     def show(self, config: FactsConfig, sources: dict[str, str], on: bool, note: str) -> None:
         self.config, self.sources = config, sources
@@ -417,17 +458,19 @@ class FactsSettings(ModalScreen[None]):
                 Text(self.role(provider_id), f"bold {accent}" if used else QUIET),
                 Text(p.name, INK if used else QUIET),
                 Text(self.key_label(p), INK if sources.get(p.id) else QUIET),
-                Text(config.model(p) or "its own model", INK if config.model(p) else QUIET),
+                Text(config.model(p) or _("its own model"), INK if config.model(p) else QUIET),
                 key=provider_id,
             )
         table.move_cursor(row=self.row_ids.index(self.selected_id))
         self.query_one("#facts-state", Static).update(
             Text.assemble(
-                ("Notes are ", QUIET),
-                ("on" if on else "off", f"bold {accent}" if on else "bold"),
+                (
+                    _("Notes are on") if on else _("Notes are off"),
+                    f"bold {accent}" if on else "bold",
+                ),
                 ("  ·  ", QUIET),
                 ("t", "bold"),
-                (f" to turn {'off' if on else 'on'}", QUIET),
+                (" " + (_("to turn off") if on else _("to turn on")), QUIET),
             )
         )
         self.query_one("#facts-note", Static).update(Text(note, accent))
@@ -439,33 +482,33 @@ class FactsSettings(ModalScreen[None]):
         order = self.config.order
         model = self.config.model(p)
         if p.id not in order:
-            role = "Not used. Press space to add it as the last fallback."
+            role = _("Not used. Press space to add it as the last fallback.")
         elif order.index(p.id) == 0:
-            role = "Primary: asked first for every new song."
+            role = _("Primary: asked first for every new song.")
         else:
             above = PROVIDERS[order[order.index(p.id) - 1]].name
-            role = f"Fallback: asked only if {above} fails."
+            role = _("Fallback: asked only if {provider} fails.", provider=above)
         writer = (
-            f"Notes are written by {model}."
+            _("Notes are written by {model}.", model=model)
             if model
-            else f"{p.name} picks the model that writes the notes."
+            else _("{provider} picks the model that writes the notes.", provider=p.name)
         )
         self.query_one("#facts-detail", Static).update(
             Text.assemble((p.name, f"bold {INK}"), "  ", (f"{role} {writer}", QUIET))
         )
-        actions = [("enter", "replace key" if self.sources.get(p.id) else "add key")]
+        actions = [("enter", _("replace key") if self.sources.get(p.id) else _("add key"))]
         if p.id in order:
-            actions.append(("space", "stop using"))
+            actions.append(("space", _("stop using")))
             if len(order) > 1:
-                actions.append(("K/J or 1-5", "move up/down"))
+                actions.append(("K/J or 1-5", _("move up/down")))
         else:
-            actions.append(("space", "use as fallback"))
-            actions.append(("1", "make primary"))
+            actions.append(("space", _("use as fallback")))
+            actions.append(("1", _("make primary")))
         if p.models:
-            actions.append(("m", "change model"))
+            actions.append(("m", _("change model")))
         if self.sources.get(p.id) in {"keychain", "session"}:
-            actions.append(("d", "remove key"))
-        actions.append(("esc", "close"))
+            actions.append(("d", _("remove key")))
+        actions.append(("esc", _("close")))
         hints = Text()
         for index, (key, label) in enumerate(actions):
             hints.append("   " if index else "")
@@ -602,6 +645,7 @@ class KirlianApp(App):
         self.appearance = Appearance.load(library)
         if characters:
             self.appearance = replace(self.appearance, characters=characters)
+        set_language(resolve(self.appearance.language))
         self.personalizing = False
         self.appearance_saving = False
         self.appearance_error = ""
@@ -657,71 +701,77 @@ class KirlianApp(App):
         with Horizontal(id="masthead"):
             yield Brand(id="brand")
             yield Static("", id="search-hint")
-        yield Input(placeholder="Search songs, albums, artists…", id="search")
+        yield Input(placeholder=_("Search songs, albums, artists…"), id="search")
         with Horizontal(id="body"):
             with Vertical(id="navigation"):
-                yield Static("LIBRARY", id="nav-heading")
-                yield OptionList("Albums", "Artists", "Songs", "Playlists", "Queue", id="nav")
+                yield Static(_("LIBRARY"), id="nav-heading")
+                yield OptionList(
+                    _("Albums"), _("Artists"), _("Songs"), _("Playlists"), _("Queue"), id="nav"
+                )
             with Vertical(id="browser"):
                 yield Static("", id="breadcrumb")
                 with Horizontal(id="collection-header"):
-                    yield Static("Albums", id="heading")
+                    yield Static(_("Albums"), id="heading")
                     yield Static("", id="collection-detail")
                 yield LibraryTable(id="tracks", cursor_type="row", zebra_stripes=False)
-                yield Static("Choose a music folder with f to begin.", id="empty")
+                yield Static(_("Choose a music folder with f to begin."), id="empty")
             with RecordPane(id="context"):
                 yield CoverImage(self.artwork_mode, no_color=self.no_color, id="cover")
                 yield Static("", id="cover-placeholder")
-                yield Static("LOCAL MUSIC", id="record-details")
+                yield Static(_("LOCAL MUSIC"), id="record-details")
                 yield Static("", id="record-note")
                 with Vertical(id="fact-card"):
                     with Horizontal(id="fact-heading"):
-                        yield Static("BEHIND THE RECORD", id="fact-label")
+                        yield Static(_("BEHIND THE RECORD"), id="fact-label")
                         yield Static(SPARK, id="fact-spark")
                     yield Static("", id="fact-text")
                     yield TitleRhythm(id="fact-pulse")
                     yield Static("", id="fact-source")
         with Vertical(id="personalization"):
-            yield Static("Make it yours", id="appearance-heading")
+            yield Static(_("Make it yours"), id="appearance-heading")
             with VerticalScroll(id="appearance-fields"):
                 yield Static("", id="appearance-preview")
                 for name, label in (
-                    ("palette", "Interface palette"),
-                    ("motion", "Motion"),
-                    ("characters", "Characters"),
+                    ("palette", _("Interface palette")),
+                    ("motion", _("Motion")),
+                    ("characters", _("Characters")),
+                    ("language", _("Language")),
                 ):
                     with Horizontal(classes="preference-row"):
                         yield Label(label)
                         yield Select(
-                            OPTIONS[name],
+                            [(i18n._(option), value) for option, value in OPTIONS[name]],
                             value=getattr(self.appearance, name),
                             allow_blank=False,
                             id=f"pref-{name}",
                         )
                 yield Static(
-                    "Interface color changes controls and highlights. "
-                    "The ribbon keeps the playing album's colors.",
+                    _(
+                        "Interface color changes controls and highlights. "
+                        "The ribbon keeps the playing album's colors."
+                    ),
                     id="appearance-explanation",
                 )
                 yield Static("", id="appearance-context")
             yield Static("", id="appearance-feedback")
             with Horizontal(id="appearance-buttons"):
-                yield Button("Save changes", id="appearance-keep", variant="primary")
-                yield Button("Reset", id="appearance-reset")
-                yield Button("Cancel", id="appearance-cancel")
+                yield Button(_("Save changes"), id="appearance-keep", variant="primary")
+                yield Button(_("Reset"), id="appearance-reset")
+                yield Button(_("Cancel"), id="appearance-cancel")
         yield Static("", id="status")
         with Vertical(id="playback"):
             with Horizontal(id="now-playing"):
                 yield Static("○", id="play-state")
                 yield Static(
-                    "Nothing playing\nChoose a song from your library.", id="playing-label"
+                    _("Nothing playing") + "\n" + _("Choose a song from your library."),
+                    id="playing-label",
                 )
                 yield Static("", id="playing-time")
             yield Animation(id="animation")
             yield Progress(id="progress")
         with Horizontal(id="footer"):
             yield Static("", id="shortcuts")
-            yield Static("vol 50%", id="volume")
+            yield Static(_("vol {percent}%", percent=50), id="volume")
 
     def on_mount(self) -> None:
         self.query_one("#search").display = False
@@ -733,9 +783,9 @@ class KirlianApp(App):
             self.query_one("#cover-placeholder").display = False
         self.apply_appearance()
         table = self.query_one(DataTable)
-        table.add_column("Record / song", key="title", width=28)
-        table.add_column("Artist / detail", key="detail", width=18)
-        table.add_column("Time", key="time", width=6)
+        table.add_column(_("Record / song"), key="title", width=28)
+        table.add_column(_("Artist / detail"), key="detail", width=18)
+        table.add_column(_("Time"), key="time", width=6)
         self.query_one("#nav", OptionList).highlighted = 0
         table.focus()
         self.update_footer()
@@ -745,7 +795,7 @@ class KirlianApp(App):
     @work
     async def boot(self) -> None:
         await self.refresh_library()
-        self.status("Starting the playback engine…")
+        self.status(_("Starting the playback engine…"))
         try:
             await self.player.start()
             self.ready = True
@@ -819,29 +869,29 @@ class KirlianApp(App):
             table.columns["title"].width = 6 if in_album else int(available * 0.65)
             table.columns["detail"].width = available - table.columns["title"].width
             title = (
-                "TITLE"
+                _("TITLE")
                 if self.searching
-                else "ALBUM"
+                else _("ALBUM")
                 if self.view in {"albums", "artist"}
-                else "ARTIST"
+                else _("ARTIST")
                 if self.view == "artists"
-                else "PLAYLIST"
+                else _("PLAYLIST")
                 if self.view == "playlists"
-                else "SONG"
+                else _("SONG")
             )
             table.columns["title"].label = Text("#" if in_album else title)
             table.columns["detail"].label = Text(
-                "TITLE"
+                _("TITLE")
                 if in_album
-                else "TYPE / ARTIST"
+                else _("TYPE / ARTIST")
                 if self.searching
                 else ""
                 if self.view == "artists"
-                else "SONGS"
+                else _("SONGS")
                 if self.view == "playlists"
-                else "ARTIST"
+                else _("ARTIST")
             )
-            table.columns["time"].label = Text("TIME", justify="right")
+            table.columns["time"].label = Text(_("TIME"), justify="right")
             table.refresh_columns()
 
     def status(self, message: str) -> None:
@@ -860,26 +910,34 @@ class KirlianApp(App):
         return text
 
     def update_footer(self) -> None:
-        self.update_text("#search-hint", self.key_hints([("/", "search"), ("p", "personalize")]))
+        self.update_text(
+            "#search-hint", self.key_hints([("/", _("search")), ("p", _("personalize"))])
+        )
         row = self.selected()
         state = getattr(self, "display_state", self.player.state)
+        opens = row and row.kind in {"album", "artist", "playlist"}
         hint = [
-            ("enter", "open" if row and row.kind in {"album", "artist", "playlist"} else "play"),
-            ("space", "pause" if not (state.paused or state.idle) else "play"),
+            ("enter", _("open") if opens else _("play")),
+            ("space", _("pause") if not (state.paused or state.idle) else _("play")),
         ]
         if row and row.kind in {"track", "album", "entry", "queue"}:
-            hint.append(("+", "playlist"))
+            hint.append(("+", _("playlist")))
         if self.view == "playlists" and row and row.kind == "playlist":
-            hint += [("e", "rename"), ("d", "delete")]
+            hint += [("e", _("rename")), ("d", _("delete"))]
         elif self.view == "playlist" and row:
-            hint += [("J/K", "move"), ("d", "remove")]
+            hint += [("J/K", _("move")), ("d", _("remove"))]
         else:
-            hint.append(("x", "pattern"))
-        hint += [("?", "help"), ("q", "quit")]
+            hint.append(("x", _("pattern")))
+        hint += [("?", _("help")), ("q", _("quit"))]
         if self.searching:
-            hint = [("enter", "open/play"), ("tab", "results"), ("esc", "back")]
+            hint = [("enter", _("open/play")), ("tab", _("results")), ("esc", _("back"))]
         if self.personalizing:
-            hint = [("tab", "move"), ("enter", "choose"), ("ctrl+s", "save"), ("esc", "cancel")]
+            hint = [
+                ("tab", _("move")),
+                ("enter", _("choose")),
+                ("ctrl+s", _("save")),
+                ("esc", _("cancel")),
+            ]
         self.update_text("#shortcuts", self.key_hints(hint))
 
     def update_text(self, selector: str, content: Text | str) -> None:
@@ -893,7 +951,7 @@ class KirlianApp(App):
 
     def track_row(self, track: Track, detail: str | None = None) -> Row:
         marker = "> " if self.player.state.path == track.path and not self.player.state.idle else ""
-        unavailable = " [unavailable]" if not track.available else ""
+        unavailable = " " + _("[unavailable]") if not track.available else ""
         return Row(
             "track",
             track.path,
@@ -909,25 +967,35 @@ class KirlianApp(App):
         previous = self.selected()
         old_position = table.cursor_row
         rows: list[Row] = []
-        heading = self.view.title()
+        heading = {
+            "albums": _("Albums"),
+            "artists": _("Artists"),
+            "songs": _("Songs"),
+            "playlists": _("Playlists"),
+            "queue": _("Queue"),
+        }.get(self.view, self.view.title())
         if self.searching:
             query = self.query_one("#search", Input).value.casefold().strip()
-            heading = "Search"
+            heading = _("Search")
             if query:
                 rows.extend(
-                    Row("album", a.id, a.title, f"Album · {a.artist}")
+                    Row("album", a.id, a.title, _("Album · {artist}", artist=a.artist))
                     for a in self.albums
                     if query in f"{a.title} {a.artist}".casefold()
                 )
                 artists = sorted({t.artist for t in self.tracks}, key=str.casefold)
-                rows.extend(Row("artist", a, a, "Artist") for a in artists if query in a.casefold())
                 rows.extend(
-                    self.track_row(t, f"Song · {t.artist} · {t.album}")
+                    Row("artist", a, a, _("Artist")) for a in artists if query in a.casefold()
+                )
+                rows.extend(
+                    self.track_row(
+                        t, _("Song · {artist} · {album}", artist=t.artist, album=t.album)
+                    )
                     for t in self.tracks
                     if query in f"{t.title} {t.artist} {t.album}".casefold()
                 )
                 rows.extend(
-                    Row("playlist", str(p.id), display_text(p.name), "Playlist")
+                    Row("playlist", str(p.id), display_text(p.name), _("Playlist"))
                     for p in self.playlist_list
                     if query in p.name.casefold()
                 )
@@ -947,7 +1015,7 @@ class KirlianApp(App):
             ]
         elif self.view == "album":
             album = self.album(self.view_value)
-            heading = album.title if album else "Album unavailable"
+            heading = album.title if album else _("Album unavailable")
             if album:
                 rows = [
                     self.track_row(t, f"{t.disc}.{t.track:02d} · {t.artist}") for t in album.tracks
@@ -960,14 +1028,14 @@ class KirlianApp(App):
                 if any(t.artist == self.view_value for t in a.tracks)
             ]
         elif self.view == "playlists":
-            rows = [Row("new-playlist", "", "+ New playlist", "")]
+            rows = [Row("new-playlist", "", _("+ New playlist"), "")]
             rows.extend(
                 Row("playlist", str(p.id), display_text(p.name), f"{p.size}")
                 for p in self.playlist_list
             )
         elif self.view == "playlist":
             playlist = self.playlist(self.view_value)
-            heading = display_text(playlist.name) if playlist else "Playlist unavailable"
+            heading = display_text(playlist.name) if playlist else _("Playlist unavailable")
             for entry in self.playlist_entries if playlist else []:
                 track = self.by_path.get(entry.path)
                 if track:
@@ -975,7 +1043,8 @@ class KirlianApp(App):
                     rows.append(replace(row, kind="entry", value=str(entry.id)))
                 else:
                     name = display_text(Path(entry.path).name)
-                    rows.append(Row("entry", str(entry.id), f"{name} [unavailable]", ""))
+                    title = _("{name} [unavailable]", name=name)
+                    rows.append(Row("entry", str(entry.id), title, ""))
         elif self.view == "queue":
             for index, item in enumerate(self.player.state.playlist):
                 track = self.by_path.get(item["filename"])
@@ -1033,14 +1102,21 @@ class KirlianApp(App):
         )
         breadcrumb = self.query_one("#breadcrumb", Static)
         breadcrumb.update(
-            Text(f"Albums / {album.artist}" if album else "Playlists" if playlist else "")
+            Text(
+                _("Albums / {artist}", artist=album.artist)
+                if album
+                else _("Playlists")
+                if playlist
+                else ""
+            )
         )
         breadcrumb.display = album is not None or playlist is not None
         if album:
+            year = album.tracks[0].year
             detail = (
-                f"{album.tracks[0].year + ' · ' if album.tracks[0].year else ''}"
-                f"{len(album.tracks)} {'song' if len(album.tracks) == 1 else 'songs'} · "
-                f"{clock(sum(t.duration for t in album.tracks))}"
+                f"{year + ' · ' if year else ''}"
+                + n_("{n} song", "{n} songs", len(album.tracks))
+                + f" · {clock(sum(t.duration for t in album.tracks))}"
             )
         elif playlist:
             seconds = sum(
@@ -1048,22 +1124,32 @@ class KirlianApp(App):
                 for e in self.playlist_entries
                 if e.path in self.by_path
             )
-            detail = f"{len(rows)} {'song' if len(rows) == 1 else 'songs'} · {clock(seconds)}"
+            detail = n_("{n} song", "{n} songs", len(rows)) + f" · {clock(seconds)}"
         elif self.view == "playlists" and not self.searching:
-            detail = f"{len(self.playlist_list)} playlists"
+            detail = n_("{n} playlist", "{n} playlists", len(self.playlist_list))
+        elif self.searching:
+            detail = n_("{n} result", "{n} results", len(rows))
+        elif self.view == "albums":
+            detail = n_("{n} album", "{n} albums", len(rows))
+        elif self.view == "artists":
+            detail = n_("{n} artist", "{n} artists", len(rows))
+        elif self.view == "songs":
+            detail = n_("{n} song", "{n} songs", len(rows))
+        elif self.view == "queue":
+            detail = n_("{n} in queue", "{n} in queue", len(rows))
         else:
-            detail = f"{len(rows)} {'results' if self.searching else self.view}"
+            detail = f"{len(rows)} {self.view}"
         self.query_one("#collection-detail", Static).update(Text(detail))
         empty = self.query_one("#empty", Static)
         empty.display = not rows
         empty.update(
-            "No matching music."
+            _("No matching music.")
             if self.searching
-            else "This playlist is empty. Select a song or album elsewhere and press +."
+            else _("This playlist is empty. Select a song or album elsewhere and press +.")
             if self.view == "playlist"
-            else "Queue is empty. Append with a, or play a track."
+            else _("Queue is empty. Append with a, or play a track.")
             if self.view == "queue"
-            else "No music here yet. Press f to choose a folder, or r to rescan."
+            else _("No music here yet. Press f to choose a folder, or r to rescan.")
         )
         self.size_columns()
         self.update_context()
@@ -1104,15 +1190,17 @@ class KirlianApp(App):
             formats = " / ".join(sorted({t.format for t in album.tracks}))
             details.append(f"{year + ' · ' if year else ''}{formats}\n")
             details.append(
-                f"{len(album.tracks)} {'song' if len(album.tracks) == 1 else 'songs'} · "
-                f"{clock(sum(t.duration for t in album.tracks))}"
+                n_("{n} song", "{n} songs", len(album.tracks))
+                + f" · {clock(sum(t.duration for t in album.tracks))}"
             )
             if track:
-                note.append("ON THIS RECORD\n\n", style="#958c98")
+                note.append(_("ON THIS RECORD") + "\n\n", style="#958c98")
                 note.append(track.title + "\n", style="#e5ddcd")
                 note.append(f"{track.disc}.{track.track:02d} · {clock(track.duration)}")
         else:
-            details.append(f"LOCAL MUSIC\n\n{len(self.albums)} albums\n{len(self.tracks)} songs")
+            details.append(_("LOCAL MUSIC") + "\n\n")
+            details.append(n_("{n} album", "{n} albums", len(self.albums)) + "\n")
+            details.append(n_("{n} song", "{n} songs", len(self.tracks)))
         self.query_one("#record-details", Static).update(details)
         record_note = self.query_one("#record-note", Static)
         record_note.update(note)
@@ -1134,20 +1222,18 @@ class KirlianApp(App):
                 # Hide stale art without throwing away reusable native placements.
                 self.query_one(CoverImage).display = False
                 label = self.query_one("#cover-placeholder", Static)
-                label.update("Loading cover…")
+                label.update(_("Loading cover…"))
                 label.display = True
                 self.fetch_cover(key, tuple(t.path for t in album.tracks), revision)
         else:
             self.show_cover(None, "")
 
-    def show_cover(
-        self, image: PILImage.Image | None, placeholder: str = "No cover in these files"
-    ) -> None:
+    def show_cover(self, image: PILImage.Image | None, placeholder: str | None = None) -> None:
         cover = self.query_one("#cover", CoverImage)
         cover.image = image
         cover.display = image is not None and cover.mode != "off"
         label = self.query_one("#cover-placeholder", Static)
-        label.update(placeholder)
+        label.update(_("No cover in these files") if placeholder is None else placeholder)
         label.display = image is None and cover.mode != "off"
 
     @work(group="artwork", exclusive=True)
@@ -1201,7 +1287,7 @@ class KirlianApp(App):
         elif row.kind == "track":
             track = self.by_path[row.value]
             if not track.available:
-                self.status("This file is unavailable. Restore it and rescan with r.")
+                self.status(_("This file is unavailable. Restore it and rescan with r."))
                 return
             album = self.album(track.album_id)
             if album:
@@ -1214,7 +1300,7 @@ class KirlianApp(App):
             self.query_one("#search").display = False
             self.open_playlist(row.value)
         elif row.kind == "new-playlist":
-            self.push_screen(NameDialog("New playlist"), self.create_playlist)
+            self.push_screen(NameDialog(_("New playlist")), self.create_playlist)
         elif row.kind == "entry":
             self.play_playlist(row.value)
         self.query_one(DataTable).focus()
@@ -1233,7 +1319,7 @@ class KirlianApp(App):
         ]
         start = next((i for i, e in enumerate(playable) if str(e.id) == entry_id), None)
         if start is None:
-            self.status("This file is unavailable. Restore it and rescan, or remove it with d.")
+            self.status(_("This file is unavailable. Restore it and rescan, or remove it with d."))
             return
         self.perform(self.player.play([e.path for e in playable], start))
 
@@ -1243,7 +1329,12 @@ class KirlianApp(App):
             return
         await asyncio.to_thread(self.playlists.create, name)
         await self.refresh_playlists()
-        self.status(f"Created {display_text(name)}. Select songs or albums and press + to add.")
+        self.status(
+            _(
+                "Created {playlist}. Select songs or albums and press + to add.",
+                playlist=display_text(name),
+            )
+        )
 
     def selected_paths(self) -> list[str]:
         row = self.selected()
@@ -1264,13 +1355,14 @@ class KirlianApp(App):
     def action_playlist_add(self) -> None:
         paths = self.selected_paths()
         if not paths:
-            self.status("Select a song or album to add it to a playlist.")
+            self.status(_("Select a song or album to add it to a playlist."))
             return
 
         def chosen(playlist_id: int | None) -> None:
             if playlist_id == 0:
                 self.push_screen(
-                    NameDialog("New playlist"), lambda name: self.add_to_playlist(paths, None, name)
+                    NameDialog(_("New playlist")),
+                    lambda name: self.add_to_playlist(paths, None, name),
                 )
             elif playlist_id is not None:
                 self.add_to_playlist(paths, playlist_id, None)
@@ -1288,8 +1380,18 @@ class KirlianApp(App):
         await asyncio.to_thread(self.playlists.add, playlist_id, paths)
         await self.refresh_playlists()
         playlist = self.playlist(str(playlist_id))
-        label = display_text(playlist.name) if playlist else "the playlist"
-        self.status(f"Added {len(paths)} {'song' if len(paths) == 1 else 'songs'} to {label}.")
+        if playlist:
+            message = n_(
+                "Added {n} song to {playlist}.",
+                "Added {n} songs to {playlist}.",
+                len(paths),
+                playlist=display_text(playlist.name),
+            )
+        else:
+            message = n_(
+                "Added {n} song to the playlist.", "Added {n} songs to the playlist.", len(paths)
+            )
+        self.status(message)
 
     def action_playlist_rename(self) -> None:
         row = self.selected()
@@ -1302,7 +1404,7 @@ class KirlianApp(App):
         )
         if playlist_id and (playlist := self.playlist(playlist_id)):
             self.push_screen(
-                NameDialog("Rename playlist", playlist.name),
+                NameDialog(_("Rename playlist"), playlist.name),
                 lambda name: self.rename_playlist(playlist.id, name),
             )
 
@@ -1321,9 +1423,11 @@ class KirlianApp(App):
         elif row.kind == "playlist" and (playlist := self.playlist(row.value)):
             self.push_screen(
                 ConfirmDialog(
-                    f"Delete the playlist “{display_text(playlist.name)}”? "
-                    "Your music files are not touched.",
-                    "Delete",
+                    _(
+                        "Delete the playlist “{playlist}”? Your music files are not touched.",
+                        playlist=display_text(playlist.name),
+                    ),
+                    _("Delete"),
                 ),
                 lambda confirmed: confirmed and self.delete_playlist(playlist.id),
             )
@@ -1337,7 +1441,7 @@ class KirlianApp(App):
     async def delete_playlist(self, playlist_id: int) -> None:
         await asyncio.to_thread(self.playlists.delete, playlist_id)
         await self.refresh_playlists()
-        self.status("Playlist deleted. No music files were changed.")
+        self.status(_("Playlist deleted. No music files were changed."))
 
     def action_playlist_move(self, offset: int) -> None:
         row = self.selected()
@@ -1419,15 +1523,18 @@ class KirlianApp(App):
         if paths:
             self.append_paths(paths)
         else:
-            self.status("This playlist has no available songs to append.")
+            self.status(_("This playlist has no available songs to append."))
 
     @work(group="playback")
     async def append_paths(self, paths: list[str]) -> None:
         try:
             await self.player.append(paths)
             self.status(
-                f"Appended {len(paths)} track(s). Open Queue to inspect; "
-                "Space starts an idle queue."
+                n_(
+                    "Appended {n} track. Open Queue to inspect; Space starts an idle queue.",
+                    "Appended {n} tracks. Open Queue to inspect; Space starts an idle queue.",
+                    len(paths),
+                )
             )
         except PlaybackError as error:
             self.status(str(error))
@@ -1451,7 +1558,7 @@ class KirlianApp(App):
     def action_folder(self) -> None:
         if self.scanning:
             self.status(
-                "Indexing is still running. You can choose another folder when it finishes."
+                _("Indexing is still running. You can choose another folder when it finishes.")
             )
             return
         self.push_screen(FolderDialog(), self.start_scan)
@@ -1460,7 +1567,7 @@ class KirlianApp(App):
         if folder and not self.scanning:
             self.scanning = True
             self.stop_scan.clear()
-            self.status("Indexing music… You can keep browsing and listening.")
+            self.status(_("Indexing music… You can keep browsing and listening."))
             self.scan(folder)
 
     @work(thread=True, group="scan")
@@ -1481,7 +1588,7 @@ class KirlianApp(App):
 
     def action_rescan(self) -> None:
         if self.scanning:
-            self.status("Indexing is already running.")
+            self.status(_("Indexing is already running."))
         elif folder := self.library.setting("music_folder"):
             self.start_scan(folder)
         else:
@@ -1494,15 +1601,15 @@ class KirlianApp(App):
         self.display_state = state
         track = self.by_path.get(state.path)
         title = track.title if track else display_text(Path(state.path).name) if state.path else ""
-        artist = track.artist if track else "Local music"
+        artist = track.artist if track else _("Local music")
         mode = (
-            "Loading"
+            _("Loading")
             if state.loading
-            else "Stopped"
+            else _("Stopped")
             if state.idle
-            else "Paused"
+            else _("Paused")
             if state.paused
-            else "Playing"
+            else _("Playing")
         )
         symbol = "○" if state.idle else "·" if state.loading else "Ⅱ" if state.paused else "▶"
         if self.appearance.characters == "ascii":
@@ -1511,8 +1618,13 @@ class KirlianApp(App):
         self.update_text(
             "#playing-label",
             Text.assemble(
-                (title or "Nothing playing", INK),
-                (f"\n{artist} · {mode}" if title else "\nChoose a song from your library.", QUIET),
+                (title or _("Nothing playing"), INK),
+                (
+                    f"\n{artist} · {mode}"
+                    if title
+                    else "\n" + _("Choose a song from your library."),
+                    QUIET,
+                ),
             ),
         )
         self.update_text(
@@ -1524,7 +1636,7 @@ class KirlianApp(App):
             if title or state.duration
             else Text(""),
         )
-        self.update_text("#volume", f"vol {state.volume:.0f}%")
+        self.update_text("#volume", _("vol {percent}%", percent=f"{state.volume:.0f}"))
         self.query_one(Progress).set_progress(state.position, state.duration)
         animation = self.query_one(Animation)
         previous_serial = animation.clock.serial
@@ -1603,7 +1715,7 @@ class KirlianApp(App):
             self.load_facts(track, self.fact_revision)
         elif not self.library.setting("facts"):
             self.library.set_setting("facts", "invited")
-            self.status("Optional: press i for short notes on how each song was made.")
+            self.status(_("Optional: press i for short notes on how each song was made."))
 
     @work(group="facts")
     async def load_facts(self, track: Track, revision: int) -> None:
@@ -1654,11 +1766,16 @@ class KirlianApp(App):
             self.status(
                 " ".join(errors)
                 if errors
-                else "No song-notes provider with a key is in use. Press i to set one up."
+                else _("No song-notes provider with a key is in use. Press i to set one up.")
             )
             return
         if errors:
-            self.status(f"{' '.join(errors)} Used {facts[0].provider if facts else 'a fallback'}.")
+            used = (
+                _("Used {provider}.", provider=facts[0].provider)
+                if facts
+                else _("Used a fallback.")
+            )
+            self.status(f"{' '.join(errors)} {used}")
         self.facts = facts
         self.fact_index = 0
         self.update_context()
@@ -1672,12 +1789,12 @@ class KirlianApp(App):
         show = show and (album is None or album.id == playing.album_id)
         loading = show and not self.facts
         if loading:
+            provider = self.fact_loading_provider.name if self.fact_loading_provider else ""
+            before, _slot, after = _("Asking {provider} while the title keeps time").partition(
+                "{provider}"
+            )
             self.query_one("#fact-text", Static).update(
-                Text.assemble(
-                    ("Asking ", QUIET),
-                    (self.fact_loading_provider.name if self.fact_loading_provider else "", INK),
-                    (" while the title keeps time", QUIET),
-                )
+                Text.assemble((before, QUIET), (provider, INK), (after, QUIET))
             )
             pulse.play(
                 playing.title,
@@ -1695,17 +1812,28 @@ class KirlianApp(App):
                 Text.assemble((fact.headline, f"bold {INK}"), "\n\n", (fact.body, INK))
             )
             reading = fact.kind == "reading"
+            template = _("A reading, drawing on {source}") if reading else _("Source: {source}")
+            before, _slot, after = template.partition("{source}")
             source = Text.assemble(
-                ("A reading, drawing on " if reading else "Source: ", QUIET),
+                (before, QUIET),
                 (fact.source_label, INK),
-                (f" · via {fact.provider}" if fact.provider else "", QUIET),
+                (after, QUIET),
+                (
+                    " · " + _("via {provider}", provider=fact.provider) if fact.provider else "",
+                    QUIET,
+                ),
                 "\n\n",
             )
             if len(self.facts) > 1:
                 source.append("[ ]", self.appearance.accent)
-                source.append(f" more notes {self.fact_index + 1}/{len(self.facts)}   ", QUIET)
+                more = _(
+                    "more notes {index}/{total}",
+                    index=self.fact_index + 1,
+                    total=len(self.facts),
+                )
+                source.append(f" {more}   ", QUIET)
             source.append("o", self.appearance.accent)
-            source.append(" source", QUIET)
+            source.append(" " + _("source"), QUIET)
             self.query_one("#fact-source", Static).update(source)
         if card.display != show:
             card.display = show
@@ -1725,13 +1853,16 @@ class KirlianApp(App):
     def open_url(self, url: str) -> None:
         opened = webbrowser.open(url)
         self.call_from_thread(
-            self.status, "Opened the source in your browser." if opened else f"Source: {url}"
+            self.status,
+            _("Opened the source in your browser.")
+            if opened
+            else _("Source: {source}", source=url),
         )
 
     def action_facts_setup(self) -> None:
         self.push_screen(FactsSettings(), self.facts_settings_closed)
 
-    def facts_settings_closed(self, _: None = None) -> None:
+    def facts_settings_closed(self, _result: None = None) -> None:
         """Apply changed providers, keys, or models to the playing song."""
         self.facts_asked.clear()  # Fixed keys and new providers deserve another try.
         self.facts = []
@@ -1769,27 +1900,29 @@ class KirlianApp(App):
     ) -> None:
         stored = await asyncio.to_thread(self.credentials.save, provider, key, remember)
         note = (
-            f"{provider.name} key saved to the keychain."
+            _("{provider} key saved to the keychain.", provider=provider.name)
             if remember and stored
-            else f"{provider.name} key set for this session."
+            else _("{provider} key set for this session.", provider=provider.name)
             if not remember
-            else "No system keychain is available; the key lasts for this session only."
+            else _("No system keychain is available; the key lasts for this session only.")
         )
         if provider.id not in self.facts_config.order:
             self.facts_config.order.append(provider.id)
-            note += f" {provider.name} added to the order."
+            note += " " + _("{provider} added to the order.", provider=provider.name)
         if not self.facts_on:
             self.facts_on = True
-            note += " Notes on."
+            note += " " + _("Notes on.")
         self.persist_facts(screen, note)
 
     def facts_role_note(self, provider: Provider) -> str:
         order = self.facts_config.order
         if provider.id not in order:
-            return f"{provider.name} is no longer used."
+            return _("{provider} is no longer used.", provider=provider.name)
         position = order.index(provider.id)
-        return f"{provider.name} is now " + (
-            "the primary." if position == 0 else f"fallback {position}."
+        if position == 0:
+            return _("{provider} is now the primary.", provider=provider.name)
+        return _(
+            "{provider} is now fallback {position}.", provider=provider.name, position=position
         )
 
     def use_facts_provider(self, screen: FactsSettings, provider: Provider) -> None:
@@ -1803,7 +1936,9 @@ class KirlianApp(App):
     def move_facts_provider(self, screen: FactsSettings, provider: Provider, step: int) -> None:
         order = self.facts_config.order
         if provider.id not in order:
-            self.refresh_facts_settings(screen, f"Press space to use {provider.name} first.")
+            self.refresh_facts_settings(
+                screen, _("Press space to use {provider} first.", provider=provider.name)
+            )
             return
         self.place_facts_provider(screen, provider, order.index(provider.id) + 1 + step)
 
@@ -1819,7 +1954,9 @@ class KirlianApp(App):
 
     def edit_facts_model(self, screen: FactsSettings, provider: Provider) -> None:
         if not provider.models:
-            self.refresh_facts_settings(screen, f"{provider.name} chooses its own model.")
+            self.refresh_facts_settings(
+                screen, _("{provider} chooses its own model.", provider=provider.name)
+            )
             return
 
         def done(model: str | None) -> None:
@@ -1829,24 +1966,36 @@ class KirlianApp(App):
                 self.facts_config.models[provider.id] = model
             else:
                 self.facts_config.models.pop(provider.id, None)
-            self.persist_facts(screen, f"{provider.name} uses {self.facts_config.model(provider)}.")
+            self.persist_facts(
+                screen,
+                _(
+                    "{provider} uses {model}.",
+                    provider=provider.name,
+                    model=self.facts_config.model(provider),
+                ),
+            )
 
         self.push_screen(ModelDialog(provider, self.facts_config.model(provider)), done)
 
     @work(group="facts-settings")
     async def forget_facts_key(self, screen: FactsSettings, provider: Provider) -> None:
         if await asyncio.to_thread(self.credentials.source, provider) == "environment":
-            note = f"{provider.environment} is set in your shell; unset it to remove that key."
+            note = _(
+                "{variable} is set in your shell; unset it to remove that key.",
+                variable=provider.environment,
+            )
         else:
             await asyncio.to_thread(self.credentials.forget, provider)
-            note = f"{provider.name} key removed."
+            note = _("{provider} key removed.", provider=provider.name)
         self.refresh_facts_settings(screen, note)
 
     def toggle_facts(self, screen: FactsSettings) -> None:
         self.facts_on = not self.facts_on
         if not self.facts_on:
             self.fact_revision += 1  # Drop any answer still on its way.
-        self.persist_facts(screen, "Notes on." if self.facts_on else "Notes off. Keys are kept.")
+        self.persist_facts(
+            screen, _("Notes on.") if self.facts_on else _("Notes off. Keys are kept.")
+        )
 
     def apply_appearance(self) -> None:
         self.theme = f"kirlian-{self.appearance.palette}"
@@ -1882,19 +2031,34 @@ class KirlianApp(App):
 
     def update_appearance_feedback(self) -> None:
         accent, selected = PALETTES[self.appearance.palette]
+        palette = next(
+            (
+                i18n._(label)
+                for label, value in OPTIONS["palette"]
+                if value == self.appearance.palette
+            ),
+            self.appearance.palette.title(),
+        )
         preview = Text.assemble(
-            (f" {self.appearance.palette.title()} ", f"{INK} on {selected}"),
-            ("  Selected row   ", QUIET),
-            ("/ search   p personalize", accent),
+            (f" {palette} ", f"{INK} on {selected}"),
+            ("  " + _("Selected row") + "   ", QUIET),
+            (f"/ {_('search')}   p {_('personalize')}", accent),
         )
         self.update_text("#appearance-preview", preview)
         notes = []
         if self.no_color:
-            notes.append("Color is disabled by NO_COLOR; the palette will display in grayscale.")
+            notes.append(_("Color is disabled by NO_COLOR; the palette will display in grayscale."))
         state = getattr(self, "display_state", self.player.state)
         if self.appearance.motion == "gentle" and (state.paused or state.idle or state.loading):
             notes.append(
-                "The ribbon moves during playback; it stays still while paused or stopped."
+                _("The ribbon moves during playback; it stays still while paused or stopped.")
+            )
+        if self.language_pending():
+            notes.append(
+                _(
+                    "The interface language changes the next time you open Kirlian. "
+                    "Song notes switch then too."
+                )
             )
         context = self.query_one("#appearance-context", Static)
         content = "\n".join(notes)
@@ -1902,16 +2066,20 @@ class KirlianApp(App):
             context.update(content)
         context.display = bool(content)
         if self.appearance_saving:
-            feedback = "Saving changes…"
+            feedback = _("Saving changes…")
         elif self.appearance_error:
             feedback = self.appearance_error
         elif self.appearance != self.preferences_before:
-            feedback = "Unsaved preview · Ctrl+S saves · Esc cancels"
+            feedback = _("Unsaved preview · Ctrl+S saves · Esc cancels")
         else:
-            feedback = "No changes yet · Ctrl+S saves · Esc cancels"
+            feedback = _("No changes yet · Ctrl+S saves · Esc cancels")
         widget = self.query_one("#appearance-feedback", Static)
         if widget.content != feedback:
             widget.update(feedback)
+
+    def language_pending(self) -> bool:
+        """The chosen language differs from the one this session was composed in."""
+        return resolve(self.appearance.language) != active_language()
 
     def on_select_changed(self, event: Select.Changed) -> None:
         if not self.personalizing or self.appearance_saving or not isinstance(event.value, str):
@@ -1965,7 +2133,7 @@ class KirlianApp(App):
         try:
             await asyncio.to_thread(appearance.save, self.library)
         except (sqlite3.Error, OSError):
-            self.appearance_error = "Could not save. Your preview is here; retry or Cancel."
+            self.appearance_error = _("Could not save. Your preview is here; retry or Cancel.")
         finally:
             self.appearance_saving = False
             self.set_appearance_controls_disabled(False)
@@ -1982,21 +2150,29 @@ class KirlianApp(App):
         self.query_one("#body").display = True
         self.query_one(DataTable).focus()
         self.update_footer()
-        self.status(
-            "Appearance saved for next time." if saved else "Preview canceled; nothing saved."
-        )
+        if saved and self.language_pending():
+            self.status(_("Language saved. It applies the next time you open Kirlian."))
+        elif saved:
+            self.status(_("Appearance saved for next time."))
+        else:
+            self.status(_("Preview canceled; nothing saved."))
 
     def action_animation_toggle(self) -> None:
         motion = "gentle" if self.appearance.motion == "off" else "off"
         self.appearance = replace(self.appearance, motion=motion)
         self.appearance.save(self.library)
         self.apply_appearance()
-        self.status("Motion on." if motion == "gentle" else "Motion off. Press v to enable.")
+        self.status(_("Motion on.") if motion == "gentle" else _("Motion off. Press v to enable."))
 
     def action_animation_shuffle(self) -> None:
         animation = self.query_one(Animation)
         animation.shuffle()
-        self.status(f"{animation.clock.variation.label} · s keeps this pattern · S recalls saved")
+        self.status(
+            _(
+                "{pattern} · s keeps this pattern · S recalls saved",
+                pattern=animation.clock.variation.label,
+            )
+        )
 
     def action_animation_save(self) -> None:
         variation = self.query_one(Animation).clock.variation
@@ -2005,17 +2181,22 @@ class KirlianApp(App):
             self.library.set_setting(
                 "saved_animations", json.dumps([v.code for v in self.saved_animations])
             )
-        self.status(f"Saved {variation.label} · S recalls saved patterns")
+        self.status(_("Saved {pattern} · S recalls saved patterns", pattern=variation.label))
 
     def action_animation_recall(self) -> None:
         if not self.saved_animations:
-            self.status("No saved animations yet. Press s to keep the current one.")
+            self.status(_("No saved animations yet. Press s to keep the current one."))
             return
         self.recalled_index = (self.recalled_index + 1) % len(self.saved_animations)
         variation = self.saved_animations[self.recalled_index]
         self.query_one(Animation).select(variation)
         self.status(
-            f"Saved {self.recalled_index + 1}/{len(self.saved_animations)} · {variation.label}"
+            _(
+                "Saved {index}/{total} · {pattern}",
+                index=self.recalled_index + 1,
+                total=len(self.saved_animations),
+                pattern=variation.label,
+            )
         )
 
     def action_cover_toggle(self) -> None:
@@ -2033,22 +2214,26 @@ class KirlianApp(App):
         self.update_context()
         self.library.set_setting("artwork_mode", cover.mode)
         self.status(
-            "Cover display: compatible blocks. Press c to try terminal graphics."
+            _("Cover display: compatible blocks. Press c to try terminal graphics.")
             if cover.mode == "blocks"
-            else "Cover display: terminal graphics. If blank, press c for compatible blocks."
+            else _("Cover display: terminal graphics. If blank, press c for compatible blocks.")
         )
 
     def action_help(self) -> None:
         self.notify(
-            "j/k or arrows move · h back · l/Enter open/play · Tab changes pane\n"
-            "Space pause · a append · n/N next/previous · H/L seek 5s · -/= volume\n"
-            "/ search · Esc back · f folder · p personalize · r rescan · q quit\n"
-            "x shuffle animation · v motion on/off · s save · S recall saved\n"
-            "c switch cover display (remembered)\n"
-            "+ add to playlist · in a playlist: J/K move · d remove · e rename\n"
-            "i song facts setup · [ ] more facts · o open the fact's source\n"
-            "Typing in search, name, or key fields never triggers playback shortcuts.",
-            title="Keyboard controls",
+            "\n".join(
+                (
+                    _("j/k or arrows move · h back · l/Enter open/play · Tab changes pane"),
+                    _("Space pause · a append · n/N next/previous · H/L seek 5s · -/= volume"),
+                    _("/ search · Esc back · f folder · p personalize · r rescan · q quit"),
+                    _("x shuffle animation · v motion on/off · s save · S recall saved"),
+                    _("c switch cover display (remembered)"),
+                    _("+ add to playlist · in a playlist: J/K move · d remove · e rename"),
+                    _("i song notes settings · [ ] more notes · o open the note's source"),
+                    _("Typing in search, name, or key fields never triggers playback shortcuts."),
+                )
+            ),
+            title=_("Keyboard controls"),
             timeout=12,
         )
 

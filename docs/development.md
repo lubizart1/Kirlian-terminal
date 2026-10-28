@@ -876,3 +876,29 @@ ASCII characters give `*  kirlian` and an ASCII fact spark; and an appearance
 saved with the old `logo` key loads without it. A headless 120 × 30 render showed
 the mark centered in the shorter masthead. Glyph rendering in the owner's
 terminal font is not yet checked.
+
+## 2026-10-28: multilingual interface
+
+Added interface languages (see architecture): `i18n.py`, eight catalogs of 242
+strings, a Language preference under `p`, locale detection, notes in the active
+language, and `scripts/i18n_catalog.py`. 257 call sites in `app.py`,
+`playback.py`, and `library.py` now go through `_`/`n_`. English output is
+unchanged except for corrected plurals ("Indexed 1 file", "1 album", "{n} in
+queue") and the help line now says "song notes" instead of "song facts".
+
+Translations were drafted by one AI agent per language and pass the catalog
+check; none has been reviewed by a native speaker. Flagged for review: key names
+left in English inside sentences ("Pulsa space…"); "fallback" terms (es
+respaldo, fr secours, de Ersatz, it riserva, pt-BR reserva, ja 予備, ko 대체,
+zh 备用); macOS settings paths written from memory; Korean particles after
+placeholders (이(가)); mixed gender in pt-BR "Reserva" descriptions; German
+"bewegen" used for both focus and reordering.
+
+Checks: `ruff`, catalog check ("All catalogs cover 242 strings"), full `pytest`
+— 162 passed, including locale precedence, saved-choice precedence, fallback,
+plural rules, every catalog complete with matching placeholders, every
+translation formatting with sample values, a Spanish launch with a language
+change that applies only after relaunch (Japanese), and per-language notes
+prompt and cache keys. The wheel contains all eight catalogs. Headless renders of
+Japanese and German at 120 × 40 showed the main screen, fact card, and settings
+fitting; CJK width and font fallback in a real terminal are unverified.

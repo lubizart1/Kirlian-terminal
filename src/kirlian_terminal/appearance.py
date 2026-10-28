@@ -9,6 +9,7 @@ from dataclasses import asdict, dataclass
 
 from textual.theme import Theme
 
+from .i18n import LANGUAGES, N_
 from .library import Library
 
 INK = "#e8e1d1"
@@ -20,9 +21,13 @@ PALETTES = {
     "amber": ("#d9b583", "#4a3927"),
 }
 OPTIONS = {
-    "palette": [("Aubergine", "aubergine"), ("Sage", "sage"), ("Amber", "amber")],
-    "motion": [("Gentle", "gentle"), ("Still", "still"), ("Off", "off")],
-    "characters": [("Fine dots", "dots"), ("Plain ASCII", "ascii")],
+    "palette": [(N_("Aubergine"), "aubergine"), (N_("Sage"), "sage"), (N_("Amber"), "amber")],
+    "motion": [(N_("Gentle"), "gentle"), (N_("Still"), "still"), (N_("Off"), "off")],
+    "characters": [(N_("Fine dots"), "dots"), (N_("Plain ASCII"), "ascii")],
+    "language": [
+        (N_("System language"), "auto"),
+        *((name, code) for code, (name, _) in LANGUAGES.items()),
+    ],
 }
 
 
@@ -31,6 +36,7 @@ class Appearance:
     palette: str = "aubergine"
     motion: str = "gentle"
     characters: str = "dots"
+    language: str = "auto"
 
     @property
     def accent(self) -> str:

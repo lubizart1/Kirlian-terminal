@@ -13,6 +13,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from .i18n import _
+
 
 class PlaybackError(Exception):
     """An actionable playback failure for display in the interface."""
@@ -62,8 +64,9 @@ class PlaybackState:
         elif event.get("event") == "end-file":
             self.loading = False
             if event.get("reason") == "error":
-                self.error = (
-                    f"Cannot play this file: {event.get('file_error', 'unsupported or unreadable')}"
+                self.error = _(
+                    "Cannot play this file: {reason}",
+                    reason=event.get("file_error") or _("unsupported or unreadable"),
                 )
 
 
@@ -90,7 +93,7 @@ class Player:
     async def start(self) -> None:
         executable = self.executable or shutil.which("mpv")
         if not executable:
-            raise PlaybackError("mpv is missing. Install it, then restart Kirlian (see README).")
+            raise PlaybackError(_("mpv is missing. Install it, then restart Kirlian (see README)."))
         self.temp = tempfile.TemporaryDirectory(prefix="kirlian-", dir="/tmp")
         socket = Path(self.temp.name) / "mpv.sock"
         try:
@@ -114,9 +117,9 @@ class Player:
                 stdout=asyncio.subprocess.DEVNULL,
                 stderr=asyncio.subprocess.DEVNULL,
             )
-            for _ in range(300):
+            for _attempt in range(300):
                 if self.process.returncode is not None:
-                    raise PlaybackError("mpv could not start. Check your mpv installation.")
+                    raise PlaybackError(_("mpv could not start. Check your mpv installation."))
                 try:
                     reader, self.writer = await asyncio.open_unix_connection(
                         socket, limit=16 * 1024 * 1024
@@ -126,7 +129,10 @@ class Player:
                     await asyncio.sleep(0.05)
             else:
                 raise PlaybackError(
-                    "mpv did not start within 15 seconds. Run mpv --version, then restart Kirlian."
+                    _(
+                        "mpv did not start within 15 seconds. "
+                        "Run mpv --version, then restart Kirlian."
+                    )
                 )
             self.reader_task = asyncio.create_task(self._read(reader))
             for index, name in enumerate(
@@ -171,7 +177,7 @@ class Player:
         finally:
             for future in self.pending.values():
                 if not future.done():
-                    future.set_exception(PlaybackError("The playback connection closed."))
+                    future.set_exception(PlaybackError(_("The playback connection closed.")))
             if not self.closing:
                 self.state.idle = True
                 self.state.loading = False
@@ -180,7 +186,7 @@ class Player:
 
     async def command(self, *args: object) -> Any:
         if not self.writer or self.writer.is_closing():
-            raise PlaybackError("Playback is unavailable. Restart Kirlian after checking mpv.")
+            raise PlaybackError(_("Playback is unavailable. Restart Kirlian after checking mpv."))
         self.request_id += 1
         request_id = self.request_id
         future = asyncio.get_running_loop().create_future()
@@ -192,7 +198,7 @@ class Player:
             await self.writer.drain()
             return await asyncio.wait_for(future, timeout=3)
         except (OSError, TimeoutError) as error:
-            raise PlaybackError("mpv did not respond. Try again or restart Kirlian.") from error
+            raise PlaybackError(_("mpv did not respond. Try again or restart Kirlian.")) from error
         finally:
             self.pending.pop(request_id, None)
 
@@ -210,7 +216,7 @@ class Player:
     async def control(self, *args: object) -> Any:
         async with self.lock:
             if args and args[0] == "seek" and (self.state.loading or self.state.idle):
-                raise PlaybackError("Wait for a track to start before seeking.")
+                raise PlaybackError(_("Wait for a track to start before seeking."))
             return await self.command(*args)
 
     async def append(self, paths: Sequence[str]) -> None:

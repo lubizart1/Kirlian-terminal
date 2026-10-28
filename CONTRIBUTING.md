@@ -24,3 +24,15 @@ contributing, you agree that your contribution is licensed under the same terms.
 New source files start with `# SPDX-License-Identifier: GPL-3.0-or-later`
 (`/* … */` in `.tcss`). Do not add dependencies whose licenses are incompatible
 with GPL-3.0-or-later; record any new dependency in `docs/licensing.md`.
+
+## Translations
+
+Visible text goes through `kirlian_terminal.i18n`: `_("Whole sentence with {name}", name=value)`,
+`n_("{n} song", "{n} songs", count)` when a count changes the wording, and `N_()` to
+mark text defined before a language is set. The first argument must be a literal.
+Never put tags, filenames, or provider text into the source string; pass them as values.
+Catalogs are `src/kirlian_terminal/locales/<code>.json`, mapping English source to
+translation. `uv run python scripts/i18n_catalog.py` reports missing, stale, and
+mismatched-placeholder entries for every language (the test suite runs the same
+check); `--template` writes the current sources with their locations to
+`locales/_template.json` for translators (do not commit it).

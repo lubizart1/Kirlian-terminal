@@ -26,3 +26,6 @@ build/
 *.wav
 *.aif
 *.aiff
+
+# Regenerated translator template
+src/kirlian_terminal/locales/_template.json

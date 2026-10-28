@@ -23,6 +23,7 @@ from urllib.parse import urlsplit
 import keyring
 from keyring.errors import KeyringError
 
+from .i18n import N_, _, english_name, language
 from .library import Library, Track, display_text
 
 KEYRING_SERVICE = "kirlian-terminal"
@@ -102,6 +103,12 @@ def fact_key(track: Track) -> str:
 
 
 def question(track: Track) -> str:
+    write_in = (
+        ""
+        if language() == "en"
+        else f"Write the headlines and bodies in {english_name()}; keep song titles, names, "
+        "and quoted lyrics in their original language. "
+    )
     year = f", {track.year}" if track.year else ""
     return (
         f'Write up to three annotations for a listener about the song "{track.title}" by '
@@ -121,6 +128,7 @@ def question(track: Track) -> str:
         "a reading, not as fact. Every annotation, including readings, needs the exact "
         "URL of a page you retrieved that supports it. Headline under 9 words; body under "
         "55 words, plain and vivid. Return fewer, or none, rather than guessing.\n\n"
+        f"{write_in}"
         'Reply with only JSON: {"facts": [{"kind": "story", "headline": "...", '
         '"body": "...", "source_url": "https://..."}]}'
     )
@@ -312,9 +320,9 @@ PROVIDERS: dict[str, Provider] = {
             },
             read_responses,
             models=(
-                ("gpt-5.4-mini", "Fast and inexpensive; solid everyday notes"),
-                ("gpt-5.6-luna", "Cheapest; plainer notes"),
-                ("gpt-6.1-sol", "Deeper reading of sources; costs more"),
+                ("gpt-5.4-mini", N_("Fast and inexpensive; solid everyday notes")),
+                ("gpt-5.6-luna", N_("Cheapest; plainer notes")),
+                ("gpt-6.1-sol", N_("Deeper reading of sources; costs more")),
             ),
         ),
         Provider(
@@ -333,9 +341,9 @@ PROVIDERS: dict[str, Provider] = {
             read_anthropic,
             auth="anthropic",
             models=(
-                ("claude-sonnet-5-5", "Balanced: good stories and readings at moderate cost"),
-                ("claude-haiku-5-5", "Fastest and cheapest; plainer notes"),
-                ("claude-opus-5-5", "Most thorough; slowest and most expensive"),
+                ("claude-sonnet-5-5", N_("Balanced: good stories and readings at moderate cost")),
+                ("claude-haiku-5-5", N_("Fastest and cheapest; plainer notes")),
+                ("claude-opus-5-5", N_("Most thorough; slowest and most expensive")),
             ),
         ),
         Provider(
@@ -430,18 +438,18 @@ def fetch_payload(
         with contextlib.suppress(OSError, ValueError):
             detail = clip(error.read(2000).decode("utf-8", "replace"), 400)
         if error.code in {401, 403}:
-            message = f"{name} rejected the API key. Press i to replace it."
+            message = _("{provider} rejected the API key. Press i to replace it.", provider=name)
         elif error.code in {402, 429}:
-            message = f"{name} rate limit or credits reached."
+            message = _("{provider} rate limit or credits reached.", provider=name)
         else:
-            message = f"{name} returned HTTP {error.code}."
+            message = _("{provider} returned HTTP {code}.", provider=name, code=error.code)
         raise FactsError(message, detail) from None
     except (urllib.error.URLError, TimeoutError, OSError):
-        raise FactsError(f"Could not reach {name}.") from None
+        raise FactsError(_("Could not reach {provider}.", provider=name)) from None
     except ValueError:
-        raise FactsError(f"{name} sent an unreadable response.") from None
+        raise FactsError(_("{provider} sent an unreadable response.", provider=name)) from None
     if not isinstance(payload, dict):
-        raise FactsError(f"{name} sent an unreadable response.")
+        raise FactsError(_("{provider} sent an unreadable response.", provider=name))
     return payload
 
 
@@ -511,7 +519,10 @@ class FactCache:
 
     @staticmethod
     def key(provider_id: str, song: str) -> str:
-        return f"v{PROMPT_VERSION}\x1f{provider_id}\x1f{song}"
+        # English keys predate translation; other languages are cached separately.
+        code = language()
+        provider = provider_id if code == "en" else f"{provider_id}:{code}"
+        return f"v{PROMPT_VERSION}\x1f{provider}\x1f{song}"
 
     def get(self, provider_id: str, song: str) -> list[Fact] | None:
         with self.library.connect() as db:
