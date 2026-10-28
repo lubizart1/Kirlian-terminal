@@ -261,7 +261,6 @@
   "System language": "系统语言",
   "{provider} sent an unreadable response.": "{provider} 返回了无法读取的响应。",
   "{provider} rejected the API key. Press i to replace it.": "{provider} 拒绝了该 API 密钥。按 i 进行替换。",
-  "Could not reach {provider}.": "无法连接 {provider}。",
   "{provider} rate limit or credits reached.": "{provider} 已达速率限制或额度已用尽。",
   "{provider} returned HTTP {code}.": "{provider} 返回 HTTP {code}。",
   "Fast and inexpensive; solid everyday notes": "快速且便宜；日常笔记够用",
@@ -282,5 +281,12 @@
   "The playback connection closed.": "播放连接已关闭。",
   "unsupported or unreadable": "格式不受支持或无法读取",
   "The interface and song notes switch to this language when you save.": "保存后，界面和歌曲笔记会切换为此语言。",
-  "Language changed. Your music kept playing.": "语言已更改，音乐仍在继续播放。"
+  "Language changed. Your music kept playing.": "语言已更改，音乐仍在继续播放。",
+  "Could not reach {provider} ({reason}).": "无法连接 {provider}（{reason}）。",
+  "timed out": "超时",
+  "no network or DNS": "无网络或 DNS",
+  "secure connection failed": "安全连接失败",
+  "connection dropped": "连接中断",
+  "network error": "网络错误",
+  "{provider} has a key but is not in use; press i to add it as a fallback.": "{provider} 已有密钥但未启用；按 i 将其添加为备用。"
 }

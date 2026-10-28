@@ -918,3 +918,27 @@ playback command was sent. A headless run against a copy of the owner's library
 (French, a song "playing" at 0:30 with a block cover) switched to Spanish with the
 cover, progress, and player line intact. Not checked: the switch in a real
 terminal with native images and live mpv.
+
+## 2026-10-28: Perplexity "could not reach" with no fallback
+
+Owner screenshot: "Impossible de joindre Perplexity" ("Could not reach
+Perplexity") on Underworld's "Dirty Epic", 13 seconds into the song, and no
+fallback. Findings: the saved order was `["perplexity"]` only; Anthropic had a
+keychain key but was not in use, so there was nothing to fall back to. The same
+request through `--check-facts perplexity` a few minutes later answered in 5.2 s
+with 3 notes, all passing the source check. The failure came well before the 90 s
+timeout, so it was a connection error (the old message hid which), and the song
+was then marked as asked for the rest of the session.
+
+Changes: a connection that drops before a reply is sent once more (timeouts are
+not repeated); the message names the reason (connection dropped, timed out, no
+network or DNS, secure connection failed); a dropped connection no longer blocks
+the song for the session, so it is asked again the next time it plays; and when
+every provider in use fails while another provider has a key, the status line
+suggests adding it as a fallback. Unused providers are never called
+automatically, so nothing is billed without being chosen.
+
+Checks: `pytest` — 164 passed, including one retry after a dropped connection,
+no retry after a timeout, the reason in the message, and an app test where a
+failed song is retried on its next play and Anthropic is suggested but not
+called. The exact cause of the original drop is not known.

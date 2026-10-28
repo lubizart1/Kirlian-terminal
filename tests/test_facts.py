@@ -264,3 +264,41 @@ def test_cache_is_per_provider_and_drops_answers_to_an_older_question(tmp_path):
     cache.put("exa", "song", [Fact("H", "B", "T", "https://e.org")])
     assert cache.get("exa", "song")[0].headline == "H"
     assert cache.get("openai", "song") is None
+
+
+def test_a_dropped_connection_is_sent_once_more_and_then_explained(monkeypatch):
+    import http.client
+
+    attempts = []
+
+    def drop_then_answer(request, timeout):
+        attempts.append(1)
+        if len(attempts) == 1:
+            raise http.client.RemoteDisconnected("closed")
+        return io.BytesIO(json.dumps(PAYLOADS["perplexity"]).encode())
+
+    monkeypatch.setattr(facts.urllib.request, "urlopen", drop_then_answer)
+    assert request_facts(PROVIDERS["perplexity"], TRACK, "key")
+    assert len(attempts) == 2
+
+    def always_drop(request, timeout):
+        attempts.append(1)
+        raise ConnectionResetError("reset")
+
+    attempts.clear()
+    monkeypatch.setattr(facts.urllib.request, "urlopen", always_drop)
+    with pytest.raises(
+        FactsError, match=r"Could not reach Perplexity \(connection dropped\)"
+    ) as raised:
+        request_facts(PROVIDERS["perplexity"], TRACK, "key")
+    assert raised.value.transient and len(attempts) == 2
+
+    def slow(request, timeout):
+        attempts.append(1)
+        raise TimeoutError
+
+    attempts.clear()
+    monkeypatch.setattr(facts.urllib.request, "urlopen", slow)
+    with pytest.raises(FactsError, match="timed out"):
+        request_facts(PROVIDERS["perplexity"], TRACK, "key")
+    assert len(attempts) == 1  # A 90-second wait is not repeated.

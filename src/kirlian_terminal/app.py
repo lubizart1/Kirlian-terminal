@@ -1786,6 +1786,9 @@ class KirlianApp(App):
                 )
             except FactsError as error:
                 errors.append(str(error))
+                if error.transient:
+                    # Ask again the next time this song starts, not on every update.
+                    self.facts_asked.discard((provider.id, song))
                 continue
             finally:
                 if self.is_running and revision == self.fact_revision:
@@ -1796,11 +1799,25 @@ class KirlianApp(App):
         if not self.is_running or revision != self.fact_revision:
             return
         if facts is None:
-            self.status(
-                " ".join(errors)
-                if errors
-                else _("No song-notes provider with a key is in use. Press i to set one up.")
-            )
+            if not errors:
+                self.status(
+                    _("No song-notes provider with a key is in use. Press i to set one up.")
+                )
+                return
+            idle = [
+                p
+                for p in PROVIDERS.values()
+                if p.id not in self.facts_config.order
+                and await asyncio.to_thread(self.credentials.key, p)
+            ]
+            if idle:
+                errors.append(
+                    _(
+                        "{provider} has a key but is not in use; press i to add it as a fallback.",
+                        provider=idle[0].name,
+                    )
+                )
+            self.status(" ".join(errors))
             return
         if errors:
             used = (

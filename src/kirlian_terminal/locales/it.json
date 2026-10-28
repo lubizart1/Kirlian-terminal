@@ -260,7 +260,6 @@
   "System language": "Lingua di sistema",
   "{provider} sent an unreadable response.": "{provider} ha inviato una risposta illeggibile.",
   "{provider} rejected the API key. Press i to replace it.": "{provider} ha rifiutato la chiave API. Premi i per sostituirla.",
-  "Could not reach {provider}.": "Impossibile raggiungere {provider}.",
   "{provider} rate limit or credits reached.": "{provider}: limite di richieste o crediti esauriti.",
   "{provider} returned HTTP {code}.": "{provider} ha restituito HTTP {code}.",
   "Could not finish indexing: {error}": "Impossibile completare l'indicizzazione: {error}",
@@ -282,5 +281,12 @@
   "Fastest and cheapest; plainer notes": "Il più veloce ed economico; note più semplici",
   "Most thorough; slowest and most expensive": "Il più accurato; il più lento e costoso",
   "The interface and song notes switch to this language when you save.": "L'interfaccia e le note sui brani passano a questa lingua quando salvi.",
-  "Language changed. Your music kept playing.": "Lingua cambiata. La musica ha continuato a suonare."
+  "Language changed. Your music kept playing.": "Lingua cambiata. La musica ha continuato a suonare.",
+  "Could not reach {provider} ({reason}).": "Impossibile raggiungere {provider} ({reason}).",
+  "timed out": "tempo scaduto",
+  "no network or DNS": "nessuna rete o DNS",
+  "secure connection failed": "connessione sicura non riuscita",
+  "connection dropped": "connessione interrotta",
+  "network error": "errore di rete",
+  "{provider} has a key but is not in use; press i to add it as a fallback.": "{provider} ha una chiave ma non è in uso; premi i per aggiungerlo come riserva."
 }

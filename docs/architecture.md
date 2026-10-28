@@ -612,3 +612,12 @@ playing song's notes are requested again in the new language. Table columns are
 added before the appearance is applied, because applying it can redraw rows.
 The time column now widens to its translated header ("DURACIÓN"), and the
 sidebar is two columns wider for "File d'attente".
+
+## 2026-10-28: dropped connections
+
+`fetch_payload` resends once when the connection drops before any reply
+(`ConnectionError`, `http.client.HTTPException`); HTTP errors and timeouts are not
+resent. `FactsError.transient` marks connection failures: those are removed from
+the session's asked set so the song is tried again on its next play, while
+rejected keys and quota errors stay blocked. A provider with a key that is not in
+the order is suggested in the status line, never used without being chosen.

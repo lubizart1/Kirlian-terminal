@@ -11,9 +11,12 @@ draws from what retrieved sources say, labeled as such on the card.
 from __future__ import annotations
 
 import contextlib
+import http.client
 import json
 import os
 import re
+import socket
+import ssl
 import urllib.error
 import urllib.request
 from collections.abc import Callable
@@ -62,9 +65,25 @@ Source = dict[str, str]  # url, title, published
 class FactsError(Exception):
     """A readable reason the provider gave no facts. `detail` is the provider's own reply."""
 
-    def __init__(self, message: str, detail: str = "") -> None:
+    def __init__(self, message: str, detail: str = "", transient: bool = False) -> None:
         super().__init__(message)
         self.detail = detail
+        # A dropped connection may work next time; a rejected key or quota will not.
+        self.transient = transient
+
+
+def connection_reason(error: BaseException) -> str:
+    """A short, listener-readable reason for a failed connection."""
+    cause = getattr(error, "reason", error)
+    if isinstance(cause, TimeoutError | socket.timeout):
+        return _("timed out")
+    if isinstance(cause, socket.gaierror):
+        return _("no network or DNS")
+    if isinstance(cause, ssl.SSLError):
+        return _("secure connection failed")
+    if isinstance(cause, ConnectionError | http.client.HTTPException):
+        return _("connection dropped")
+    return _("network error")
 
 
 @dataclass(frozen=True)
@@ -431,8 +450,7 @@ def fetch_payload(
     )
     name = provider.name
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:
-            payload = json.load(response)
+        payload = post(request, timeout)
     except urllib.error.HTTPError as error:
         detail = ""
         with contextlib.suppress(OSError, ValueError):
@@ -444,13 +462,35 @@ def fetch_payload(
         else:
             message = _("{provider} returned HTTP {code}.", provider=name, code=error.code)
         raise FactsError(message, detail) from None
-    except (urllib.error.URLError, TimeoutError, OSError):
-        raise FactsError(_("Could not reach {provider}.", provider=name)) from None
+    except (urllib.error.URLError, OSError, http.client.HTTPException) as error:
+        reason = connection_reason(error)
+        raise FactsError(
+            _("Could not reach {provider} ({reason}).", provider=name, reason=reason),
+            f"{type(error).__name__}: {error}",
+            transient=True,
+        ) from None
     except ValueError:
         raise FactsError(_("{provider} sent an unreadable response.", provider=name)) from None
     if not isinstance(payload, dict):
         raise FactsError(_("{provider} sent an unreadable response.", provider=name))
     return payload
+
+
+def post(request: urllib.request.Request, timeout: float) -> object:
+    """Send once more if the connection drops before a reply; never after a timeout."""
+    for attempt in range(2):
+        try:
+            with urllib.request.urlopen(request, timeout=timeout) as response:
+                return json.load(response)
+        except urllib.error.HTTPError:
+            raise
+        except (ConnectionError, http.client.HTTPException, urllib.error.URLError) as error:
+            dropped = isinstance(error, ConnectionError | http.client.HTTPException) or isinstance(
+                getattr(error, "reason", None), ConnectionError
+            )
+            if attempt or not dropped:
+                raise
+    raise AssertionError("unreachable")
 
 
 def request_facts(

@@ -507,3 +507,45 @@ async def test_facts_fall_back_on_errors_and_are_kept_per_provider(
         app.facts_settings_closed()
         await wait_for(pilot, lambda: card() and "From Anthropic" in card())
         assert app.fact_cache.get("openai", "artist\x1falbum\x1fsong 2")[0].provider == "OpenAI"
+
+
+async def test_a_dropped_connection_is_retried_next_play_and_unused_keys_are_suggested(
+    tmp_path, audio_factory, monkeypatch
+):
+    from kirlian_terminal.app import PlayerUpdate
+    from kirlian_terminal.facts import PROVIDERS, Credentials, Fact, FactsError
+
+    for name in ("PERPLEXITY_API_KEY", "ANTHROPIC_API_KEY"):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setattr(KirlianApp, "FACT_DELAY", 0)
+    library, paths = populated(tmp_path, audio_factory)
+    library.set_setting("facts", "on")
+    FactsConfig(["perplexity"]).save(library)
+    credentials = Credentials()
+    for provider in ("perplexity", "anthropic"):
+        credentials.save(PROVIDERS[provider], "key", remember=True)
+    calls = []
+
+    def fetch(provider, track, key, model):
+        calls.append(provider.id)
+        if len(calls) == 1:
+            raise FactsError("Could not reach Perplexity (connection dropped).", transient=True)
+        return [Fact("Back", "Body.", "Src", "https://e.org", provider=provider.name)]
+
+    app = KirlianApp(library, player=FakePlayer(), credentials=credentials, fetch_facts=fetch)
+
+    def play(path, serial):
+        state = PlaybackState(path=path, paused=False, idle=False, started_serial=serial)
+        app.on_player_update(PlayerUpdate(state))
+
+    async with app.run_test(size=(140, 50)) as pilot:
+        await pilot.press("enter")
+        play(paths[0], 1)
+        await wait_for(
+            pilot, lambda: "Anthropic has a key" in str(app.query_one("#status").content)
+        )
+        play(paths[1], 2)
+        await pilot.pause(0.1)
+        play(paths[0], 3)  # The same song again: a dropped connection is retried.
+        await wait_for(pilot, lambda: calls.count("perplexity") == 3)
+        assert "anthropic" not in calls  # Unused providers are suggested, never billed.

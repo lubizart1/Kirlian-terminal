@@ -260,7 +260,6 @@
   "System language": "システムの言語",
   "{provider} sent an unreadable response.": "{provider} から読み取れない応答が返されました。",
   "{provider} rejected the API key. Press i to replace it.": "{provider} が API キーを拒否しました。i で置き換えてください。",
-  "Could not reach {provider}.": "{provider} に接続できませんでした。",
   "{provider} rate limit or credits reached.": "{provider} のレート制限またはクレジット上限に達しました。",
   "{provider} returned HTTP {code}.": "{provider} から HTTP {code} が返されました。",
   "Fast and inexpensive; solid everyday notes": "速くて安価。普段使いに十分なノート",
@@ -282,5 +281,12 @@
   "unsupported or unreadable": "非対応か、読み取れません",
   "i song notes settings · [ ] more notes · o open the note's source": "i 曲ノートの設定 · [ ] ほかのノート · o ノートの出典を開く",
   "The interface and song notes switch to this language when you save.": "保存すると、画面と曲ノートがこの言語に切り替わります。",
-  "Language changed. Your music kept playing.": "言語を変更しました。再生はそのまま続いています。"
+  "Language changed. Your music kept playing.": "言語を変更しました。再生はそのまま続いています。",
+  "Could not reach {provider} ({reason}).": "{provider} に接続できません（{reason}）。",
+  "timed out": "タイムアウト",
+  "no network or DNS": "ネットワークまたは DNS なし",
+  "secure connection failed": "安全な接続に失敗",
+  "connection dropped": "接続が切れました",
+  "network error": "ネットワークエラー",
+  "{provider} has a key but is not in use; press i to add it as a fallback.": "{provider} はキーがありますが未使用です。i で予備に追加できます。"
 }

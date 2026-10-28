@@ -260,7 +260,6 @@
   "System language": "시스템 언어",
   "{provider} sent an unreadable response.": "{provider}에서 읽을 수 없는 응답을 보냈어요.",
   "{provider} rejected the API key. Press i to replace it.": "{provider}에서 API 키를 거부했어요. i를 눌러 키를 바꾸세요.",
-  "Could not reach {provider}.": "{provider}에 연결할 수 없어요.",
   "{provider} rate limit or credits reached.": "{provider} 사용량 한도 또는 크레딧이 소진됐어요.",
   "{provider} returned HTTP {code}.": "{provider}에서 HTTP {code}을(를) 반환했어요.",
   "Could not finish indexing: {error}": "색인을 마치지 못했어요: {error}",
@@ -282,5 +281,12 @@
   "Fastest and cheapest; plainer notes": "가장 빠르고 저렴해요. 더 담백한 노트",
   "Most thorough; slowest and most expensive": "가장 꼼꼼해요. 가장 느리고 비싸요",
   "The interface and song notes switch to this language when you save.": "저장하면 화면과 곡 노트가 이 언어로 바뀌어요.",
-  "Language changed. Your music kept playing.": "언어를 바꿨어요. 음악은 계속 재생 중이에요."
+  "Language changed. Your music kept playing.": "언어를 바꿨어요. 음악은 계속 재생 중이에요.",
+  "Could not reach {provider} ({reason}).": "{provider}에 연결할 수 없어요({reason}).",
+  "timed out": "시간 초과",
+  "no network or DNS": "네트워크 또는 DNS 없음",
+  "secure connection failed": "보안 연결 실패",
+  "connection dropped": "연결이 끊김",
+  "network error": "네트워크 오류",
+  "{provider} has a key but is not in use; press i to add it as a fallback.": "{provider}은(는) 키가 있지만 사용하지 않아요. i를 눌러 대체로 추가하세요."
 }

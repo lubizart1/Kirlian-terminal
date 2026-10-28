@@ -260,7 +260,6 @@
   "System language": "Idioma do sistema",
   "{provider} sent an unreadable response.": "{provider} enviou uma resposta ilegível.",
   "{provider} rejected the API key. Press i to replace it.": "{provider} recusou a chave de API. Pressione i para trocá-la.",
-  "Could not reach {provider}.": "Não foi possível acessar {provider}.",
   "{provider} rate limit or credits reached.": "{provider}: limite de uso ou de créditos atingido.",
   "{provider} returned HTTP {code}.": "{provider} retornou HTTP {code}.",
   "Fast and inexpensive; solid everyday notes": "Rápido e barato; notas boas para o dia a dia",
@@ -282,5 +281,12 @@
   "unsupported or unreadable": "sem suporte ou ilegível",
   "i song notes settings · [ ] more notes · o open the note's source": "i configura as notas · [ ] mais notas · o abre a fonte da nota",
   "The interface and song notes switch to this language when you save.": "A interface e as notas das músicas mudam para este idioma quando você salvar.",
-  "Language changed. Your music kept playing.": "Idioma alterado. Sua música continuou tocando."
+  "Language changed. Your music kept playing.": "Idioma alterado. Sua música continuou tocando.",
+  "Could not reach {provider} ({reason}).": "Não foi possível acessar {provider} ({reason}).",
+  "timed out": "tempo esgotado",
+  "no network or DNS": "sem rede ou DNS",
+  "secure connection failed": "falha na conexão segura",
+  "connection dropped": "conexão interrompida",
+  "network error": "erro de rede",
+  "{provider} has a key but is not in use; press i to add it as a fallback.": "{provider} tem uma chave, mas não está em uso; pressione i para adicioná-lo como reserva."
 }
