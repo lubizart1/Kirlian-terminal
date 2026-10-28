@@ -46,14 +46,17 @@ def main() -> None:
         nargs="?",
         const="",
         metavar="PROVIDER",
-        help="Make one live song-facts request and show what passes the source check. "
+        help="Make one live song-notes request and show what passes the source check. "
         "PROVIDER is exa, openai, anthropic, perplexity, parallel, or all (keys found); "
-        "default: the provider chosen in the player",
+        "default: your primary provider",
     )
     facts.add_argument("--artist", default="John Cale", help="Artist for --check-facts")
     facts.add_argument("--title", default="Paris 1919", help="Song title for --check-facts")
     facts.add_argument("--album", default="Paris 1919", help="Album for --check-facts")
     facts.add_argument("--year", default="1973", help="Year for --check-facts")
+    facts.add_argument(
+        "--model", default="", help="Model for --check-facts (OpenAI and Anthropic only)"
+    )
     facts.add_argument(
         "--facts-report", type=Path, help="Save --check-facts responses as local JSON"
     )
@@ -69,15 +72,18 @@ def main() -> None:
         return
     data = args.data_dir or user_data_path("kirlian-terminal", appauthor=False)
     if args.check_facts is not None:
+        from .facts import FactsConfig
         from .facts_check import run_facts_check
 
-        configured = None
+        config = FactsConfig()
         database = data.expanduser() / "library.sqlite3"
         if database.exists():
-            configured = Library(database).setting("facts_provider")
+            config = FactsConfig.load(Library(database))
         song = (args.artist, args.title, args.album, args.year)
         raise SystemExit(
-            run_facts_check(args.check_facts or None, configured, song, args.facts_report)
+            run_facts_check(
+                args.check_facts or None, config, song, args.facts_report, model=args.model
+            )
         )
     if not shutil.which("mpv"):
         print(

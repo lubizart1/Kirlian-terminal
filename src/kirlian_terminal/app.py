@@ -36,10 +36,10 @@ from .facts import (
     Credentials,
     Fact,
     FactCache,
+    FactsConfig,
     FactsError,
     Provider,
     fact_key,
-    provider_named,
     request_facts,
 )
 from .graphics import NATIVE_SUPPORTED
@@ -219,65 +219,36 @@ class ConfirmDialog(ModalScreen[bool]):
         self.dismiss(False)
 
 
-class FactsDialog(ModalScreen[tuple[str, str, str] | None]):
-    """Opt-in for song facts. Returns (choice, provider id, key); choice: keep, session, off."""
+class KeyDialog(ModalScreen[tuple[str, bool] | None]):
+    """Add or replace one provider's key. Returns (key, keep in keychain)."""
 
     BINDINGS = [Binding("escape", "cancel", "Cancel")]
 
-    def __init__(self, enabled: bool, provider: Provider, key_sources: dict[str, str]) -> None:
+    def __init__(self, provider: Provider, source: str) -> None:
         super().__init__()
-        self.enabled = enabled
         self.provider = provider
-        self.key_sources = key_sources
+        self.source = source
 
     def compose(self) -> ComposeResult:
+        p = self.provider
         with Vertical(classes="dialog"):
-            yield Label("Song facts · Behind the record")
-            yield Static(
-                "Short, sourced notes about how the playing song was made, from a web "
-                "search service you choose, using your own API key. The provider may charge "
-                "your account per request.\n\n"
-                "Sent: the song title, artist, album, and year. Never sent: audio, artwork, "
-                "or file paths. Each song is asked about once; answers are kept locally."
-            )
-            with Horizontal(classes="preference-row"):
-                yield Label("Provider")
-                yield Select(
-                    [(p.name, p.id) for p in PROVIDERS.values()],
-                    value=self.provider.id,
-                    allow_blank=False,
-                    id="facts-provider",
-                )
-            yield Static("", id="facts-hint", classes="dialog-hint")
-            yield Input(password=True, id="facts-key")
+            yield Label(f"{p.name} API key")
+            note = {
+                "environment": f"{p.environment} is set in your environment and takes "
+                "precedence; a key saved here is used once it is unset.",
+                "keychain": "Replacing the saved key. The old one is overwritten.",
+                "session": "Replacing this session's key.",
+            }.get(self.source, f"Create one at {p.signup}. {p.name} bills your account.")
+            yield Static(note, classes="dialog-hint")
+            yield Input(password=True, placeholder=f"{p.name} API key", id="facts-key")
             yield Static("", id="facts-error")
             with Horizontal(classes="dialog-buttons"):
-                yield Button("Turn on", id="keep", variant="primary")
+                yield Button("Save to keychain", id="keep", variant="primary")
                 yield Button("This session only", id="session")
-                if self.enabled:
-                    yield Button("Turn off", id="off")
                 yield Button("Cancel", id="cancel")
 
     def on_mount(self) -> None:
-        self.show_provider()
-        self.query_one(Select).focus()
-
-    def on_select_changed(self, event: Select.Changed) -> None:
-        event.stop()
-        if isinstance(event.value, str):
-            self.provider = PROVIDERS[event.value]
-            self.show_provider()
-
-    def show_provider(self) -> None:
-        p = self.provider
-        hint = {
-            "environment": f"Using {p.environment} from the environment. Leave the field blank.",
-            "keychain": f"Your {p.name} key is in the system keychain. Leave blank to keep it.",
-            "session": f"Your {p.name} key is set for this session. Leave blank to keep it.",
-        }.get(self.key_sources.get(p.id, ""), f"Paste your {p.name} API key from {p.signup}.")
-        self.query_one("#facts-hint", Static).update(hint)
-        self.query_one(Input).placeholder = f"{p.name} API key"
-        self.query_one("#facts-error", Static).update("")
+        self.query_one(Input).focus()
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         event.stop()
@@ -292,13 +263,163 @@ class FactsDialog(ModalScreen[tuple[str, str, str] | None]):
             self.dismiss(None)
             return
         key = self.query_one(Input).value.strip()
-        if choice != "off" and not key and not self.key_sources.get(self.provider.id):
-            self.query_one("#facts-error", Static).update("Enter an API key to turn facts on.")
+        if not key:
+            self.query_one("#facts-error", Static).update("Paste a key, or press Esc.")
             return
-        self.dismiss((choice, self.provider.id, key))
+        self.dismiss((key, choice == "keep"))
 
     def action_cancel(self) -> None:
         self.dismiss(None)
+
+
+class ModelDialog(ModalScreen[str | None]):
+    """Returns a model name; an empty string restores the provider's default."""
+
+    BINDINGS = [Binding("escape", "cancel", "Cancel")]
+
+    def __init__(self, provider: Provider, current: str) -> None:
+        super().__init__()
+        self.provider = provider
+        self.current = current
+
+    def compose(self) -> ComposeResult:
+        p = self.provider
+        with Vertical(classes="dialog"):
+            yield Label(f"{p.name} model")
+            yield Static(
+                f"Default: {p.model}. Suggestions: {', '.join(p.models)}. Any model name "
+                f"{p.name} accepts with web search works. Leave blank for the default.",
+                classes="dialog-hint",
+            )
+            yield Input(value=self.current, placeholder=p.model, id="facts-model")
+
+    def on_mount(self) -> None:
+        self.query_one(Input).focus()
+
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        event.stop()
+        self.dismiss(event.value.strip())
+
+    def action_cancel(self) -> None:
+        self.dismiss(None)
+
+
+class FactsSettings(ModalScreen[None]):
+    """Song-notes providers: keys, order (primary, then fallbacks), models, on/off."""
+
+    BINDINGS = [
+        Binding("escape", "close", "Close"),
+        Binding("enter", "key", "Add or replace key", priority=True),
+        Binding("space", "use", "Use / skip"),
+        Binding("J", "move(1)", "Move down"),
+        Binding("K", "move(-1)", "Move up"),
+        Binding("j", "cursor(1)", "Down", show=False),
+        Binding("k", "cursor(-1)", "Up", show=False),
+        Binding("m", "model", "Model"),
+        Binding("d", "forget", "Remove key"),
+        Binding("t", "toggle", "Notes on/off"),
+    ]
+
+    def compose(self) -> ComposeResult:
+        with Vertical(classes="dialog", id="facts-settings"):
+            yield Label("Song notes · Behind the record")
+            yield Static(
+                "Short notes on how the playing song was made and what it is about, from "
+                "providers you choose, with your own keys. The first provider in the order "
+                "is asked first; the others are used only if it fails.\n"
+                "Sent: title, artist, album, year. Never: audio, artwork, or file paths.",
+                classes="dialog-hint",
+            )
+            yield DataTable(id="facts-providers", cursor_type="row", zebra_stripes=False)
+            yield Static("", id="facts-state")
+            yield Static(
+                Text.assemble(
+                    *(
+                        part
+                        for key, label in (
+                            ("enter", "key"),
+                            ("space", "use/skip"),
+                            ("J/K", "order"),
+                            ("m", "model"),
+                            ("d", "remove key"),
+                            ("t", "on/off"),
+                            ("esc", "close"),
+                        )
+                        for part in ((key, "bold"), (f" {label}   ", QUIET))
+                    )
+                ),
+                classes="dialog-hint",
+            )
+
+    def on_mount(self) -> None:
+        table = self.query_one(DataTable)
+        for label, key in (
+            ("#", "order"),
+            ("Provider", "name"),
+            ("Model", "model"),
+            ("Key", "key"),
+        ):
+            table.add_column(label, key=key)
+        self.app.refresh_facts_settings(self)
+        table.focus()
+
+    @property
+    def provider(self) -> Provider:
+        ids = list(PROVIDERS)
+        return PROVIDERS[ids[max(0, self.query_one(DataTable).cursor_row)]]
+
+    def show(self, config: FactsConfig, sources: dict[str, str], on: bool, note: str) -> None:
+        table = self.query_one(DataTable)
+        row = table.cursor_row
+        table.clear()
+        for p in PROVIDERS.values():
+            position = config.order.index(p.id) + 1 if p.id in config.order else 0
+            key = {"environment": f"from {p.environment}", "keychain": "keychain"}.get(
+                sources.get(p.id, ""), sources.get(p.id) or "none"
+            )
+            table.add_row(
+                Text(str(position) if position else "–", self.app.appearance.accent),
+                Text(p.name, INK if position else QUIET),
+                Text(config.model(p) or "—", QUIET),
+                Text(key, INK if sources.get(p.id) else QUIET),
+                key=p.id,
+            )
+        table.move_cursor(row=max(0, row))
+        state = Text.assemble(("Notes: ", QUIET), ("on" if on else "off", "bold"))
+        if note:
+            state.append(f"   {note}", QUIET)
+        self.query_one("#facts-state", Static).update(state)
+
+    def action_cursor(self, step: int) -> None:
+        table = self.query_one(DataTable)
+        table.move_cursor(row=table.cursor_row + step)
+
+    def action_key(self) -> None:
+        self.app.edit_facts_key(self, self.provider)
+
+    def action_use(self) -> None:
+        self.app.use_facts_provider(self, self.provider)
+
+    def action_move(self, step: int) -> None:
+        self.app.move_facts_provider(self, self.provider, step)
+
+    def action_model(self) -> None:
+        self.app.edit_facts_model(self, self.provider)
+
+    def action_forget(self) -> None:
+        self.app.forget_facts_key(self, self.provider)
+
+    def action_toggle(self) -> None:
+        self.app.toggle_facts(self)
+
+    def action_close(self) -> None:
+        self.dismiss(None)
+
+    def on_data_table_row_highlighted(self, event: DataTable.RowHighlighted) -> None:
+        event.stop()  # The library table's handlers live on the app.
+
+    def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
+        event.stop()
 
 
 class LibraryTable(DataTable):
@@ -365,7 +486,7 @@ class KirlianApp(App):
         artwork: str | None = None,
         characters: str | None = None,
         credentials: Credentials | None = None,
-        fetch_facts: Callable[[Provider, Track, str], list[Fact]] = request_facts,
+        fetch_facts: Callable[[Provider, Track, str, str], list[Fact]] = request_facts,
     ):
         super().__init__()
         self.library = library
@@ -376,12 +497,13 @@ class KirlianApp(App):
         self.fetch_facts_for = fetch_facts
         self.fact_cache = FactCache(library)
         self.facts_on = library.setting("facts") == "on"
-        self.facts_provider = provider_named(library.setting("facts_provider"))
+        self.facts_config = FactsConfig.load(library)
+        self.fact_loading_provider: Provider | None = None
         self.facts: list[Fact] = []
         self.fact_index = 0
         self.fact_path = ""
         self.fact_revision = 0
-        self.facts_asked: set[str] = set()
+        self.facts_asked: set[tuple[str, str]] = set()  # (provider id, song) tried this session
         self.fact_loading = False
         self.artwork_mode = (
             artwork
@@ -1400,36 +1522,58 @@ class KirlianApp(App):
 
     @work(group="facts")
     async def load_facts(self, track: Track, revision: int) -> None:
-        # Wait out rapid skipping. A late answer is cached but never shown for another song.
+        """Ask providers in order; later ones only when an earlier one fails.
+
+        Wait out rapid skipping first. A late answer is cached but never shown for
+        another song.
+        """
         await asyncio.sleep(self.FACT_DELAY)
         if revision != self.fact_revision:
             return
-        key = fact_key(track)
-        facts = await asyncio.to_thread(self.fact_cache.get, key)
-        if facts is None:
-            if key in self.facts_asked:
-                return
-            provider = self.facts_provider
+        song = fact_key(track)
+        errors: list[str] = []
+        facts: list[Fact] | None = None
+        for provider in self.facts_config.providers:
+            facts = await asyncio.to_thread(self.fact_cache.get, provider.id, song)
+            if facts is not None or revision != self.fact_revision:
+                break
+            if (provider.id, song) in self.facts_asked:
+                continue
             api_key = await asyncio.to_thread(self.credentials.key, provider)
             if not api_key:
-                self.status(f"Song facts need a {provider.name} API key. Press i to add one.")
-                return
-            self.facts_asked.add(key)
+                continue
+            self.facts_asked.add((provider.id, song))
+            self.fact_loading_provider = provider
             self.fact_loading = True
             self.update_context()
             try:
-                facts = await asyncio.to_thread(self.fetch_facts_for, provider, track, api_key)
+                facts = await asyncio.to_thread(
+                    self.fetch_facts_for,
+                    provider,
+                    track,
+                    api_key,
+                    self.facts_config.model(provider),
+                )
             except FactsError as error:
-                if revision == self.fact_revision:
-                    self.status(str(error))
-                return
+                errors.append(str(error))
+                continue
             finally:
                 if self.is_running and revision == self.fact_revision:
                     self.fact_loading = False
                     self.update_context()
-            await asyncio.to_thread(self.fact_cache.put, key, facts)
+            await asyncio.to_thread(self.fact_cache.put, provider.id, song, facts)
+            break
         if not self.is_running or revision != self.fact_revision:
             return
+        if facts is None:
+            self.status(
+                " ".join(errors)
+                if errors
+                else "No song-notes provider with a key is in use. Press i to set one up."
+            )
+            return
+        if errors:
+            self.status(f"{' '.join(errors)} Used {facts[0].provider if facts else 'a fallback'}.")
         self.facts = facts
         self.fact_index = 0
         self.update_context()
@@ -1446,7 +1590,7 @@ class KirlianApp(App):
             self.query_one("#fact-text", Static).update(
                 Text.assemble(
                     ("Asking ", QUIET),
-                    (self.facts_provider.name, INK),
+                    (self.fact_loading_provider.name if self.fact_loading_provider else "", INK),
                     (" while the title keeps time", QUIET),
                 )
             )
@@ -1465,10 +1609,16 @@ class KirlianApp(App):
             self.query_one("#fact-text", Static).update(
                 Text.assemble((fact.headline, f"bold {INK}"), "\n\n", (fact.body, INK))
             )
-            source = Text.assemble(("Source: ", QUIET), (fact.source_label, INK), "\n\n")
+            reading = fact.kind == "reading"
+            source = Text.assemble(
+                ("A reading, drawing on " if reading else "Source: ", QUIET),
+                (fact.source_label, INK),
+                (f" · via {fact.provider}" if fact.provider else "", QUIET),
+                "\n\n",
+            )
             if len(self.facts) > 1:
                 source.append("[ ]", self.appearance.accent)
-                source.append(f" more facts {self.fact_index + 1}/{len(self.facts)}   ", QUIET)
+                source.append(f" more notes {self.fact_index + 1}/{len(self.facts)}   ", QUIET)
             source.append("o", self.appearance.accent)
             source.append(" source", QUIET)
             self.query_one("#fact-source", Static).update(source)
@@ -1493,45 +1643,113 @@ class KirlianApp(App):
             self.status, "Opened the source in your browser." if opened else f"Source: {url}"
         )
 
-    @work(group="facts-setup", exclusive=True)
-    async def action_facts_setup(self) -> None:
+    def action_facts_setup(self) -> None:
+        self.push_screen(FactsSettings(), self.facts_settings_closed)
+
+    def facts_settings_closed(self, _: None = None) -> None:
+        """Apply changed providers, keys, or models to the playing song."""
+        self.facts_asked.clear()  # Fixed keys and new providers deserve another try.
+        self.facts = []
+        self.fact_loading = False
+        self.fact_path = ""
+        self.observe_fact_song(getattr(self, "display_state", self.player.state))
+
+    @work(group="facts-settings")
+    async def refresh_facts_settings(self, screen: FactsSettings, note: str = "") -> None:
         sources = await asyncio.to_thread(
             lambda: {p.id: self.credentials.source(p) for p in PROVIDERS.values()}
         )
-        self.push_screen(
-            FactsDialog(self.facts_on, self.facts_provider, sources), self.apply_facts_choice
-        )
+        if screen.is_mounted:
+            screen.show(self.facts_config, sources, self.facts_on, note)
 
-    @work(group="facts-setup", exclusive=True)
-    async def apply_facts_choice(self, result: tuple[str, str, str] | None) -> None:
-        if result is None:
+    @work(group="facts-settings")
+    async def persist_facts(self, screen: FactsSettings, note: str = "") -> None:
+        await asyncio.to_thread(self.facts_config.save, self.library)
+        await asyncio.to_thread(self.library.set_setting, "facts", "on" if self.facts_on else "off")
+        self.refresh_facts_settings(screen, note)
+
+    @work(group="facts-settings")
+    async def edit_facts_key(self, screen: FactsSettings, provider: Provider) -> None:
+        source = await asyncio.to_thread(self.credentials.source, provider)
+
+        def done(result: tuple[str, bool] | None) -> None:
+            if result:
+                self.save_facts_key(screen, provider, *result)
+
+        self.push_screen(KeyDialog(provider, source), done)
+
+    @work(group="facts-settings")
+    async def save_facts_key(
+        self, screen: FactsSettings, provider: Provider, key: str, remember: bool
+    ) -> None:
+        stored = await asyncio.to_thread(self.credentials.save, provider, key, remember)
+        note = (
+            f"{provider.name} key saved to the keychain."
+            if remember and stored
+            else f"{provider.name} key set for this session."
+            if not remember
+            else "No system keychain is available; the key lasts for this session only."
+        )
+        if provider.id not in self.facts_config.order:
+            self.facts_config.order.append(provider.id)
+            note += f" {provider.name} added to the order."
+        if not self.facts_on:
+            self.facts_on = True
+            note += " Notes on."
+        self.persist_facts(screen, note)
+
+    def use_facts_provider(self, screen: FactsSettings, provider: Provider) -> None:
+        order = self.facts_config.order
+        if provider.id in order:
+            order.remove(provider.id)
+            note = f"{provider.name} skipped."
+        else:
+            order.append(provider.id)
+            note = f"{provider.name} is number {len(order)} in the order."
+        self.persist_facts(screen, note)
+
+    def move_facts_provider(self, screen: FactsSettings, provider: Provider, step: int) -> None:
+        """The table keeps a fixed row order; only the order numbers change."""
+        order = self.facts_config.order
+        if provider.id not in order:
+            self.refresh_facts_settings(screen, f"Press space to use {provider.name} first.")
             return
-        choice, provider_id, key = result
-        if choice == "off":
-            self.facts_on = False
-            self.facts = []
-            self.fact_loading = False
+        index = order.index(provider.id)
+        target = index + step
+        if 0 <= target < len(order):
+            order[index], order[target] = order[target], order[index]
+        self.persist_facts(screen, f"{PROVIDERS[order[0]].name} is asked first.")
+
+    def edit_facts_model(self, screen: FactsSettings, provider: Provider) -> None:
+        if not provider.models:
+            self.refresh_facts_settings(screen, f"{provider.name} chooses its own model.")
+            return
+
+        def done(model: str | None) -> None:
+            if model is None:
+                return
+            if model and model != provider.model:
+                self.facts_config.models[provider.id] = model
+            else:
+                self.facts_config.models.pop(provider.id, None)
+            self.persist_facts(screen, f"{provider.name} uses {self.facts_config.model(provider)}.")
+
+        self.push_screen(ModelDialog(provider, self.facts_config.model(provider)), done)
+
+    @work(group="facts-settings")
+    async def forget_facts_key(self, screen: FactsSettings, provider: Provider) -> None:
+        if await asyncio.to_thread(self.credentials.source, provider) == "environment":
+            note = f"{provider.environment} is set in your shell; unset it to remove that key."
+        else:
+            await asyncio.to_thread(self.credentials.forget, provider)
+            note = f"{provider.name} key removed."
+        self.refresh_facts_settings(screen, note)
+
+    def toggle_facts(self, screen: FactsSettings) -> None:
+        self.facts_on = not self.facts_on
+        if not self.facts_on:
             self.fact_revision += 1  # Drop any answer still on its way.
-            for provider in PROVIDERS.values():
-                await asyncio.to_thread(self.credentials.forget, provider)
-            await asyncio.to_thread(self.library.set_setting, "facts", "off")
-            self.update_context()
-            self.status("Song facts off; saved keys were removed. Saved facts stay local.")
-            return
-        provider = PROVIDERS[provider_id]
-        message = f"Song facts on with {provider.name}. They appear beside the playing album."
-        if key and not await asyncio.to_thread(
-            self.credentials.save, provider, key, choice == "keep"
-        ):
-            message = "No system keychain is available; the key lasts for this session only."
-        self.facts_provider = provider
-        self.facts_on = True
-        self.facts_asked.clear()  # A new key or provider deserves another try.
-        await asyncio.to_thread(self.library.set_setting, "facts_provider", provider.id)
-        await asyncio.to_thread(self.library.set_setting, "facts", "on")
-        self.status(message)
-        self.fact_path = ""
-        self.observe_fact_song(getattr(self, "display_state", self.player.state))
+        self.persist_facts(screen, "Notes on." if self.facts_on else "Notes off. Keys are kept.")
 
     def apply_appearance(self) -> None:
         self.theme = f"kirlian-{self.appearance.palette}"

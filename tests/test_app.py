@@ -5,6 +5,7 @@ from pathlib import Path
 from textual.widgets import DataTable, Input
 
 from kirlian_terminal.app import FolderDialog, KirlianApp
+from kirlian_terminal.facts import FactsConfig
 from kirlian_terminal.library import Library
 from kirlian_terminal.playback import PlaybackState
 
@@ -339,12 +340,13 @@ async def test_facts_follow_the_playing_song_and_discard_late_answers(
     monkeypatch.setattr(KirlianApp, "FACT_DELAY", 0)
     library, paths = populated(tmp_path, audio_factory)
     library.set_setting("facts", "on")
+    FactsConfig(["exa"]).save(library)
     credentials = Credentials()
     credentials.save(PROVIDERS["exa"], "key", remember=True)
     release_first = threading.Event()
     asked = []
 
-    def fetch(provider, track, key):
+    def fetch(provider, track, key, model):
         asked.append(track.title)
         if track.title == "Song 2":
             release_first.wait(timeout=10)
@@ -378,7 +380,7 @@ async def test_facts_follow_the_playing_song_and_discard_late_answers(
             assert app.query_one("#fact-pulse").timer is None
         finally:
             release_first.set()
-        await wait_for(pilot, lambda: app.fact_cache.get("artist\x1falbum\x1fsong 2"))
+        await wait_for(pilot, lambda: app.fact_cache.get("exa", "artist\x1falbum\x1fsong 2"))
         await pilot.pause()
         assert "About Song 10" in card_text()
         await pilot.press("right_square_bracket")
@@ -391,29 +393,101 @@ async def test_facts_follow_the_playing_song_and_discard_late_answers(
         assert not app.query_one("#fact-card").display
 
 
-async def test_facts_setup_picks_a_provider_stores_its_key_and_typing_is_not_a_shortcut(
+async def test_facts_settings_adds_a_key_orders_providers_and_typing_is_not_a_shortcut(
     tmp_path, audio_factory, monkeypatch
 ):
     import keyring
 
-    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    from kirlian_terminal.app import FactsSettings, KeyDialog
+
+    for name in ("EXA_API_KEY", "OPENAI_API_KEY", "ANTHROPIC_API_KEY"):
+        monkeypatch.delenv(name, raising=False)
     library, _ = populated(tmp_path, audio_factory)
     player = FakePlayer()
     app = KirlianApp(library, player=player)
     async with app.run_test(size=(120, 40)) as pilot:
         await pilot.press("i")
-        await wait_for(pilot, lambda: app.screen.query("#facts-key"))
-        await pilot.press("enter", "down", "enter")
-        await pilot.pause()
-        assert app.screen.query_one("#facts-provider").value == "openai"
-        assert "OpenAI" in str(app.screen.query_one("#facts-hint").content)
-        await pilot.press("tab", "enter")
-        assert "Enter an API key" in str(app.screen.query_one("#facts-error").content)
-        await pilot.press("q", "space", "n", "o")
+        await wait_for(pilot, lambda: isinstance(app.screen, FactsSettings))
+        await pilot.press("j", "enter")  # Rows: Exa, OpenAI, …
+        await wait_for(pilot, lambda: isinstance(app.screen, KeyDialog))
         await pilot.press("enter")
-        await wait_for(pilot, lambda: app.facts_on)
+        assert "Paste a key" in str(app.screen.query_one("#facts-error").content)
+        await pilot.press("q", "space", "n", "o", "J", "t", "enter")
+        await wait_for(pilot, lambda: app.facts_config.order == ["openai"] and app.facts_on)
         assert not player.calls
-        assert keyring.get_password("kirlian-terminal", "openai") == "q no"
+        assert keyring.get_password("kirlian-terminal", "openai") == "q noJt"
         assert keyring.get_password("kirlian-terminal", "exa") is None
-        assert library.setting("facts_provider") == "openai"
-        assert app.facts_provider.id == "openai"
+
+        # Anthropic as a second provider, then first; the order is saved.
+        await pilot.press("j", "space")
+        await wait_for(pilot, lambda: app.facts_config.order == ["openai", "anthropic"])
+        await pilot.press("K")
+        await wait_for(pilot, lambda: app.facts_config.order == ["anthropic", "openai"])
+        await pilot.press("m")
+        await pilot.press("ctrl+a", "ctrl+k", *"claude-haiku-5-5", "enter")
+        await wait_for(pilot, lambda: app.facts_config.models == {"anthropic": "claude-haiku-5-5"})
+        await pilot.press("t")
+        await wait_for(pilot, lambda: not app.facts_on)
+        await pilot.press("escape")
+        await pilot.pause()
+        stored = FactsConfig.load(library)
+        assert stored.order == ["anthropic", "openai"]
+        assert stored.models == {"anthropic": "claude-haiku-5-5"}
+        assert library.setting("facts") == "off"
+        assert keyring.get_password("kirlian-terminal", "openai") == "q noJt"
+
+
+async def test_facts_fall_back_on_errors_and_are_kept_per_provider(
+    tmp_path, audio_factory, monkeypatch
+):
+    from kirlian_terminal.app import PlayerUpdate
+    from kirlian_terminal.facts import PROVIDERS, Credentials, Fact, FactsError
+
+    for name in ("OPENAI_API_KEY", "ANTHROPIC_API_KEY"):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setattr(KirlianApp, "FACT_DELAY", 0)
+    library, paths = populated(tmp_path, audio_factory)
+    library.set_setting("facts", "on")
+    FactsConfig(["anthropic", "openai"], {"anthropic": "claude-test"}).save(library)
+    credentials = Credentials()
+    for provider in ("anthropic", "openai"):
+        credentials.save(PROVIDERS[provider], "key", remember=True)
+    calls = []
+    failing = {"anthropic"}
+
+    def fetch(provider, track, key, model):
+        calls.append((provider.id, model))
+        if provider.id in failing:
+            raise FactsError(f"{provider.name} rate limit or credits reached.")
+        return [
+            Fact(
+                f"From {provider.name}",
+                "Body.",
+                "Src",
+                "https://e.org",
+                kind="reading",
+                provider=provider.name,
+            )
+        ]
+
+    app = KirlianApp(library, player=FakePlayer(), credentials=credentials, fetch_facts=fetch)
+
+    def card():
+        shown = app.query_one("#fact-card").display
+        return shown and app.query_one("#fact-text").content.plain
+
+    async with app.run_test(size=(140, 50)) as pilot:
+        await pilot.press("enter")
+        state = PlaybackState(path=paths[0], paused=False, idle=False, started_serial=1)
+        app.on_player_update(PlayerUpdate(state))
+        await wait_for(pilot, lambda: card() and "From OpenAI" in card())
+        assert calls == [("anthropic", "claude-test"), ("openai", "gpt-5.4-mini")]
+        assert "rate limit" in app.query_one("#status").content.plain
+        source_line = app.query_one("#fact-source").content.plain
+        assert "A reading, drawing on Src" in source_line and "via OpenAI" in source_line
+
+        # Once the primary recovers, reopening settings asks it; its answer is separate.
+        failing.clear()
+        app.facts_settings_closed()
+        await wait_for(pilot, lambda: card() and "From Anthropic" in card())
+        assert app.fact_cache.get("openai", "artist\x1falbum\x1fsong 2")[0].provider == "OpenAI"

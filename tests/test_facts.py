@@ -8,7 +8,13 @@ import pytest
 from keyring.errors import KeyringError
 
 from kirlian_terminal import facts
-from kirlian_terminal.facts import PROVIDERS, Credentials, FactsError, request_facts
+from kirlian_terminal.facts import (
+    PROVIDERS,
+    Credentials,
+    FactsConfig,
+    FactsError,
+    request_facts,
+)
 from kirlian_terminal.library import Track
 
 TRACK = Track(
@@ -133,7 +139,7 @@ def test_titles_and_dates_merge_across_duplicate_source_entries():
     [fact] = facts.verified_facts(
         ANSWER, [facts.source(URL), facts.source(URL, "John Cale on Paris 1919", "2010-05-01")]
     )
-    assert fact.source_label == "John Cale on Paris 1919, 2010"
+    assert fact.source_label == "John Cale on Paris 1919 · example.org, 2010"
 
 
 def test_unusable_answers_and_non_web_sources():
@@ -196,10 +202,10 @@ def test_live_check_explains_kept_and_dropped_facts_without_revealing_the_key(
     )
     out = io.StringIO()
     report = tmp_path / "report.json"
-    assert run_facts_check("perplexity", None, SAMPLE, report, out) == 0
+    assert run_facts_check("perplexity", FactsConfig(), SAMPLE, report, out) == 0
     text = out.getvalue()
-    assert "Facts proposed: 2 · shown after the source check: 1" in text
-    assert "✓ Little Feat in the room" in text
+    assert "Notes proposed: 2 · shown after the source check: 1" in text
+    assert "✓ [story] Little Feat in the room" in text
     assert "✗ Invented" in text
     assert "sk-secret-value" not in text + report.read_text()
     assert json.loads(report.read_text())["results"][0]["retrieved_pages"] == [URL]
@@ -211,5 +217,50 @@ def test_live_check_explains_kept_and_dropped_facts_without_revealing_the_key(
 
     monkeypatch.setattr(facts.urllib.request, "urlopen", rejected)
     out = io.StringIO()
-    assert run_facts_check("perplexity", None, SAMPLE, None, out) == 1
+    assert run_facts_check("perplexity", FactsConfig(), SAMPLE, None, out) == 1
     assert "unknown model" in out.getvalue()
+
+
+def test_readings_keep_their_kind_and_the_answering_provider(monkeypatch):
+    reading = {**GOOD, "kind": "reading"}
+    payload = {**PAYLOADS["exa"], "answer": {"facts": [reading, {**GOOD, "kind": "rumor"}]}}
+    monkeypatch.setattr(
+        facts.urllib.request, "urlopen", lambda r, timeout: io.BytesIO(json.dumps(payload).encode())
+    )
+    first, second = request_facts(PROVIDERS["exa"], TRACK, "key")
+    assert (first.kind, first.provider) == ("reading", "Exa")
+    assert second.kind == "story"  # Unknown kinds are not shown as interpretation.
+
+
+def test_facts_config_migrates_the_single_provider_setting_and_ignores_bad_values(tmp_path):
+    from kirlian_terminal.library import Library
+
+    library = Library(tmp_path / "library.db")
+    library.set_setting("facts_provider", "perplexity")
+    assert FactsConfig.load(library).order == ["perplexity"]
+    library.set_setting(
+        "facts_config",
+        json.dumps(
+            {"order": ["openai", "nope", "openai", "exa"], "models": {"exa": "x", "openai": "m"}}
+        ),
+    )
+    config = FactsConfig.load(library)
+    assert config.order == ["openai", "exa"]
+    assert config.models == {"openai": "m"}  # Exa has no model choice.
+    assert config.model(PROVIDERS["anthropic"]) == PROVIDERS["anthropic"].model
+
+
+def test_cache_is_per_provider_and_drops_answers_to_an_older_question(tmp_path):
+    from kirlian_terminal.facts import Fact, FactCache
+    from kirlian_terminal.library import Library
+
+    library = Library(tmp_path / "library.db")
+    with library.connect() as db:
+        db.execute("CREATE TABLE facts (key TEXT PRIMARY KEY, facts TEXT NOT NULL)")
+        db.execute("INSERT INTO facts VALUES ('artist\x1falbum\x1fsong', '[]')")
+    cache = FactCache(library)
+    with library.connect() as db:
+        assert db.execute("SELECT COUNT(*) FROM facts").fetchone()[0] == 0
+    cache.put("exa", "song", [Fact("H", "B", "T", "https://e.org")])
+    assert cache.get("exa", "song")[0].headline == "H"
+    assert cache.get("openai", "song") is None

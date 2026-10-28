@@ -72,9 +72,9 @@ testing, add `--data-dir .local/tryout`. Run `uv run kirlian --help` for options
 | `f` / `r` | Choose folder / rescan |
 | `p` | Preview and save appearance preferences |
 | `?` | Keyboard help |
-| `i` | Set up, change, or turn off song facts |
-| `[` / `]` | Previous / next fact for the playing song |
-| `o` | Open the shown fact's source in your browser |
+| `i` | Song-notes settings: keys, provider order and fallbacks, models, on/off |
+| `[` / `]` | Previous / next note for the playing song |
+| `o` | Open the shown note's source in your browser |
 | `q` | Quit and stop this player's audio |
 
 The bottom row shows the current Enter and Space actions, pattern, help, quit,
@@ -116,39 +116,59 @@ A song can appear more than once on purpose. If a file goes missing, its entry
 stays and is marked `[unavailable]`; playback skips it, and `d` removes it.
 Deleting a playlist never touches your music files.
 
-## Song facts
+## Song notes
 
-The side panel can show a short **Behind the record** note about the playing
-song: who played on it, where it was recorded, or how it came together. Each fact
-names its source, and only facts that match a page the provider's search actually
-retrieved are shown. `[` / `]` step through up to three facts; `o` opens the source.
+The side panel can show short **Behind the record** notes about the playing song,
+in the spirit of good liner notes or Genius annotations: what it is about, what a
+lyric refers to, the circumstances it was written in, or a sound and why it is
+there. Credits and studio lists are avoided unless there is a story in them.
 
-Facts are off by default and use your own API key with one of these providers:
+Each note is one of two kinds, shown on the card:
+
+- **Story**: something a source states. The card shows `Source: …`.
+- **Reading**: an interpretation the model draws by connecting what sources say,
+  phrased as a reading. The card shows `A reading, drawing on …`.
+
+Either way, a note is shown only if its source is a page the provider's search
+actually retrieved. The card names the source site, its year when stated, and
+which provider answered. `[` / `]` step through up to three notes; `o` opens the
+source.
+
+Notes are off by default and use your own API keys:
 
 | Provider | Get a key | Environment variable | What is called |
 | --- | --- | --- | --- |
+| Anthropic | [platform.claude.com](https://platform.claude.com) | `ANTHROPIC_API_KEY` | Messages API with web search; default `claude-sonnet-5-5` |
+| OpenAI | [platform.openai.com](https://platform.openai.com/api-keys) | `OPENAI_API_KEY` | Responses API with web search; default `gpt-5.4-mini` |
 | Exa | [dashboard.exa.ai](https://dashboard.exa.ai) | `EXA_API_KEY` | `/answer` |
-| OpenAI | [platform.openai.com](https://platform.openai.com/api-keys) | `OPENAI_API_KEY` | Responses API, `gpt-5.4-mini` with web search |
-| Anthropic | [platform.claude.com](https://platform.claude.com) | `ANTHROPIC_API_KEY` | Messages API, `claude-haiku-4-5` with web search |
 | Perplexity | [perplexity.ai](https://www.perplexity.ai/account/api) | `PERPLEXITY_API_KEY` | Agent API, `fast` effort |
 | Parallel | [platform.parallel.ai](https://platform.parallel.ai) | `PARALLEL_API_KEY` | Responses API, `low` effort |
 
-Each provider bills your account per request. To turn facts on, press `i`, choose a
-provider, paste its key, and choose **Turn on** (saved in the system credential
-store, such as the macOS Keychain) or **This session only**. Without a usable
-credential store the key lasts for the session only. Each provider's key is stored
-separately, so switching back does not require pasting it again. A key exported in
-that provider's environment variable takes precedence; press `i` to turn facts on.
-**Turn off** removes all saved keys. To try a different OpenAI or Anthropic model,
-set `KIRLIAN_FACTS_MODEL` before launching.
+Each provider bills your account per request. Press `i` for the song-notes
+settings, a table of providers with their place in the order, model, and key:
 
-Only the song title, artist, album, and year are sent to the chosen provider, two
-seconds after a song starts. Audio, artwork, and file paths are never sent. Each
-song is asked about once; answers, including "nothing found", are kept in the local
-database and reused if you switch providers.
+| Key | Action |
+| --- | --- |
+| `Enter` | Add or replace (rotate) the selected provider's key: **Save to keychain** or **This session only** |
+| `Space` | Use or skip the provider |
+| `J` / `K` | Move it later / earlier in the order |
+| `m` | Choose a model (Anthropic and OpenAI); blank restores the default |
+| `d` | Remove its saved key |
+| `t` | Turn notes on or off; keys are kept |
+| `Esc` | Close and apply to the playing song |
+
+The first provider in the order is asked first. The others are fallbacks, asked
+only when an earlier one fails (rejected key, quota, timeout, error); the status
+line says which failed. A key exported in a provider's environment variable takes
+precedence over a saved one; unset it in your shell to stop using it. Without a
+usable system credential store, saved keys last for the session only.
+
+Only the song title, artist, album, and year are sent, two seconds after a song
+starts. Audio, artwork, and file paths are never sent. Each provider is asked about
+each song once; answers, including "nothing found", are kept locally per provider,
+so reordering providers lets you compare them on songs you have already heard.
 The card appears while the side panel shows the playing song's album, so it hides
-below 110 columns. Timeouts, a rejected key, or a spent quota appear in the status
-line and never interrupt playback.
+below 110 columns. Failures appear in the status line and never interrupt playback.
 
 While a request is open, the card shows the playing title as a beat: each syllable
 is a hit (the first of each word accented, every digit its own hit), each gap
@@ -164,6 +184,7 @@ To try a provider and key outside the player, make one live request:
 uv run kirlian --check-facts            # the provider chosen in the player
 uv run kirlian --check-facts openai     # a specific provider
 uv run kirlian --check-facts all        # every provider with a saved or exported key
+uv run kirlian --check-facts anthropic --model claude-opus-5-5
 uv run kirlian --check-facts exa --artist "Talk Talk" --title "New Grass" \
   --album "Laughing Stock" --year 1991
 ```
@@ -299,8 +320,8 @@ defaults, then personalize whenever you wish. No account or setup wizard is need
 
 Music, tags, and artwork are never written to. The application stores metadata,
 the chosen folder, file availability, cover display choice, appearance preferences,
-saved seeds, playlists, and fetched song facts in its own SQLite database. Song-facts
-API keys are kept in the system credential store, never in that database:
+saved seeds, playlists, song-notes settings, and fetched notes in its own SQLite
+database. Song-notes API keys are kept in the system credential store, never there:
 
 - macOS: `~/Library/Application Support/kirlian-terminal/`
 - Linux: `$XDG_DATA_HOME/kirlian-terminal/`, defaulting to `~/.local/share/kirlian-terminal/`
@@ -308,7 +329,7 @@ API keys are kept in the system credential store, never in that database:
 `--data-dir` overrides that location. This prototype selects one music root at a
 time. Playback uses a private local socket and one owned mpv child process. There
 are no accounts, analytics, or network services. The only network request is the
-optional song-facts call to the provider you chose, described above.
+optional song-notes call to the providers you chose, described above.
 
 ## Current limits
 
@@ -321,9 +342,9 @@ optional song-facts call to the provider you chose, described above.
 - Long titles are clipped in the table; the context pane provides more space on
   wider terminals. It hides below 110 columns, taking the fact card with it. The
   minimum target is 80 × 24.
-- Song facts are tested against hand-written responses in each provider's documented
-  format; no live request to any provider has been made in this repository's checks.
-  Default models will age; `KIRLIAN_FACTS_MODEL` overrides them.
+- Notes were checked live with Anthropic only (one song, see the development
+  record). The other providers are tested against hand-written responses in their
+  documented formats. Default models will age; change them with `m` in settings.
 - Google Gemini is not offered: its grounding returns redirect links rather than
   the source pages, which the source check cannot match.
 - Saved playlists live in the Playlists view, not as individual sidebar entries.

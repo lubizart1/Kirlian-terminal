@@ -818,3 +818,33 @@ messages.
 
 Not verified: a live request to any provider (the owner is testing with a key);
 the rhythm's timing and look in a real terminal.
+
+## 2026-10-26: annotation-style notes, provider order, and key settings
+
+Owner report: a Perplexity key was "added", but nothing changed. Findings on this
+Mac: the keychain held only an Anthropic key (`security find-generic-password`
+showed one `kirlian-terminal` item), and `facts_provider` was `perplexity`. Facts
+were cached per song regardless of provider, so the six songs already answered
+by Anthropic kept showing Anthropic's notes. The old dialog also opened with the
+provider dropdown focused, so a key pasted right after choosing a provider could
+miss the key field. Both causes are removed (see architecture).
+
+Changes: Genius-annotation prompt with `story` / `reading` kinds; per-provider,
+versioned cache; ordered providers with fallback on failure; settings screen
+(`i`) for adding, rotating, and removing keys, ordering, models, and on/off;
+`--check-facts --model`; source labels with the site; relative page ages dropped.
+
+Live check (one billed request, owner's Anthropic key, `claude-sonnet-5-5`):
+"Electronic Performer" by Air returned 3 notes in 17.5 s from 34 retrieved pages;
+all 3 passed the source check. One `reading` (the lyrics' MIDI clock and 12-bit
+samplers casting Air as Kraftwerk-style machines) and two `story` notes (first
+song from the sessions, per Nicolas Godin; the build that never drops, per
+Uncut). The earlier prompt's notes for the same song were engineers, studios,
+and mixing credits. Not evaluated: other songs, other providers live, Opus.
+
+Checks: `ruff check`, `ruff format --check`, `pytest` — 131 passed. New tests:
+the settings walkthrough (key typed with `q`, space, `J`, `t` without triggering
+shortcuts; order, model, on/off persisted; keys kept when turned off), fallback
+on a provider error with the right model per provider and the card's reading and
+"via" labels, primary recovery after settings close, per-provider cache, cache
+version cleanup, config migration and validation, kind handling, and labels.

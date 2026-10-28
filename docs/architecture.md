@@ -449,15 +449,15 @@ model-written URL alone" rule identical across providers:
 | OpenAI | `POST /v1/responses`, `gpt-5.4-mini`, `web_search` tool | strict `text.format` | `url_citation` annotations, `web_search_call.action.sources` (via `include`) |
 | Parallel | `POST /v1/responses`, model `parallel`, `reasoning.effort: low` | `text.format` | `url_citation` annotations, `open_page` actions |
 | Perplexity | `POST /v1/agent`, `effort: fast` | `response_format` | `search_results` output item |
-| Anthropic | `POST /v1/messages`, `claude-haiku-4-5`, `web_search_20250305` (3 uses) | prompt only; JSON taken from the final text block | `web_search_tool_result` blocks and text citations |
+| Anthropic | `POST /v1/messages`, `claude-sonnet-5-5` (was `claude-haiku-4-5`), `web_search_20250305` (5 uses) | prompt only; JSON taken from the final text block | `web_search_tool_result` blocks and text citations |
 
 Perplexity's Sonar chat-completions API was retired on 2026-09-27; the Agent API
 is its documented replacement. OpenAI, Parallel, and Perplexity share one reader
 because their responses use the OpenAI Responses `output[]` shape. The timeout
 rose to 60 seconds because Perplexity documents a 10-30 second delay the first
 time a schema is used and Parallel's research takes 5-10 seconds at low effort.
-Default models will age, so `KIRLIAN_FACTS_MODEL` overrides the model for OpenAI
-and Anthropic only. Gemini is not offered because its grounding returns redirect
+Default models will age; the settings screen sets a model for OpenAI and
+Anthropic (this replaced a short-lived `KIRLIAN_FACTS_MODEL` variable). Gemini is not offered because its grounding returns redirect
 URLs, not the source pages the shared check needs.
 
 Keys are stored per provider (keyring user = provider id, environment variable
@@ -493,3 +493,46 @@ the player uses. `fetch_payload()` was split from `request_facts()` for this;
 `FactsError.detail` carries the provider's own error body (clipped, controls
 stripped) for the check, while the player still shows only the short message.
 The optional JSON report stores the provider response but never the key.
+
+## 2026-10-26: annotations, fallbacks, and the settings screen
+
+Live comparison by the owner: Anthropic's answers were accurate but obvious
+(engineers, studios, mixing credits). The owner asked for Genius-annotation-style
+notes that infer things about the song from context.
+
+**Question.** The prompt now asks for annotations about meaning, lyric references,
+circumstances, the song's place in the artist's work, and audible choices, and
+discourages credit and studio lists. Each note has a `kind`: `story` (a source
+states it) or `reading` (an interpretation connecting what sources say). This
+keeps the source rule intact: interpretation is allowed, but a reading still
+needs a retrieved page supporting its basis, and the card labels it ("A reading,
+drawing on …") so it is never presented as fact. An unknown kind is shown as a
+story; the schema and prompt offer only the two kinds.
+`PROMPT_VERSION` is part of the cache key, so earlier answers are asked again and
+old rows are deleted on open. The Anthropic default moved to `claude-sonnet-5-5`
+with five searches and 2048 output tokens; the timeout is 90 s.
+
+**Per-provider cache.** Facts were cached per song only, so after switching
+providers the old provider's answer kept appearing and the new provider was
+never asked, which made comparison impossible. The cache key is now
+`v<version>/<provider>/<song>`, and the card says which provider answered.
+
+**Order and fallbacks.** `FactsConfig` (settings key `facts_config`) holds the
+ordered providers in use and per-provider model overrides; it migrates the
+single `facts_provider` setting. Providers are tried in order. A provider's
+cached answer, including "nothing found", ends the search; a failure (HTTP error,
+quota, timeout, unreadable reply) or a missing key moves to the next. Failures
+are not retried within a session until the settings screen closes. Fallback on
+"nothing found" was rejected: it would bill every provider for obscure songs.
+
+**Settings screen.** `i` opens a modal table of all providers (fixed row order,
+with the order number, model, and where the key comes from). Keys are added or
+rotated in a separate password dialog (keychain or session), removed with `d`,
+and never displayed. Environment keys are shown as such and cannot be removed
+from inside the app. Turning notes off keeps keys; removing keys is explicit.
+The earlier single-provider dialog lost pasted keys when the provider dropdown
+still had focus; key entry now always starts in a focused input.
+
+**Source labels.** Labels add the site (`Air · uncut.co.uk`). Anthropic's
+`page_age` values like "7216 days ago" measure from a page's last update, so
+they are dropped rather than turned into a misleading year.

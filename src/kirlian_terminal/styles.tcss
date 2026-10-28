@@ -50,7 +50,11 @@ FolderDialog { align: center middle; background: $k-surface 80%; }
 #folder-dialog { width: 68; max-width: 95%; height: auto; padding: 1 2; border: round $k-accent; background: #19161c; }
 #folder-dialog Label { text-style: bold; margin-bottom: 1; }
 #folder-error, #facts-error { height: 2; color: #e2a895; }
-NameDialog, PlaylistPicker, ConfirmDialog, FactsDialog { align: center middle; background: $k-surface 80%; }
+NameDialog, PlaylistPicker, ConfirmDialog, FactsSettings, KeyDialog, ModelDialog { align: center middle; background: $k-surface 80%; }
+#facts-settings { width: 86; }
+#facts-providers { height: auto; max-height: 9; margin-top: 1; background: #19161c; }
+#facts-providers > .datatable--header { background: #19161c; }
+#facts-state { height: auto; margin-top: 1; }
 .dialog { width: 68; max-width: 95%; height: auto; max-height: 90%; padding: 1 2; border: round $k-accent; background: #19161c; }
 .dialog Label { text-style: bold; margin-bottom: 1; }
 .dialog-hint { height: auto; margin-top: 1; color: $k-quiet; }

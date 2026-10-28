@@ -17,11 +17,11 @@ from pathlib import Path
 from .facts import (
     PROVIDERS,
     Credentials,
+    FactsConfig,
     FactsError,
     Provider,
     fetch_payload,
     json_object,
-    model_for,
     verified_facts,
 )
 from .library import Track
@@ -45,12 +45,14 @@ def sample_track(artist: str, title: str, album: str, year: str) -> Track:
     )
 
 
-def check_provider(provider: Provider, key: str, track: Track, out) -> tuple[bool, dict]:
+def check_provider(
+    provider: Provider, key: str, model: str, track: Track, out
+) -> tuple[bool, dict]:
     """Returns (responded, report entry)."""
-    entry: dict = {"provider": provider.id, "model": model_for(provider)}
+    entry: dict = {"provider": provider.id, "model": model}
     started = time.monotonic()
     try:
-        payload = fetch_payload(provider, track, key)
+        payload = fetch_payload(provider, track, key, model)
     except FactsError as error:
         entry |= {"error": str(error), "detail": error.detail}
         print(f"  Failed after {time.monotonic() - started:.1f} s: {error}", file=out)
@@ -74,7 +76,7 @@ def check_provider(provider: Provider, key: str, track: Track, out) -> tuple[boo
     if answer and json_object(answer) is None:
         print("  The answer was not the requested JSON.", file=out)
     print(
-        f"  Facts proposed: {len(proposed)} · shown after the source check: {len(kept)}", file=out
+        f"  Notes proposed: {len(proposed)} · shown after the source check: {len(kept)}", file=out
     )
     for item in proposed:
         if not isinstance(item, dict):
@@ -82,24 +84,26 @@ def check_provider(provider: Provider, key: str, track: Track, out) -> tuple[boo
         [fact] = verified_facts({"facts": [item]}, sources) or [None]
         headline = str(item.get("headline") or "(no headline)")[:60]
         if fact:
-            print(f"    ✓ {fact.headline}", file=out)
+            print(f"    ✓ [{fact.kind}] {fact.headline}", file=out)
             print(f"        {fact.body}", file=out)
             print(f"        Source: {fact.source_label} · {fact.source_url}", file=out)
         else:
             url = str(item.get("source_url") or "(none)")[:100]
             print(f"    ✗ {headline} — source {url} was not a retrieved page", file=out)
     if not kept:
-        print("  No fact would be shown for this song.", file=out)
+        print("  No note would be shown for this song.", file=out)
     return True, entry
 
 
 def run_facts_check(
     choice: str | None,
-    configured: str | None,
+    config: FactsConfig,
     song: tuple[str, str, str, str],
     report: Path | None,
     out=sys.stdout,
+    model: str = "",
 ) -> int:
+    """`choice`: a provider id, "all" (every provider with a key), or None (the primary)."""
     credentials = Credentials()
     if choice == "all":
         providers = [p for p in PROVIDERS.values() if credentials.key(p)]
@@ -111,7 +115,7 @@ def run_facts_check(
             )
             return 1
     else:
-        provider_id = choice or configured or "exa"
+        provider_id = choice or (config.order[0] if config.order else "anthropic")
         if provider_id not in PROVIDERS:
             print(
                 f"Unknown provider {provider_id!r}. Choose: {', '.join(PROVIDERS)}, all.", file=out
@@ -130,13 +134,14 @@ def run_facts_check(
         if not key and sys.stdin.isatty():
             key = getpass.getpass(f"{provider.name} API key (not saved): ").strip()
             source = "typed for this check"
-        model = f" ({model_for(provider)})" if model_for(provider) else ""
-        print(f"{provider.name}{model} · key from {source or 'nowhere'}", file=out)
+        chosen = (model if model and provider.models else "") or config.model(provider)
+        label = f" ({chosen})" if chosen else ""
+        print(f"{provider.name}{label} · key from {source or 'nowhere'}", file=out)
         if not key:
             print(f"  No key. Set {provider.environment} or press i in the player.\n", file=out)
             failures += 1
             continue
-        responded, entry = check_provider(provider, key, track, out)
+        responded, entry = check_provider(provider, key, chosen, track, out)
         failures += not responded
         entries.append(entry)
         print(file=out)

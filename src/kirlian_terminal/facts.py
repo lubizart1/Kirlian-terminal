@@ -1,9 +1,11 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Optional sourced song facts. Only title, artist, album, and year leave the machine.
+"""Optional sourced song notes. Only title, artist, album, and year leave the machine.
 
-Each provider is asked the same question and returns facts with a source URL plus
-the pages its search actually retrieved. A fact is kept only when its URL matches
-one of those retrieved pages, whichever provider answered.
+Each provider is asked the same question and returns notes with a source URL plus
+the pages its search actually retrieved. A note is kept only when its URL matches
+one of those retrieved pages, whichever provider answered. Notes are either a
+"story" a source states directly, or a "reading": an interpretation the model
+draws from what retrieved sources say, labeled as such on the card.
 """
 
 from __future__ import annotations
@@ -11,10 +13,11 @@ from __future__ import annotations
 import contextlib
 import json
 import os
+import re
 import urllib.error
 import urllib.request
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field, replace
 from urllib.parse import urlsplit
 
 import keyring
@@ -23,19 +26,22 @@ from keyring.errors import KeyringError
 from .library import Library, Track, display_text
 
 KEYRING_SERVICE = "kirlian-terminal"
-MODEL_ENVIRONMENT = "KIRLIAN_FACTS_MODEL"
-TIMEOUT = 60
-HEADLINE_LIMIT = 60
-BODY_LIMIT = 280
+# Bump when the question changes so earlier answers are asked again.
+PROMPT_VERSION = "2"
+TIMEOUT = 90
+HEADLINE_LIMIT = 70
+BODY_LIMIT = 340
+KINDS = ("story", "reading")
 
 FACT = {
     "type": "object",
     "properties": {
+        "kind": {"type": "string", "enum": list(KINDS)},
         "headline": {"type": "string"},
         "body": {"type": "string"},
         "source_url": {"type": "string"},
     },
-    "required": ["headline", "body", "source_url"],
+    "required": ["kind", "headline", "body", "source_url"],
 }
 SCHEMA = {
     "type": "object",
@@ -67,11 +73,28 @@ class Fact:
     source_title: str
     source_url: str
     published: str = ""
+    kind: str = "story"
+    provider: str = ""
 
     @property
     def source_label(self) -> str:
-        year = self.published[:4]
-        return f"{self.source_title}, {year}" if year.isdigit() else self.source_title
+        """Page title, site, and year, e.g. "Air · uncut.co.uk, 2004"."""
+        title = self.source_title.strip(" -–—|·:")
+        host = urlsplit(self.source_url).netloc.casefold().removeprefix("www.")
+        named = host in title.casefold() or title.casefold().replace(" ", "") in host
+        label = title if not host or named else f"{title} · {host}"
+        year = re.search(r"\b(1[89]|20)\d{2}\b", self.published)
+        return f"{label}, {year[0]}" if year else label
+
+
+def page_date(published: object) -> str:
+    """Keep a stated date; drop relative ages such as Anthropic's "490 days ago".
+
+    Those count from the page's last update, not its publication, so turning them
+    into a year would misdate older articles.
+    """
+    text = str(published or "")
+    return "" if re.search(r"\bago\b", text, re.IGNORECASE) else text
 
 
 def fact_key(track: Track) -> str:
@@ -81,13 +104,24 @@ def fact_key(track: Track) -> str:
 def question(track: Track) -> str:
     year = f", {track.year}" if track.year else ""
     return (
-        f'Search the web for up to three short, specific facts about how the song "{track.title}" '
-        f'by {track.artist} (from the album "{track.album}"{year}) was written or recorded: '
-        "the people who played on it, the studio, the process, or the story behind it. "
-        "Each fact needs a headline under 8 words and a body under 45 words, written for a "
-        "listener. Use only what a source you found states, and give that page's exact URL. "
-        "Skip generic praise, chart positions, and anything about a different song. Return no "
-        'facts rather than guessing. Reply with only JSON: {"facts": [{"headline": "...", '
+        f'Write up to three annotations for a listener about the song "{track.title}" by '
+        f'{track.artist}, from the album "{track.album}"{year}, in the spirit of the best '
+        "Genius annotations and liner notes. Search the web: interviews, reviews, "
+        "encyclopedias, lyric annotation sites, books.\n\n"
+        "Look for what makes this song itself interesting: what it is about, what its "
+        "lyrics or title refer to, the circumstances or mood it was written in, where it "
+        "sits in the artist's life and work, what it borrows or answers, and sounds a "
+        "listener can hear and why they are there. Prefer the surprising and specific. "
+        "Skip lists of credits, studios, engineers, release dates, chart positions, and "
+        "generic praise unless there is a story in them. Do not describe the album in "
+        "general, and nothing about a different song.\n\n"
+        'Each annotation has a kind. "story": something a source states directly. '
+        '"reading": an interpretation you draw by connecting what sources say, for '
+        "example linking a lyric to an event an interview describes. Phrase a reading as "
+        "a reading, not as fact. Every annotation, including readings, needs the exact "
+        "URL of a page you retrieved that supports it. Headline under 9 words; body under "
+        "55 words, plain and vivid. Return fewer, or none, rather than guessing.\n\n"
+        'Reply with only JSON: {"facts": [{"kind": "story", "headline": "...", '
         '"body": "...", "source_url": "https://..."}]}'
     )
 
@@ -143,7 +177,17 @@ def verified_facts(answer: object, sources: list[Source]) -> list[Fact]:
         if urlsplit(source_url).scheme not in {"http", "https"}:
             continue
         title = clip(source.get("title") or urlsplit(source_url).netloc, 70)
-        facts.append(Fact(headline, body, title, source_url, source.get("published", "")))
+        kind = str(item.get("kind") or "story").casefold()
+        facts.append(
+            Fact(
+                headline,
+                body,
+                title,
+                source_url,
+                source.get("published", ""),
+                kind if kind in KINDS else "story",
+            )
+        )
     return facts[:3]
 
 
@@ -199,7 +243,7 @@ def read_anthropic(payload: dict) -> tuple[object, list[Source]]:
     for block in dicts(payload.get("content")):
         if block.get("type") == "web_search_tool_result":
             sources += [
-                source(r.get("url"), r.get("title"), r.get("page_age"))
+                source(r.get("url"), r.get("title"), page_date(r.get("page_age")))
                 for r in dicts(block.get("content"))
                 if r.get("type") == "web_search_result"
             ]
@@ -222,10 +266,11 @@ class Provider:
     environment: str
     signup: str
     endpoint: str
-    model: str
+    model: str  # Sent as the model field when the API needs one.
     body: Callable[[str, str], dict]
     read: Callable[[dict], tuple[object, list[Source]]]
     auth: str = "bearer"  # bearer, x-api-key, or anthropic
+    models: tuple[str, ...] = ()  # Suggestions; empty when the listener cannot choose.
 
     def headers(self, key: str) -> dict[str, str]:
         if self.auth == "bearer":
@@ -265,6 +310,7 @@ PROVIDERS: dict[str, Provider] = {
                 "text": openai_style_format(strict=True),
             },
             read_responses,
+            models=("gpt-5.4-mini", "gpt-5.6-luna", "gpt-6.1-sol"),
         ),
         Provider(
             "anthropic",
@@ -272,15 +318,16 @@ PROVIDERS: dict[str, Provider] = {
             "ANTHROPIC_API_KEY",
             "platform.claude.com",
             "https://api.anthropic.com/v1/messages",
-            "claude-haiku-4-5",
+            "claude-sonnet-5-5",
             lambda prompt, model: {
                 "model": model,
-                "max_tokens": 1024,
-                "tools": [{"type": "web_search_20250305", "name": "web_search", "max_uses": 3}],
+                "max_tokens": 2048,
+                "tools": [{"type": "web_search_20250305", "name": "web_search", "max_uses": 5}],
                 "messages": [{"role": "user", "content": prompt}],
             },
             read_anthropic,
             auth="anthropic",
+            models=("claude-sonnet-5-5", "claude-haiku-5-5", "claude-opus-5-5"),
         ),
         Provider(
             "perplexity",
@@ -316,24 +363,52 @@ PROVIDERS: dict[str, Provider] = {
         ),
     )
 }
-DEFAULT_PROVIDER = "exa"
 
 
-def provider_named(provider_id: str | None) -> Provider:
-    return PROVIDERS.get(provider_id or "", PROVIDERS[DEFAULT_PROVIDER])
+@dataclass
+class FactsConfig:
+    """Providers in use, primary first (later ones are fallbacks), and chosen models."""
+
+    order: list[str] = field(default_factory=list)
+    models: dict[str, str] = field(default_factory=dict)
+
+    @classmethod
+    def load(cls, library: Library) -> FactsConfig:
+        try:
+            stored = json.loads(library.setting("facts_config") or "{}")
+        except ValueError:
+            stored = {}
+        stored = stored if isinstance(stored, dict) else {}
+        order = [p for p in stored.get("order") or [] if p in PROVIDERS]
+        if not order and library.setting("facts_provider") in PROVIDERS:
+            order = [library.setting("facts_provider")]  # Single-provider setup, 2026-10-26.
+        models = stored.get("models") if isinstance(stored.get("models"), dict) else {}
+        models = {
+            p: str(m) for p, m in models.items() if p in PROVIDERS and PROVIDERS[p].models and m
+        }
+        return cls(list(dict.fromkeys(order)), models)
+
+    def save(self, library: Library) -> None:
+        library.set_setting(
+            "facts_config", json.dumps({"order": self.order, "models": self.models})
+        )
+
+    def model(self, provider: Provider) -> str:
+        """The model to request; "" for providers that pick their own."""
+        return self.models.get(provider.id, provider.model) if provider.models else ""
+
+    @property
+    def providers(self) -> list[Provider]:
+        return [PROVIDERS[p] for p in self.order]
 
 
-def model_for(provider: Provider) -> str:
-    # Only OpenAI and Anthropic take a model name; the others select by effort or product.
-    override = os.environ.get(MODEL_ENVIRONMENT, "").strip()
-    return override if override and provider.id in {"openai", "anthropic"} else provider.model
-
-
-def fetch_payload(provider: Provider, track: Track, key: str, timeout: float = TIMEOUT) -> dict:
+def fetch_payload(
+    provider: Provider, track: Track, key: str, model: str = "", timeout: float = TIMEOUT
+) -> dict:
     """Blocking provider call. Raises FactsError with a listener-readable message."""
     request = urllib.request.Request(
         provider.endpoint,
-        data=json.dumps(provider.body(question(track), model_for(provider))).encode(),
+        data=json.dumps(provider.body(question(track), model or provider.model)).encode(),
         headers=provider.headers(key),
         method="POST",
     )
@@ -348,12 +423,12 @@ def fetch_payload(provider: Provider, track: Track, key: str, timeout: float = T
         if error.code in {401, 403}:
             message = f"{name} rejected the API key. Press i to replace it."
         elif error.code in {402, 429}:
-            message = f"{name} rate limit or credits reached; facts paused."
+            message = f"{name} rate limit or credits reached."
         else:
-            message = f"{name} returned HTTP {error.code}; no fact for this song."
+            message = f"{name} returned HTTP {error.code}."
         raise FactsError(message, detail) from None
     except (urllib.error.URLError, TimeoutError, OSError):
-        raise FactsError(f"Could not reach {name}; no fact for this song.") from None
+        raise FactsError(f"Could not reach {name}.") from None
     except ValueError:
         raise FactsError(f"{name} sent an unreadable response.") from None
     if not isinstance(payload, dict):
@@ -362,10 +437,11 @@ def fetch_payload(provider: Provider, track: Track, key: str, timeout: float = T
 
 
 def request_facts(
-    provider: Provider, track: Track, key: str, timeout: float = TIMEOUT
+    provider: Provider, track: Track, key: str, model: str = "", timeout: float = TIMEOUT
 ) -> list[Fact]:
     """Blocking; run off the UI loop."""
-    return verified_facts(*provider.read(fetch_payload(provider, track, key, timeout)))
+    payload = fetch_payload(provider, track, key, model, timeout)
+    return [replace(f, provider=provider.name) for f in verified_facts(*provider.read(payload))]
 
 
 class Credentials:
@@ -410,7 +486,11 @@ class Credentials:
 
 
 class FactCache:
-    """Facts per song, kept so each song is requested once, not once per launch."""
+    """Notes per provider and song, so each is requested once, not once per launch.
+
+    Keyed by provider so providers can be compared, and by prompt version so a new
+    question asks again. Rows from earlier versions are removed on open.
+    """
 
     def __init__(self, library: Library) -> None:
         self.library = library
@@ -418,10 +498,17 @@ class FactCache:
             db.execute(
                 "CREATE TABLE IF NOT EXISTS facts (key TEXT PRIMARY KEY, facts TEXT NOT NULL)"
             )
+            db.execute("DELETE FROM facts WHERE key NOT LIKE ?", (f"v{PROMPT_VERSION}\x1f%",))
 
-    def get(self, key: str) -> list[Fact] | None:
+    @staticmethod
+    def key(provider_id: str, song: str) -> str:
+        return f"v{PROMPT_VERSION}\x1f{provider_id}\x1f{song}"
+
+    def get(self, provider_id: str, song: str) -> list[Fact] | None:
         with self.library.connect() as db:
-            row = db.execute("SELECT facts FROM facts WHERE key = ?", (key,)).fetchone()
+            row = db.execute(
+                "SELECT facts FROM facts WHERE key = ?", (self.key(provider_id, song),)
+            ).fetchone()
         if row is None:
             return None
         try:
@@ -429,9 +516,9 @@ class FactCache:
         except (ValueError, TypeError):
             return None
 
-    def put(self, key: str, facts: list[Fact]) -> None:
+    def put(self, provider_id: str, song: str, facts: list[Fact]) -> None:
         with self.library.connect() as db:
             db.execute(
                 "INSERT OR REPLACE INTO facts VALUES (?, ?)",
-                (key, json.dumps([vars(fact) for fact in facts])),
+                (self.key(provider_id, song), json.dumps([vars(fact) for fact in facts])),
             )
