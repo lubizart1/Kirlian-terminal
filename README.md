@@ -145,14 +145,18 @@ Notes are off by default and use your own API keys:
 | Parallel | [platform.parallel.ai](https://platform.parallel.ai) | `PARALLEL_API_KEY` | Responses API, `low` effort |
 
 Each provider bills your account per request. Press `i` for the song-notes
-settings, a table of providers with their place in the order, model, and key:
+settings. Providers are listed in the order they are asked: the **Primary** first,
+then **Fallback 1**, **Fallback 2**, and so on, then those not used. Moving a
+provider moves its row. The line under the table explains the selected provider
+(its role, and which model writes its notes) and shows only the keys that apply:
 
 | Key | Action |
 | --- | --- |
-| `Enter` | Add or replace (rotate) the selected provider's key: **Save to keychain** or **This session only** |
-| `Space` | Use or skip the provider |
-| `J` / `K` | Move it later / earlier in the order |
-| `m` | Choose a model (Anthropic and OpenAI); blank restores the default |
+| `Enter` | Add or replace (rotate) the provider's key: **Save to keychain** or **This session only** |
+| `Space` | Use the provider as the last fallback, or stop using it |
+| `1`–`5` | Put it at that position; `1` makes it the primary |
+| `K` / `J` (or Shift+↑ / Shift+↓) | Move it up or down |
+| `m` | Choose the model that writes the notes (Anthropic and OpenAI), from a short list with what to expect, or any other model name |
 | `d` | Remove its saved key |
 | `t` | Turn notes on or off; keys are kept |
 | `Esc` | Close and apply to the playing song |

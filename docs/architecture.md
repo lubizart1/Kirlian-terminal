@@ -536,3 +536,18 @@ still had focus; key entry now always starts in a focused input.
 **Source labels.** Labels add the site (`Air · uncut.co.uk`). Anthropic's
 `page_age` values like "7216 days ago" measure from a page's last update, so
 they are dropped rather than turned into a misleading year.
+
+## 2026-10-28: settings screen readability
+
+Owner feedback on the first settings screen: it was unclear whether `m` changed
+anything and why, and reordering fallbacks was hard because rows stayed in a
+fixed order while only a number column changed. Rows are now sorted by role
+(Primary, Fallback N, Not used); moving a provider moves its row and the
+selection follows it by provider id, not row index. `1`-`5` place a provider
+directly; Shift+arrows move it. A detail line explains the selected provider's
+role in words ("Fallback: asked only if Perplexity fails") and which model
+writes its notes, and the action line lists only actions that apply (no `m` for
+providers without a model choice, no `d` without a saved key). The model column
+is "Writes notes with". The model picker is a list of suggested models, each with
+what to expect, plus "Another model…" for a typed name; it states that the model
+affects song notes only. Choosing the default removes the override.

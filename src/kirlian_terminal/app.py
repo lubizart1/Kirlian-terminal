@@ -273,7 +273,7 @@ class KeyDialog(ModalScreen[tuple[str, bool] | None]):
 
 
 class ModelDialog(ModalScreen[str | None]):
-    """Returns a model name; an empty string restores the provider's default."""
+    """Pick the model that writes the notes. Returns a model name, "" for the default."""
 
     BINDINGS = [Binding("escape", "cancel", "Cancel")]
 
@@ -285,110 +285,193 @@ class ModelDialog(ModalScreen[str | None]):
     def compose(self) -> ComposeResult:
         p = self.provider
         with Vertical(classes="dialog"):
-            yield Label(f"{p.name} model")
+            yield Label(f"Which {p.name} model writes your notes?")
             yield Static(
-                f"Default: {p.model}. Suggestions: {', '.join(p.models)}. Any model name "
-                f"{p.name} accepts with web search works. Leave blank for the default.",
+                f"{p.name} searches the web, then this model reads the pages and writes the "
+                "notes. Larger models usually find better stories and readings, take longer, "
+                "and cost more per song. This changes song notes only.",
                 classes="dialog-hint",
             )
-            yield Input(value=self.current, placeholder=p.model, id="facts-model")
+            options = [
+                Text.assemble(
+                    ("● " if model == self.current else "  ", self.app.appearance.accent),
+                    (model, f"bold {INK}"),
+                    ("  default" if model == p.model else "", QUIET),
+                    f"\n    {about}",
+                )
+                for model, about in p.models
+            ]
+            options.append(Text("  Another model…\n    Type any model name it offers"))
+            yield OptionList(*options, id="model-choices")
+            yield Input(placeholder=f"{p.name} model name", id="facts-model")
 
     def on_mount(self) -> None:
-        self.query_one(Input).focus()
+        choices = self.query_one(OptionList)
+        names = [model for model, _ in self.provider.models]
+        known = self.current in names
+        choices.highlighted = names.index(self.current) if known else len(names)
+        model_input = self.query_one(Input)
+        model_input.display = not known
+        model_input.value = "" if known else self.current
+        choices.focus()
+
+    def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
+        event.stop()
+        models = self.provider.models
+        if event.option_index < len(models):
+            model = models[event.option_index][0]
+            self.dismiss("" if model == self.provider.model else model)
+        else:
+            model_input = self.query_one(Input)
+            model_input.display = True
+            model_input.focus()
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         event.stop()
-        self.dismiss(event.value.strip())
+        model = event.value.strip()
+        self.dismiss("" if model == self.provider.model else model)
 
     def action_cancel(self) -> None:
         self.dismiss(None)
 
 
 class FactsSettings(ModalScreen[None]):
-    """Song-notes providers: keys, order (primary, then fallbacks), models, on/off."""
+    """Song-notes providers in the order they are asked, with keys and models.
+
+    Rows are sorted by role (primary, fallbacks, then unused), so moving a provider
+    moves its row, and the selection follows it. The line under the table explains
+    the selected provider and lists only the actions that apply to it.
+    """
 
     BINDINGS = [
         Binding("escape", "close", "Close"),
         Binding("enter", "key", "Add or replace key", priority=True),
-        Binding("space", "use", "Use / skip"),
-        Binding("J", "move(1)", "Move down"),
-        Binding("K", "move(-1)", "Move up"),
+        Binding("space", "use", "Use / stop using"),
+        Binding("J,shift+down", "move(1)", "Move down"),
+        Binding("K,shift+up", "move(-1)", "Move up"),
         Binding("j", "cursor(1)", "Down", show=False),
         Binding("k", "cursor(-1)", "Up", show=False),
+        *(Binding(str(n), f"place({n})", f"Make #{n}", show=False) for n in range(1, 6)),
         Binding("m", "model", "Model"),
         Binding("d", "forget", "Remove key"),
         Binding("t", "toggle", "Notes on/off"),
     ]
 
+    def __init__(self) -> None:
+        super().__init__()
+        self.row_ids: list[str] = list(PROVIDERS)
+        self.selected_id = self.row_ids[0]
+        self.config = FactsConfig()
+        self.sources: dict[str, str] = {}
+
     def compose(self) -> ComposeResult:
         with Vertical(classes="dialog", id="facts-settings"):
             yield Label("Song notes · Behind the record")
+            yield Static("", id="facts-state")
             yield Static(
-                "Short notes on how the playing song was made and what it is about, from "
-                "providers you choose, with your own keys. The first provider in the order "
-                "is asked first; the others are used only if it fails.\n"
-                "Sent: title, artist, album, year. Never: audio, artwork, or file paths.",
+                "Providers are asked from the top. The primary answers every new song; a "
+                "fallback is asked only if the ones above it fail. Sent: title, artist, "
+                "album, year. Never: audio, artwork, or file paths.",
                 classes="dialog-hint",
             )
             yield DataTable(id="facts-providers", cursor_type="row", zebra_stripes=False)
-            yield Static("", id="facts-state")
-            yield Static(
-                Text.assemble(
-                    *(
-                        part
-                        for key, label in (
-                            ("enter", "key"),
-                            ("space", "use/skip"),
-                            ("J/K", "order"),
-                            ("m", "model"),
-                            ("d", "remove key"),
-                            ("t", "on/off"),
-                            ("esc", "close"),
-                        )
-                        for part in ((key, "bold"), (f" {label}   ", QUIET))
-                    )
-                ),
-                classes="dialog-hint",
-            )
+            yield Static("", id="facts-detail")
+            yield Static("", id="facts-actions")
+            yield Static("", id="facts-note")
 
     def on_mount(self) -> None:
         table = self.query_one(DataTable)
-        for label, key in (
-            ("#", "order"),
-            ("Provider", "name"),
-            ("Model", "model"),
-            ("Key", "key"),
-        ):
-            table.add_column(label, key=key)
+        for label in ("Role", "Provider", "Key", "Writes notes with"):
+            table.add_column(label)
         self.app.refresh_facts_settings(self)
         table.focus()
 
     @property
     def provider(self) -> Provider:
-        ids = list(PROVIDERS)
-        return PROVIDERS[ids[max(0, self.query_one(DataTable).cursor_row)]]
+        return PROVIDERS[self.selected_id]
+
+    def role(self, provider_id: str) -> str:
+        order = self.config.order
+        if provider_id not in order:
+            return "Not used"
+        position = order.index(provider_id)
+        return "Primary" if position == 0 else f"Fallback {position}"
+
+    def key_label(self, p: Provider) -> str:
+        return {
+            "keychain": "Saved in keychain",
+            "session": "This session only",
+            "environment": f"From shell ({p.environment})",
+        }.get(self.sources.get(p.id, ""), "No key")
 
     def show(self, config: FactsConfig, sources: dict[str, str], on: bool, note: str) -> None:
+        self.config, self.sources = config, sources
+        self.row_ids = config.order + [p for p in PROVIDERS if p not in config.order]
+        accent = self.app.appearance.accent
         table = self.query_one(DataTable)
-        row = table.cursor_row
         table.clear()
-        for p in PROVIDERS.values():
-            position = config.order.index(p.id) + 1 if p.id in config.order else 0
-            key = {"environment": f"from {p.environment}", "keychain": "keychain"}.get(
-                sources.get(p.id, ""), sources.get(p.id) or "none"
-            )
+        for provider_id in self.row_ids:
+            p = PROVIDERS[provider_id]
+            used = provider_id in config.order
             table.add_row(
-                Text(str(position) if position else "–", self.app.appearance.accent),
-                Text(p.name, INK if position else QUIET),
-                Text(config.model(p) or "—", QUIET),
-                Text(key, INK if sources.get(p.id) else QUIET),
-                key=p.id,
+                Text(self.role(provider_id), f"bold {accent}" if used else QUIET),
+                Text(p.name, INK if used else QUIET),
+                Text(self.key_label(p), INK if sources.get(p.id) else QUIET),
+                Text(config.model(p) or "its own model", INK if config.model(p) else QUIET),
+                key=provider_id,
             )
-        table.move_cursor(row=max(0, row))
-        state = Text.assemble(("Notes: ", QUIET), ("on" if on else "off", "bold"))
-        if note:
-            state.append(f"   {note}", QUIET)
-        self.query_one("#facts-state", Static).update(state)
+        table.move_cursor(row=self.row_ids.index(self.selected_id))
+        self.query_one("#facts-state", Static).update(
+            Text.assemble(
+                ("Notes are ", QUIET),
+                ("on" if on else "off", f"bold {accent}" if on else "bold"),
+                ("  ·  ", QUIET),
+                ("t", "bold"),
+                (f" to turn {'off' if on else 'on'}", QUIET),
+            )
+        )
+        self.query_one("#facts-note", Static).update(Text(note, accent))
+        self.describe()
+
+    def describe(self) -> None:
+        """Explain the selected provider and list the actions that apply to it."""
+        p = self.provider
+        order = self.config.order
+        model = self.config.model(p)
+        if p.id not in order:
+            role = "Not used. Press space to add it as the last fallback."
+        elif order.index(p.id) == 0:
+            role = "Primary: asked first for every new song."
+        else:
+            above = PROVIDERS[order[order.index(p.id) - 1]].name
+            role = f"Fallback: asked only if {above} fails."
+        writer = (
+            f"Notes are written by {model}."
+            if model
+            else f"{p.name} picks the model that writes the notes."
+        )
+        self.query_one("#facts-detail", Static).update(
+            Text.assemble((p.name, f"bold {INK}"), "  ", (f"{role} {writer}", QUIET))
+        )
+        actions = [("enter", "replace key" if self.sources.get(p.id) else "add key")]
+        if p.id in order:
+            actions.append(("space", "stop using"))
+            if len(order) > 1:
+                actions.append(("K/J or 1-5", "move up/down"))
+        else:
+            actions.append(("space", "use as fallback"))
+            actions.append(("1", "make primary"))
+        if p.models:
+            actions.append(("m", "change model"))
+        if self.sources.get(p.id) in {"keychain", "session"}:
+            actions.append(("d", "remove key"))
+        actions.append(("esc", "close"))
+        hints = Text()
+        for index, (key, label) in enumerate(actions):
+            hints.append("   " if index else "")
+            hints.append(key, f"bold {self.app.appearance.accent}")
+            hints.append(f" {label}", QUIET)
+        self.query_one("#facts-actions", Static).update(hints)
 
     def action_cursor(self, step: int) -> None:
         table = self.query_one(DataTable)
@@ -402,6 +485,9 @@ class FactsSettings(ModalScreen[None]):
 
     def action_move(self, step: int) -> None:
         self.app.move_facts_provider(self, self.provider, step)
+
+    def action_place(self, position: int) -> None:
+        self.app.place_facts_provider(self, self.provider, position)
 
     def action_model(self) -> None:
         self.app.edit_facts_model(self, self.provider)
@@ -417,6 +503,9 @@ class FactsSettings(ModalScreen[None]):
 
     def on_data_table_row_highlighted(self, event: DataTable.RowHighlighted) -> None:
         event.stop()  # The library table's handlers live on the app.
+        if 0 <= event.cursor_row < len(self.row_ids):
+            self.selected_id = self.row_ids[event.cursor_row]
+            self.describe()
 
     def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
         event.stop()
@@ -1698,27 +1787,39 @@ class KirlianApp(App):
             note += " Notes on."
         self.persist_facts(screen, note)
 
+    def facts_role_note(self, provider: Provider) -> str:
+        order = self.facts_config.order
+        if provider.id not in order:
+            return f"{provider.name} is no longer used."
+        position = order.index(provider.id)
+        return f"{provider.name} is now " + (
+            "the primary." if position == 0 else f"fallback {position}."
+        )
+
     def use_facts_provider(self, screen: FactsSettings, provider: Provider) -> None:
         order = self.facts_config.order
         if provider.id in order:
             order.remove(provider.id)
-            note = f"{provider.name} skipped."
         else:
             order.append(provider.id)
-            note = f"{provider.name} is number {len(order)} in the order."
-        self.persist_facts(screen, note)
+        self.persist_facts(screen, self.facts_role_note(provider))
 
     def move_facts_provider(self, screen: FactsSettings, provider: Provider, step: int) -> None:
-        """The table keeps a fixed row order; only the order numbers change."""
         order = self.facts_config.order
         if provider.id not in order:
             self.refresh_facts_settings(screen, f"Press space to use {provider.name} first.")
             return
-        index = order.index(provider.id)
-        target = index + step
-        if 0 <= target < len(order):
-            order[index], order[target] = order[target], order[index]
-        self.persist_facts(screen, f"{PROVIDERS[order[0]].name} is asked first.")
+        self.place_facts_provider(screen, provider, order.index(provider.id) + 1 + step)
+
+    def place_facts_provider(
+        self, screen: FactsSettings, provider: Provider, position: int
+    ) -> None:
+        """Put a provider at a 1-based position, adding it if it was not used."""
+        order = self.facts_config.order
+        if provider.id in order:
+            order.remove(provider.id)
+        order.insert(min(max(position, 1), len(order) + 1) - 1, provider.id)
+        self.persist_facts(screen, self.facts_role_note(provider))
 
     def edit_facts_model(self, screen: FactsSettings, provider: Provider) -> None:
         if not provider.models:

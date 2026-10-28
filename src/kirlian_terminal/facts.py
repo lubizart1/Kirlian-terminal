@@ -270,7 +270,8 @@ class Provider:
     body: Callable[[str, str], dict]
     read: Callable[[dict], tuple[object, list[Source]]]
     auth: str = "bearer"  # bearer, x-api-key, or anthropic
-    models: tuple[str, ...] = ()  # Suggestions; empty when the listener cannot choose.
+    # (model, what to expect) suggestions; empty when the listener cannot choose.
+    models: tuple[tuple[str, str], ...] = ()
 
     def headers(self, key: str) -> dict[str, str]:
         if self.auth == "bearer":
@@ -310,7 +311,11 @@ PROVIDERS: dict[str, Provider] = {
                 "text": openai_style_format(strict=True),
             },
             read_responses,
-            models=("gpt-5.4-mini", "gpt-5.6-luna", "gpt-6.1-sol"),
+            models=(
+                ("gpt-5.4-mini", "Fast and inexpensive; solid everyday notes"),
+                ("gpt-5.6-luna", "Cheapest; plainer notes"),
+                ("gpt-6.1-sol", "Deeper reading of sources; costs more"),
+            ),
         ),
         Provider(
             "anthropic",
@@ -327,7 +332,11 @@ PROVIDERS: dict[str, Provider] = {
             },
             read_anthropic,
             auth="anthropic",
-            models=("claude-sonnet-5-5", "claude-haiku-5-5", "claude-opus-5-5"),
+            models=(
+                ("claude-sonnet-5-5", "Balanced: good stories and readings at moderate cost"),
+                ("claude-haiku-5-5", "Fastest and cheapest; plainer notes"),
+                ("claude-opus-5-5", "Most thorough; slowest and most expensive"),
+            ),
         ),
         Provider(
             "perplexity",

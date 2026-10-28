@@ -848,3 +848,20 @@ shortcuts; order, model, on/off persisted; keys kept when turned off), fallback
 on a provider error with the right model per provider and the card's reading and
 "via" labels, primary recovery after settings close, per-provider cache, cache
 version cleanup, config migration and validation, kind handling, and labels.
+
+## 2026-10-28: clearer song-notes settings
+
+Owner screenshot: Anthropic had a key but was "–" while Perplexity was "1", the
+model column's purpose was unclear, and reordering was hard. Reworked the screen
+as recorded in architecture (role-sorted rows, selection follows the provider,
+direct `1`-`5` placement, per-row explanation and applicable actions, model
+picker with descriptions). Model descriptions are relative guidance from the
+providers' positioning, not measured quality or price.
+
+Checks: `ruff`, full `pytest` — 131 passed. The settings test now walks: add an
+OpenAI key (typing `q`, space, `J`, `t` into the key field), add Anthropic as a
+fallback and confirm the detail line, move it up with `K` and confirm the row and
+selection moved, place OpenAI first with `1`, pick Haiku from the list and then
+the default again (override removed), turn notes off, and reload the saved order.
+Headless renders at 120 × 42 checked the table, detail line, and model list.
+Not checked in a real terminal.

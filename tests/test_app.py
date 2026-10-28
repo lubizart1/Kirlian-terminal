@@ -418,21 +418,37 @@ async def test_facts_settings_adds_a_key_orders_providers_and_typing_is_not_a_sh
         assert keyring.get_password("kirlian-terminal", "openai") == "q noJt"
         assert keyring.get_password("kirlian-terminal", "exa") is None
 
-        # Anthropic as a second provider, then first; the order is saved.
-        await pilot.press("j", "space")
+        # Rows follow the order: OpenAI (primary), then unused Exa, Anthropic, …
+        screen = app.screen
+        assert screen.row_ids[0] == "openai" and screen.selected_id == "openai"
+        await pilot.press("j", "j", "space")
         await wait_for(pilot, lambda: app.facts_config.order == ["openai", "anthropic"])
-        await pilot.press("K")
+        await pilot.pause()
+        assert screen.selected_id == "anthropic" and screen.row_ids[1] == "anthropic"
+        assert "Fallback: asked only if OpenAI fails" in str(
+            screen.query_one("#facts-detail").content
+        )
+        await pilot.press("K")  # The selection moves with its row.
         await wait_for(pilot, lambda: app.facts_config.order == ["anthropic", "openai"])
-        await pilot.press("m")
-        await pilot.press("ctrl+a", "ctrl+k", *"claude-haiku-5-5", "enter")
+        await pilot.pause()
+        assert screen.row_ids[:2] == ["anthropic", "openai"] and screen.selected_id == "anthropic"
+        await pilot.press("j", "1")
+        await wait_for(pilot, lambda: app.facts_config.order == ["openai", "anthropic"])
+        await pilot.pause()
+        await pilot.press("j", "m")  # Anthropic: pick a listed model.
+        await wait_for(pilot, lambda: app.screen.query("#model-choices"))
+        await pilot.press("down", "enter")
         await wait_for(pilot, lambda: app.facts_config.models == {"anthropic": "claude-haiku-5-5"})
+        await pilot.press("m")
+        await wait_for(pilot, lambda: app.screen.query("#model-choices"))
+        await pilot.press("up", "enter")  # Back to the default removes the override.
+        await wait_for(pilot, lambda: app.facts_config.models == {})
         await pilot.press("t")
         await wait_for(pilot, lambda: not app.facts_on)
         await pilot.press("escape")
         await pilot.pause()
         stored = FactsConfig.load(library)
-        assert stored.order == ["anthropic", "openai"]
-        assert stored.models == {"anthropic": "claude-haiku-5-5"}
+        assert stored.order == ["openai", "anthropic"]
         assert library.setting("facts") == "off"
         assert keyring.get_password("kirlian-terminal", "openai") == "q noJt"
 
