@@ -661,3 +661,38 @@ preamp and ten bands; below 36 rows the sliders become one row of block bars. It
 owns arrow keys and Escape while focused (the app's priority arrow bindings are
 disabled for it); the app owns the settings and talks to mpv. Saving waits 0.3 s
 so a held key writes once. Strings are translated in all nine languages.
+
+## 2026-10-28: real frequency bars, a display-only amp, and the Sound screen
+
+The owner found the first amp hard to use (a hidden slider grid that captured the
+arrow keys) and asked for real per-frequency bars, then for pitch and speed.
+
+**Bars.** mpv's metadata only reports filters on the audio path, so the bands
+ride along as audio: the meter graph forces stereo, splits off a mono copy, runs
+it through twenty half-octave `bandpass` filters (40 Hz to 16 kHz, log-spaced),
+`amerge`s the bands as extra channels next to the stereo signal, measures every
+channel with `astats`, then `pan=stereo|c0=c0|c1=c1` keeps only the two real
+channels. Frame metadata survives `pan`, so `af-metadata/meter` carries channels
+1-2 (levels) and 3-22 (bands); `aspectralstats` runs after `pan`. Checked against
+two sine tones (100 Hz and 4 kHz bars peaked) and a real AAC track. The cost is
+twenty biquads per sample. Side effect: output is always stereo (mono files play
+on both sides; surround is folded), which is what most listening setups get anyway.
+
+**Amp.** The panel no longer takes focus or keys; it draws bars (eighth-block
+heights, -60 to -10 dB, instant rise and 1.6 per second fall, caps that hang 0.4 s),
+meters, and a status line. CLIP is shown only when the equalizer is on, since
+mastered music routinely peaks at full scale.
+
+**Sound screen.** A modal list with one row per control: the same up/down,
+left/right model as the other settings screens, and a sentence for the selected
+row (each band has a plain description of what it shapes). It drives the same
+app methods as before, so live tuning and filter reinstalls are unchanged.
+
+**Speed and pitch.** mpv's `speed`, `pitch`, and `audio-pitch-correction`
+properties: speed keeps the key (scaletempo2), pitch shifts by 2^(n/12) keeping
+the speed, and Tape turns pitch correction off so pitch follows speed. Verified by
+rendering output with `--ao=pcm`: speed 1.5 shortened 4.0 s to 2.67 s at the same
+centroid; pitch +5 semitones raised a 440 Hz centroid to about 604 Hz; speed 1.5
+without correction raised it to about 691 Hz. These are session-only (`Tempo`) so
+a song never starts slowed by surprise. mpv applies them after the app's filters,
+so bars show the pre-speed spectrum.

@@ -972,3 +972,24 @@ Not verified: listening. Equalizer curves and presets were not checked by ear,
 nor whether rebuilding the filter list on enable or between songs is audible.
 The big clock and scrolling title from the first sketch were not built; true
 per-band spectrum bars remain out of scope.
+
+## 2026-10-28: frequency bars, simpler amp, speed and pitch
+
+Owner feedback: the amp was hard to understand; asked for real per-frequency bars,
+then pitch and speed controls. Changes are recorded in architecture. Feasibility
+checks against mpv 0.41: band channels survived `pan` in `af-metadata`; twenty
+reads took 13 ms; speed, pitch, and pitch correction were verified by rendering.
+
+Smoke runs with the real mpv on a copy of one of the owner's tracks (the copy was
+deleted): bars showed a plausible tilt (about -22 dB at 75-140 Hz down to -50 dB
+at 16 kHz); the Sound screen changed presets and bands live; speed 0.85× with Tape
+set mpv's speed to 0.85 and pitch correction off.
+
+Checks: `ruff`, catalog check (334 strings), `pytest` — 174 passed. Tests now cover: the amp
+not taking focus (Enter still opens an album), the Sound screen's preset, band,
+reset, preamp, ReplayGain, and equalizer-off paths reaching mpv; speed, pitch,
+and Tape reaching mpv and resetting on the next launch; band channels parsed
+from positions 3-22; and layout at 80 × 24 and 120 × 44.
+
+Not verified by ear: band and preset curves, the sound of pitch shifting, and
+whether turning the equalizer on mid-song is audible.

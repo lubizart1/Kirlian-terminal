@@ -76,39 +76,78 @@ def test_reaction_speeds_up_with_loudness_and_sparks_on_hits():
     assert not reaction.sparks
 
 
-async def test_amp_keys_tune_mpv_live_and_persist(tmp_path, audio_factory):
+async def test_amp_only_displays_and_the_sound_screen_changes_mpv(tmp_path, audio_factory):
+    from kirlian_terminal.amp import SoundSettings
+
     library, paths = populated(tmp_path, audio_factory)
     player = AmpPlayer()
     app = KirlianApp(library, player=player)
-    async with app.run_test(size=(120, 44)) as pilot:
+    async with app.run_test(size=(120, 46)) as pilot:
         await pilot.pause()
         await pilot.press("w")
         panel = app.query_one("#amp")
-        assert panel.display and app.focused is panel
-        # Arrows belong to the amp: no navigation, no playback.
-        await pilot.press("left", "up", "up")  # 500 Hz +2: turns the equalizer on.
+        assert panel.display and app.focused is not panel
+        await pilot.press("enter")  # The library keeps its keys while the amp is open.
+        assert app.view == "album"
+
+        await pilot.press("E")
+        await pilot.pause()
+        assert isinstance(app.screen, SoundSettings)
+        # Rows: equalizer, preset, preamp, balance, ReplayGain, speed, pitch, tape, bands.
+        await pilot.press("j", "right", "right")  # Preset: Flat → Bass → Rock.
         await pilot.pause(0.1)
-        assert app.amp.enabled and app.amp.gains[4] == 2
-        assert player.calls[0][0] == "apply" and "equalizer@b4" in player.calls[0][1]
-        assert app.view == "albums"
-        await pilot.press("up")
+        assert app.amp.preset == "Rock" and app.amp.enabled
+        assert player.calls[0][0] == "apply" and "equalizer@b0" in player.calls[0][1]
+        await pilot.press(*["j"] * 8, "right")  # 62 Hz +1 from Rock's +3.
         await pilot.pause(0.1)
-        assert player.calls[-1] == ("tune", "equalizer@b4", "gain", "3")
-        await pilot.press("left", "left", "left", "left", "left", "down")  # Preamp -1 dB.
+        assert app.amp.gains[1] == 4 and app.amp.preset == ""
+        assert player.calls[-1] == ("tune", "equalizer@b1", "gain", "4")
+        assert "62 Hz" in str(app.screen.query_one("#sound-detail").content)
+        await pilot.press("0")
+        await pilot.pause(0.1)
+        assert app.amp.gains[1] == 0
+        await pilot.press(*["k"] * 7, "left")  # Preamp -1 dB.
         await pilot.pause(0.1)
         assert player.calls[-1] == ("tune", "volume@pre", "volume", "-1dB")
-        await pilot.press("g", "full_stop", "full_stop")  # Custom → Flat → Bass.
+        await pilot.press("j", "j", "right")  # ReplayGain: per track.
         await pilot.pause(0.1)
-        assert app.amp.replaygain == "track" and app.amp.preset == "Bass"
-        await pilot.press("e")
+        assert app.amp.replaygain == "track"
+        await pilot.press("k", "k", "k", "k", "enter")  # Equalizer off removes the chain.
         await pilot.pause(0.1)
-        assert player.calls[-1] == ("apply", METER, "track")  # Off removes the chain.
-        await pilot.press("w")
-        assert app.focused is not panel and not panel.display
+        assert player.calls[-1] == ("apply", METER, "track")
+        await pilot.press("escape", "w")
         await pilot.pause(0.5)
+        assert not panel.display
     saved = AmpSettings.load(library)
-    assert saved.preset == "Bass" and saved.replaygain == "track" and not saved.enabled
+    assert saved.replaygain == "track" and not saved.enabled and saved.gains[0] == 4
     assert not any(call[0] in {"play", "pause"} for call in player.calls)
+
+
+async def test_speed_pitch_and_tape_reach_mpv_and_reset_next_launch(tmp_path, audio_factory):
+    from kirlian_terminal.audio import Tempo
+
+    library, _ = populated(tmp_path, audio_factory)
+    player = AmpPlayer()
+    sent = []
+
+    async def apply_tempo(tempo):
+        sent.append(tempo)
+
+    player.apply_tempo = apply_tempo
+    app = KirlianApp(library, player=player)
+    async with app.run_test(size=(120, 46)) as pilot:
+        await pilot.pause()
+        await pilot.press("E", *["j"] * 5, "left", "left", "left")  # Speed 0.85×.
+        await pilot.press("j", "right", "right")  # Pitch +2 semitones.
+        await pilot.press("j", "enter")  # Tape on.
+        await pilot.pause(0.2)
+        assert sent[-1] == Tempo(speed=0.85, semitones=2, tape=True)
+        assert abs(sent[-1].pitch - 2 ** (2 / 12)) < 1e-9
+        assert "+2 semitones" in app.query_one("#amp").render().plain
+        await pilot.press("k", "0", "k", "0")  # Reset pitch and speed.
+        await pilot.pause(0.2)
+        assert sent[-1] == Tempo(tape=True)
+    assert KirlianApp(library, player=AmpPlayer()).tempo == Tempo()
 
 
 async def test_levels_reach_meters_and_ribbon_only_while_playing(tmp_path, audio_factory):
@@ -142,4 +181,16 @@ async def test_amp_fits_small_and_large_windows(tmp_path, audio_factory, size):
         panel = app.query_one("#amp")
         assert panel.compact == (size[1] < 36)
         assert panel.region.bottom <= app.query_one("#animation").region.y
+        assert app.focused is not panel
         assert not app.screen.show_horizontal_scrollbar
+
+
+def test_spectrum_bands_ride_after_the_two_real_channels():
+    from kirlian_terminal.audio import SPECTRUM
+
+    metadata = {f"lavfi.astats.{n}.RMS_level": str(-10 - n) for n in range(1, len(SPECTRUM) + 3)}
+    levels = Levels.parse(metadata)
+    assert levels.rms == (-11.0, -12.0)
+    assert len(levels.bands) == len(SPECTRUM) and levels.bands[0] == -13.0
+    assert Levels.parse({"lavfi.astats.1.RMS_level": "-9"}).bands == ()
+    assert METER.count("bandpass=") == len(SPECTRUM) and "pan=stereo|c0=c0|c1=c1" in METER

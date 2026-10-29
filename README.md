@@ -204,30 +204,38 @@ messages, such as an unknown model, are printed as returned. Add
 contains no key. The default song is John Cale's "Paris 1919". Each check is a
 billed request.
 
-## The amp
+## The amp and sound settings
 
-Press `w` for a Winamp-style amp above the ribbon. It shows the playing file's
-codec, bitrate, sample rate, and channels; live left/right level meters with peak
-marks that hold for a second (`CLIP` when a peak reaches full scale); a ten-band
-equalizer (31 Hz to 16 kHz, ±12 dB) with a preamp; a balance slider; and
-ReplayGain. While the amp has focus:
+Press `w` to show the amp above the ribbon, and `w` again to hide it. It only
+displays, so every library key keeps working while it is open:
 
-| Key | Action |
+- Frequency bars: twenty bands from 40 Hz to 16 kHz, measured from the audio as
+  it plays, with caps that hang briefly at each peak.
+- Left and right level meters with a one-second peak mark. `CLIP` appears only
+  when the equalizer is on and a peak reaches full scale.
+- The file's format, bitrate, sample rate, and channels, and the current
+  equalizer, ReplayGain, balance, speed, and pitch.
+
+Press `E` for **Sound**, one row per setting. `↑`/`↓` choose a row, `←`/`→` change
+it, `0` resets it, `Enter` turns the equalizer (or Tape) on and off, and `Esc`
+closes. The line under the list says what the selected row does.
+
+| Row | What it does |
 | --- | --- |
-| `←` / `→` (or `h` / `l`) | Choose the preamp, a band, or balance |
-| `↑` / `↓` (or `k` / `j`) | Raise or lower it by 1 dB (balance by 10%) |
-| `0` | Reset the selected slider |
-| `e` | Equalizer on / off |
-| `,` / `.` | Previous / next preset: Flat, Bass, Rock, Pop, Jazz, Classical, Dance, Vocal, Treble |
-| `g` | ReplayGain: off, track, album |
-| `w` or `Esc` | Close the amp |
+| Equalizer | On or off. Off removes all processing; you hear the file as it is. |
+| Preset | Flat, Bass, Rock, Pop, Jazz, Classical, Dance, Vocal, Treble. Sets all ten bands. |
+| Preamp | Lowers or raises everything before the bands (−12 to +6 dB). |
+| Balance | Toward the left or right speaker, in 10% steps. |
+| ReplayGain | Off, per track, or per album, using loudness tags already in your files. |
+| Speed | 0.50× to 2.00× in 5% steps, keeping the key. |
+| Pitch | −12 to +12 semitones, keeping the speed. |
+| Tape | Pitch follows speed, like a record: slower is deeper, faster is higher. |
+| 31 Hz … 16 kHz | Each band ±12 dB, with a short description of what it shapes. |
 
-Moving a slider turns the equalizer on. When it is off, its filters are removed,
-so you hear the file exactly as before. Boosting bands can clip; lower the preamp
-if `CLIP` appears. ReplayGain uses loudness tags already in your files and does
-nothing for files without them. The equalizer, preset, balance, ReplayGain, and
-whether the amp is open are remembered. Short windows show the equalizer as a
-single row of bars. Everything runs inside mpv; your files are never changed.
+Changing a band or preset turns the equalizer on. The equalizer, balance, and
+ReplayGain are remembered; speed, pitch, and Tape reset the next time you open
+Kirlian. The bars and meters show the audio before mpv applies speed and pitch.
+Everything runs inside mpv; your files are never changed.
 
 ## Covers and the filament ribbon
 

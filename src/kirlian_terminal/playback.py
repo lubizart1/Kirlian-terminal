@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from .audio import METER, AmpSettings, Levels
+from .audio import METER, AmpSettings, Levels, Tempo
 from .i18n import _
 
 
@@ -266,6 +266,13 @@ class Player:
         async with self.lock:
             await self.command("af", "set", amp.filters())
             await self.command("set_property", "replaygain", amp.replaygain)
+
+    async def apply_tempo(self, tempo: Tempo) -> None:
+        """mpv changes speed without changing pitch unless tape mode links them."""
+        async with self.lock:
+            await self.command("set_property", "audio-pitch-correction", not tempo.tape)
+            await self.command("set_property", "speed", tempo.speed)
+            await self.command("set_property", "pitch", tempo.pitch)
 
     async def tune(self, target: str, command: str, value: str) -> None:
         """Adjust one stage of the running equalizer without rebuilding it."""

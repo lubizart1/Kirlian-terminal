@@ -40,9 +40,13 @@ DataTable > .datatable--cursor, DataTable:focus > .datatable--cursor { backgroun
 #playing-label { width: 1fr; height: 2; text-wrap: nowrap; text-overflow: ellipsis; }
 #playing-time { width: 18; height: 1; text-align: right; color: $k-quiet; }
 #animation { width: 100%; height: 3; text-wrap: nowrap; }
-#amp { height: 13; margin-bottom: 1; text-wrap: nowrap; }
-#amp.compact { height: 9; }
-#amp:focus { background-tint: transparent; }
+#amp { height: 11; margin-bottom: 1; text-wrap: nowrap; }
+#amp.compact { height: 8; }
+#sound-settings { width: 78; }
+#sound-rows { height: auto; max-height: 20; margin-top: 1; background: #19161c; }
+#sound-rows > .datatable--header { background: #19161c; }
+#sound-detail { height: auto; min-height: 2; margin-top: 1; }
+#sound-keys { height: auto; margin-top: 1; }
 Screen.amp-open #playback { height: auto; }
 #progress { height: 1; }
 #footer { height: 2; padding: 0 2; color: $k-quiet; }
@@ -54,7 +58,7 @@ FolderDialog { align: center middle; background: $k-surface 80%; }
 #folder-dialog { width: 68; max-width: 95%; height: auto; padding: 1 2; border: round $k-accent; background: #19161c; }
 #folder-dialog Label { text-style: bold; margin-bottom: 1; }
 #folder-error, #facts-error { height: 2; color: #e2a895; }
-NameDialog, PlaylistPicker, ConfirmDialog, FactsSettings, KeyDialog, ModelDialog { align: center middle; background: $k-surface 80%; }
+NameDialog, PlaylistPicker, ConfirmDialog, FactsSettings, KeyDialog, ModelDialog, SoundSettings { align: center middle; background: $k-surface 80%; }
 #facts-settings { width: 92; }
 #facts-providers { height: auto; max-height: 9; margin-top: 1; background: #19161c; }
 #facts-providers > .datatable--header { background: #19161c; }

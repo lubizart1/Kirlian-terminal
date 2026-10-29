@@ -27,11 +27,11 @@ from textual.screen import ModalScreen
 from textual.widgets import Button, DataTable, Input, Label, OptionList, Select, Static
 
 from . import i18n
-from .amp import COLUMNS, AmpPanel
+from .amp import COLUMNS, AmpPanel, SoundSettings
 from .animations import Variation
 from .appearance import INK, OPTIONS, PALETTES, QUIET, Appearance, themes
 from .artwork import load_artwork
-from .audio import PREAMP_RANGE, PRESETS, REPLAYGAIN, AmpSettings, clamp
+from .audio import PREAMP_RANGE, PRESETS, REPLAYGAIN, AmpSettings, Tempo, clamp
 from .brand import ASCII_SPARK, SPARK, Brand
 from .cover import CoverImage, RecordPane
 from .facts import (
@@ -601,6 +601,7 @@ class KirlianApp(App):
         Binding("equals_sign", "volume(5)", "Louder"),
         Binding("v", "animation_toggle", "Animation on/off"),
         Binding("w", "amp", "Amp"),
+        Binding("E", "sound", "Sound"),
         Binding("x", "animation_shuffle", "Shuffle animation"),
         Binding("s", "animation_save", "Save animation"),
         Binding("S", "animation_recall", "Recall animation"),
@@ -693,6 +694,7 @@ class KirlianApp(App):
         self.palette_revision = 0
         self.palette_cache: OrderedDict[str, tuple[str, ...]] = OrderedDict()
         self.amp = AmpSettings.load(library)
+        self.tempo = Tempo()
         self.amp_installed = ""  # The filter list mpv last rebuilt from.
         self.saved_animations: list[Variation] = []
         self.recalled_index = -1
@@ -880,9 +882,7 @@ class KirlianApp(App):
             if self.appearance_saving:
                 return action in {"focus_next", "focus_previous"}
             return action in {"back", "focus_next", "focus_previous"}
-        # Arrows and Escape belong to the amp while it has focus.
-        amp_keys = {"navigate_back", "open", "back"}
-        return not (isinstance(self.focused, AmpPanel) and action in amp_keys)
+        return True
 
     def on_resize(self, event: events.Resize | None = None) -> None:
         if self.is_mounted and self.query("#body"):
@@ -2089,14 +2089,15 @@ class KirlianApp(App):
             await asyncio.sleep(0.05)
 
     def action_amp(self) -> None:
+        """Show or hide the amp. It only displays, so the library keeps every key."""
         self.amp = replace(self.amp, visible=not self.amp.visible)
         self.apply_appearance()
-        panel = self.query_one(AmpPanel)
-        if self.amp.visible:
-            panel.focus()
-        else:
-            self.query_one(DataTable).focus()
         self.save_amp()
+        if self.amp.visible:
+            self.status(_("Amp open. E opens the sound settings; w hides it."))
+
+    def action_sound(self) -> None:
+        self.push_screen(SoundSettings())
 
     def change_amp(self, amp: AmpSettings, message: str = "") -> None:
         before, self.amp = self.amp, amp
@@ -2169,8 +2170,31 @@ class KirlianApp(App):
         name = names[(current + step) % len(names)]
         self.change_amp(self.amp.with_preset(name), _("Preset: {name}", name=i18n._(name)))
 
-    def amp_replaygain(self) -> None:
-        mode = REPLAYGAIN[(REPLAYGAIN.index(self.amp.replaygain) + 1) % len(REPLAYGAIN)]
+    def tempo_change(self, kind: str, step: int | None) -> None:
+        """Speed and pitch for this session; step None resets, `tape` toggles."""
+        tempo = self.tempo
+        if kind == "speed":
+            tempo = tempo.with_speed(step)
+        elif kind == "pitch":
+            tempo = tempo.with_semitones(step)
+        else:
+            tempo = replace(tempo, tape=not tempo.tape)
+        self.tempo = tempo
+        self.query_one(AmpPanel).tempo = tempo
+        self.query_one(AmpPanel).refresh()
+        self.send_tempo(tempo)
+
+    @work(group="tempo", exclusive=True)
+    async def send_tempo(self, tempo: Tempo) -> None:
+        try:
+            await self.player.apply_tempo(tempo)
+        except PlaybackError as error:
+            self.status(str(error))
+        except AttributeError:
+            pass  # A test double without tempo control.
+
+    def amp_replaygain(self, step: int = 1) -> None:
+        mode = REPLAYGAIN[(REPLAYGAIN.index(self.amp.replaygain) + step) % len(REPLAYGAIN)]
         label = {"no": _("off"), "track": _("track"), "album": _("album")}[mode]
         self.change_amp(replace(self.amp, replaygain=mode), _("ReplayGain: {mode}", mode=label))
 
@@ -2410,7 +2434,8 @@ class KirlianApp(App):
                     _("c switch cover display (remembered)"),
                     _("+ add to playlist · in a playlist: J/K move · d remove · e rename"),
                     _("i song notes settings · [ ] more notes · o open the note's source"),
-                    _("w amp: level meters, equalizer, balance, ReplayGain"),
+                    _("w amp: frequency bars and level meters"),
+                    _("E sound: equalizer, balance, ReplayGain, speed, pitch"),
                     _("Typing in search, name, or key fields never triggers playback shortcuts."),
                 )
             ),

@@ -1,9 +1,12 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Live audio levels and the amp's equalizer, both run inside the owned mpv.
 
-Levels come from FFmpeg's `astats` and `aspectralstats` filters, which measure
-the audio mpv is playing and pass it through unchanged; mpv exposes their latest
-frame as the `af-metadata/meter` property. The equalizer is a chain of FFmpeg
+Levels come from FFmpeg filters inside mpv's own filter list. A copy of the
+playing audio is folded to mono and split through twenty band-pass filters; the
+bands ride along as extra channels next to the real stereo signal, `astats`
+measures every channel, and `pan` drops the extra channels again, so what you hear
+is the stereo signal untouched. mpv exposes the measurements of the latest frame
+as the `af-metadata/meter` property. The equalizer is a chain of FFmpeg
 `equalizer` filters with a preamp and balance stage. When it is off, the chain is
 removed, so the audio is exactly what it was without the amp.
 """
@@ -22,10 +25,32 @@ GAIN_LIMIT = 12.0
 PREAMP_RANGE = (-12.0, 6.0)
 SILENCE = -60.0
 REPLAYGAIN = ("no", "track", "album")
-METER = (
-    "@meter:lavfi=[astats=metadata=1:reset=1:measure_overall=none"
-    ":measure_perchannel=RMS_level+Peak_level,aspectralstats=measure=centroid+flux]"
-)
+# Twenty log-spaced analysis bands from 40 Hz to 16 kHz, half an octave wide.
+SPECTRUM = tuple(round(40 * (16000 / 40) ** (index / 19)) for index in range(20))
+SPECTRUM_FLOOR = -90.0
+
+
+def meter_graph() -> str:
+    """Measure the stereo signal and twenty bands, then output only the stereo signal."""
+    count = len(SPECTRUM)
+    splits = "".join(f"[s{index}]" for index in range(count))
+    bands = "".join(f"[b{index}]" for index in range(count))
+    parts = [
+        # Stereo in, stereo out: mono files play on both sides, surround is folded.
+        "aformat=channel_layouts=stereo,asplit=2[main][copy]",
+        f"[copy]pan=mono|c0=0.5*c0+0.5*c1,asplit={count}{splits}",
+        *(
+            f"[s{index}]bandpass=f={frequency}:t=o:w=0.5[b{index}]"
+            for index, frequency in enumerate(SPECTRUM)
+        ),
+        f"[main]{bands}amerge=inputs={count + 1},"
+        "astats=metadata=1:reset=1:measure_overall=none:measure_perchannel=RMS_level+Peak_level,"
+        "pan=stereo|c0=c0|c1=c1,aspectralstats=measure=centroid+flux",
+    ]
+    return f"@meter:lavfi=[{';'.join(parts)}]"
+
+
+METER = meter_graph()
 # Shapes in dB per band, 31 Hz to 16 kHz. Gentle by design: boosts clip easily.
 PRESETS: dict[str, tuple[float, ...]] = {
     N_("Flat"): (0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
@@ -42,6 +67,31 @@ PRESETS: dict[str, tuple[float, ...]] = {
 
 def clamp(value: float, low: float, high: float) -> float:
     return min(high, max(low, value))
+
+
+@dataclass(frozen=True)
+class Tempo:
+    """Speed and pitch for this session. Not saved: songs start normal next launch."""
+
+    speed: float = 1.0  # 0.5 to 2.0
+    semitones: int = 0  # -12 to +12
+    tape: bool = False  # Pitch follows speed, like a record played faster or slower.
+
+    @property
+    def normal(self) -> bool:
+        return self.speed == 1.0 and self.semitones == 0 and not self.tape
+
+    @property
+    def pitch(self) -> float:
+        return 2 ** (self.semitones / 12)
+
+    def with_speed(self, step: int | None) -> Tempo:
+        speed = 1.0 if step is None else clamp(round(self.speed + step * 0.05, 2), 0.5, 2.0)
+        return replace(self, speed=speed)
+
+    def with_semitones(self, step: int | None) -> Tempo:
+        value = 0 if step is None else int(clamp(self.semitones + step, -12, 12))
+        return replace(self, semitones=value)
 
 
 @dataclass(frozen=True)
@@ -105,22 +155,23 @@ class AmpSettings:
         return f"@eq:lavfi=[{','.join(stages)}],{METER}"
 
 
-def decibels(value: object) -> float:
+def decibels(value: object, floor: float = SILENCE) -> float:
     try:
         number = float(value)  # type: ignore[arg-type]
     except (TypeError, ValueError):
-        return SILENCE
-    return SILENCE if math.isnan(number) else clamp(number, SILENCE, 6.0)
+        return floor
+    return floor if math.isnan(number) else clamp(number, floor, 6.0)
 
 
 @dataclass(frozen=True)
 class Levels:
-    """One frame of what is playing: per-channel dB, brightness in Hz, and change."""
+    """One frame of what is playing: per-channel dB, band dB, brightness, and change."""
 
     rms: tuple[float, ...] = (SILENCE, SILENCE)
     peak: tuple[float, ...] = (SILENCE, SILENCE)
     centroid: float = 0.0
     flux: float = 0.0
+    bands: tuple[float, ...] = ()  # RMS dB per SPECTRUM band, low to high
 
     @classmethod
     def parse(cls, metadata: object) -> Levels:
@@ -148,8 +199,16 @@ class Levels:
                     values.append(value)
             return sum(values) / len(values) if values else 0.0
 
+        bands = tuple(
+            decibels(metadata.get(f"lavfi.astats.{index + 3}.RMS_level"), SPECTRUM_FLOOR)
+            for index in range(len(SPECTRUM))
+        )
         return cls(
-            channels("RMS_level"), channels("Peak_level"), spectral("centroid"), spectral("flux")
+            channels("RMS_level"),
+            channels("Peak_level"),
+            spectral("centroid"),
+            spectral("flux"),
+            bands if f"lavfi.astats.{len(SPECTRUM) + 2}.RMS_level" in metadata else (),
         )
 
     @property
