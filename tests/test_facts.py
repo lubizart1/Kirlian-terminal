@@ -259,20 +259,30 @@ def test_facts_config_migrates_the_single_provider_setting_and_ignores_bad_value
     assert config.model(PROVIDERS["anthropic"]) == PROVIDERS["anthropic"].model
 
 
-def test_cache_is_per_provider_and_drops_answers_to_an_older_question(tmp_path):
-    from kirlian_terminal.facts import Fact, FactCache
+def test_a_song_already_paid_for_is_never_asked_again(tmp_path):
+    from kirlian_terminal.facts import PROMPT_VERSION, Fact, FactCache
     from kirlian_terminal.library import Library
 
     library = Library(tmp_path / "library.db")
+    song = "artist\x1falbum\x1fsong_100%"  # SQL wildcards in a title match only literally.
+    older = Fact("Older prompt", "B", "T", "https://e.org/old")
     with library.connect() as db:
         db.execute("CREATE TABLE facts (key TEXT PRIMARY KEY, facts TEXT NOT NULL)")
-        db.execute("INSERT INTO facts VALUES ('artist\x1falbum\x1fsong', '[]')")
+        # Saved by an earlier release whose prompt has since changed.
+        key = f"v{int(PROMPT_VERSION) - 1}\x1fperplexity\x1f{song}"
+        db.execute("INSERT INTO facts VALUES (?, ?)", (key, json.dumps([vars(older)])))
+        db.execute("INSERT INTO facts VALUES ('artist\x1falbum\x1fsong_1000', '[]')")
     cache = FactCache(library)
-    with library.connect() as db:
-        assert db.execute("SELECT COUNT(*) FROM facts").fetchone()[0] == 0
-    cache.put("exa", "song", [Fact("H", "B", "T", "https://e.org")])
-    assert cache.get("exa", "song")[0].headline == "H"
-    assert cache.get("openai", "song") is None
+    assert cache.saved(song, "en", ["openai"]) == [older]  # Survives upgrades and reordering.
+    assert cache.saved("artist\x1falbum\x1fother", "en", ["openai"]) is None
+    assert cache.saved(song, "fr", ["openai"]) is None  # Another language is a new request.
+
+    cache.put("exa", song, [])  # "Nothing found" is saved too, but notes win.
+    current = Fact("Current", "B", "T", "https://e.org/new")
+    cache.put("anthropic", song, [current])
+    assert cache.saved(song, "en", ["exa", "openai"]) == [current]
+    cache.put("openai", song, [Fact("Primary", "B", "T", "https://e.org/p")])
+    assert cache.saved(song, "en", ["openai", "anthropic"])[0].headline == "Primary"
 
 
 def test_a_dropped_connection_is_sent_once_more_and_then_explained(monkeypatch):

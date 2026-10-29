@@ -556,10 +556,11 @@ class Credentials:
 
 
 class FactCache:
-    """Notes per provider and song, so each is requested once, not once per launch.
+    """Notes per provider, language, and song, kept across launches and upgrades.
 
-    Keyed by provider so providers can be compared, and by prompt version so a new
-    question asks again. Rows from earlier versions are removed on open.
+    Each request costs the listener money, so a song with any saved answer in the
+    current language is never asked about again: not after reordering providers,
+    and not after a prompt change (newer answers are only preferred when present).
     """
 
     def __init__(self, library: Library) -> None:
@@ -568,7 +569,6 @@ class FactCache:
             db.execute(
                 "CREATE TABLE IF NOT EXISTS facts (key TEXT PRIMARY KEY, facts TEXT NOT NULL)"
             )
-            db.execute("DELETE FROM facts WHERE key NOT LIKE ?", (f"v{PROMPT_VERSION}\x1f%",))
 
     @staticmethod
     def key(provider_id: str, song: str, code: str) -> str:
@@ -576,20 +576,35 @@ class FactCache:
         provider = provider_id if code == "en" else f"{provider_id}:{code}"
         return f"v{PROMPT_VERSION}\x1f{provider}\x1f{song}"
 
-    def get(self, provider_id: str, song: str, code: str | None = None) -> list[Fact] | None:
-        """Best effort: a locked or full database means "not cached", never a crash."""
-        key = self.key(provider_id, song, code or language())
+    def saved(self, song: str, code: str, order: list[str]) -> list[Fact] | None:
+        """Any saved answer for this song in this language, or None if it was never asked.
+
+        Preference: answers with notes over "nothing found", the current prompt over
+        older ones, then the listener's provider order.
+        """
+        tail = "\x1f" + song
         try:
             with self.library.connect() as db:
-                row = db.execute("SELECT facts FROM facts WHERE key = ?", (key,)).fetchone()
+                rows = db.execute(
+                    "SELECT key, facts FROM facts WHERE substr(key, -?) = ?", (len(tail), tail)
+                ).fetchall()
         except sqlite3.Error:
             return None
-        if row is None:
-            return None
-        try:
-            return [Fact(**item) for item in json.loads(row[0])]
-        except (ValueError, TypeError):
-            return None
+        found = []
+        for key, value in rows:
+            version, provider, rest = (key.split("\x1f", 2) + ["", ""])[:3]
+            provider_id, _sep, provider_code = provider.partition(":")
+            if rest != song or not re.fullmatch(r"v\d+", version):
+                continue
+            if (provider_code or "en") != code:
+                continue
+            try:
+                facts = [Fact(**item) for item in json.loads(value)]
+            except (ValueError, TypeError):
+                continue
+            rank = order.index(provider_id) if provider_id in order else len(order)
+            found.append((not facts, version != f"v{PROMPT_VERSION}", rank, facts))
+        return min(found, key=lambda entry: entry[:3])[3] if found else None
 
     def put(self, provider_id: str, song: str, facts: list[Fact], code: str | None = None) -> None:
         """`code` is the language the notes were requested in, which may have changed since."""

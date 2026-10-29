@@ -367,7 +367,7 @@ async def test_facts_follow_the_playing_song_and_discard_late_answers(
             assert app.query_one("#fact-pulse").timer is None
         finally:
             release_first.set()
-        await wait_for(pilot, lambda: app.fact_cache.get("exa", "artist\x1falbum\x1fsong 2"))
+        await wait_for(pilot, lambda: app.fact_cache.saved("artist\x1falbum\x1fsong 2", "en", []))
         await pilot.pause()
         assert "About Song 10" in card_text()
         await pilot.press("right_square_bracket")
@@ -440,7 +440,7 @@ async def test_facts_settings_adds_a_key_orders_providers_and_typing_is_not_a_sh
         assert keyring.get_password("kirlian-terminal", "openai") == "q noJt"
 
 
-async def test_facts_fall_back_on_errors_and_are_kept_per_provider(
+async def test_facts_fall_back_on_errors_and_a_fallback_answer_is_not_paid_for_twice(
     tmp_path, audio_factory, monkeypatch
 ):
     from kirlian_terminal.app import PlayerUpdate
@@ -489,11 +489,11 @@ async def test_facts_fall_back_on_errors_and_are_kept_per_provider(
         source_line = app.query_one("#fact-source").content.plain
         assert "A reading, drawing on Src" in source_line and "via OpenAI" in source_line
 
-        # Once the primary recovers, reopening settings asks it; its answer is separate.
+        # The primary recovers, but this song is already answered: nothing more is billed.
         failing.clear()
         app.facts_settings_closed()
-        await wait_for(pilot, lambda: card() and "From Anthropic" in card())
-        assert app.fact_cache.get("openai", "artist\x1falbum\x1fsong 2")[0].provider == "OpenAI"
+        await pilot.pause(0.2)
+        assert len(calls) == 2 and "From OpenAI" in card()
 
 
 async def test_a_dropped_connection_is_retried_next_play_and_unused_keys_are_suggested(

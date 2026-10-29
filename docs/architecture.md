@@ -211,8 +211,12 @@ URL alone is never shown. OpenAI and Anthropic allow a model override. Requests 
 `urllib` in a thread with a 90-second timeout, resent once only if the connection
 drops before any reply.
 
-A cached answer, including "nothing found", ends the search; a failure or missing key
-moves to the next provider. Failures are not retried until the settings screen
+Before any request, `FactCache.saved` looks for an answer to the song in the current
+language from any provider and any prompt version (notes over "nothing found", then
+the current prompt, then the listener's order); if one is found, nothing is sent. Each
+request is billed to the listener, so saved answers are never discarded: not on
+reordering providers, recovering a failed primary, or changing the prompt. A failure
+or missing key moves to the next provider. Failures are not retried until the settings screen
 closes, except dropped connections, which retry on the next play. The cache key is
 prompt version, provider, language asked in, and casefolded artist, album, and title.
 The card follows the playing song and hides while the record pane shows another album.

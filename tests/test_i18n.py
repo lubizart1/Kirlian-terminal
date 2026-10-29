@@ -134,8 +134,8 @@ def test_notes_are_requested_and_cached_per_language(tmp_path):
     assert "in French" in question(track)
     # An English request still in flight when the listener switched to French.
     cache.put("exa", "song", note, "en")
-    assert cache.get("exa", "song") is None
-    assert cache.get("exa", "song", "en") == note
+    assert cache.saved("song", "fr", ["exa"]) is None
+    assert cache.saved("song", "en", ["exa"]) == note
 
 
 async def test_language_switch_survives_player_events_during_the_rebuild(tmp_path, audio_factory):

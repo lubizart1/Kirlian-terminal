@@ -1822,10 +1822,11 @@ class KirlianApp(App):
         # language it was asked in.
         code = active_language()
         errors: list[str] = []
-        facts: list[Fact] | None = None
-        for provider in self.facts_config.providers:
-            facts = await asyncio.to_thread(self.fact_cache.get, provider.id, song, code)
-            if facts is not None or revision != self.fact_revision:
+        order = self.facts_config.order
+        # Any answer already paid for, from any provider, is reused; nothing is sent.
+        facts = await asyncio.to_thread(self.fact_cache.saved, song, code, order)
+        for provider in self.facts_config.providers if facts is None else ():
+            if revision != self.fact_revision:
                 break
             asked = (provider.id, code, song)
             if asked in self.facts_asked:

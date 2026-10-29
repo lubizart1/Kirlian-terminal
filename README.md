@@ -3,10 +3,13 @@
 A small terminal music player for people who listen to albums.
 
 Kirlian Terminal plays local music, keeps your place in the record, and is being
-built as a standalone companion to Kirlian. Playback is offline. No account or API
-key is required, and the player does not modify your music files or tags. Optional
-song facts use your own API key for a provider you choose (Exa, OpenAI, Anthropic,
-Perplexity, or Parallel) and are off until you turn them on.
+built as a standalone companion to Kirlian. **It works fully offline**: playback,
+covers, the ribbon, the amp, and playlists never touch the network. No account or
+API key is required, and the player does not modify your music files or tags.
+Optional song notes use your own API key for a provider you choose (Exa, OpenAI,
+Anthropic, Perplexity, or Parallel) and are off until you turn them on. Notes are
+**saved on your computer**: each song is paid for once, and its notes come back
+instantly, offline, every time it plays after that.
 
 **Status: local prototype with the filament listening interface.**
 Includes background indexing, album/artist/song browsing, search, an active queue,
@@ -171,9 +174,13 @@ usable system credential store, saved keys last for the session only.
 Only the song title, artist, album, year, and the language to write in are sent, two
 seconds after a song starts. Audio, artwork, and file paths are never sent. A file
 without title and album tags is not asked about at all, because the player would
-otherwise be showing its filename and folder name in their place. Each provider is asked about
-each song once; answers, including "nothing found", are kept locally per provider,
-so reordering providers lets you compare them on songs you have already heard.
+otherwise be showing its filename and folder name in their place.
+
+Answers, including "nothing found", are saved locally, so a song is requested at
+most once per language. Saved notes are reused even after you reorder or change
+providers, and after updates to the player, so you never pay twice for the same song.
+Only switching the interface language asks again, in the new language. A request
+that fails (no connection, a rejected key) saves nothing and costs nothing to retry.
 The card appears while the side panel shows the playing song's album, so it hides
 below 110 columns. Failures appear in the status line and never interrupt playback.
 
