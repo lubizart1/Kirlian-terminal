@@ -2,20 +2,21 @@
 
 The player has 100 local patterns: ten families, each with ten named variations.
 They occupy the existing three-row ribbon and inherit the playing album's palette.
-The shapes are decorative; they do not claim to measure the audio.
+While a song plays, each family answers one part of the measured music (below);
+without measurements, every pattern draws exactly its saved shape.
 
-| Family | Character |
-| --- | --- |
-| Filaments | One wandering thread with fine strands beside it |
-| Tides | Slow, overlapping swells |
-| Braids | Two threads crossing and separating |
-| Ripples | Nested, widening elliptical rings |
-| Orbits | Open loops with small moving satellites |
-| Fronds | Curved leaves growing from a fine stem |
-| Mycelium | Branches and forks along a wandering root |
-| Embers | Sparse drifting sparks with short trails |
-| Seeds | Small floating forms turning in a slow current |
-| Constellations | Loose clusters, dotted connections, and tiny changing stars |
+| Family | Character | Answers |
+| --- | --- | --- |
+| Filaments | One wandering thread with fine strands beside it | Mids lift the thread; treble adds strands |
+| Tides | Slow, overlapping swells | Swells rise with the bass |
+| Braids | Two threads crossing and separating | Loud passages pull them apart |
+| Ripples | Nested, widening elliptical rings | Each hit pushes the rings outward |
+| Orbits | Open loops with small moving satellites | Loops widen with bass; hits nudge satellites |
+| Fronds | Curved leaves growing from a fine stem | Leaves reach further when loud |
+| Mycelium | Branches and forks along a wandering root | Branches reach further when loud |
+| Embers | Sparse drifting sparks with short trails | More sparks when loud; a burst on hits |
+| Seeds | Small floating forms turning in a slow current | Swell with bass; turn with mids |
+| Constellations | Loose clusters, dotted connections, and tiny changing stars | Cymbals and treble make stars flare |
 
 Each family includes **Drift, Undercurrent, Glimmer, Breath, Current, Stillwater,
 Weave, Dusk, Bloom, and Whisper**. The recipes vary pace, direction, spacing,
@@ -24,7 +25,9 @@ stable patterns; they are not generated labels for arbitrary random seeds.
 
 ## Choosing and keeping patterns
 
-- Starting a song or pressing `x` draws another pattern. A session pool visits
+- Starting a song or pressing `x` draws another pattern. The old one dissolves
+  into it dot by dot over 0.7 s, and the new pattern's name appears on the ribbon,
+  holds, then scatters (about 1.8 s in all). Still and Off motion skip this. A session pool visits
   all 100 before refilling and prefers another family whenever one remains.
 - `s` saves the current pattern locally. `S` cycles saved patterns from the start.
   Manual recall can revisit a favorite without waiting for the shuffle pool.
@@ -59,3 +62,10 @@ terminal transport, and album artwork. Results depend on hardware and load.
 The renderer caps width at 400 cells, stores only the current three rows, and draws
 at the existing maximum of 10 frames per second. It does not cache 100 animation
 sequences, read music, access the network, or request a screen layout per frame.
+
+## Depth and color
+
+Each pattern marks its main stroke and its fine detail (side strands, outer rings,
+orbit paths, leaf veins, ember tails, constellation lines). Fine detail is drawn
+closer to the background color, so the main thread reads first. Album colors
+blend across every character rather than in four-character blocks.

@@ -704,3 +704,25 @@ marks that window: handlers update app state only (`display_state`, caches) and
 skip widget queries; `apply_language` redraws everything from state after
 `prepare_screen`. New code that touches widgets from player events, workers, or
 timers must respect this flag.
+
+## 2026-10-28: pattern reveal, music per family, depth
+
+**Sound in patterns.** `patterns.render(..., sound)` takes a `Sound` (bass, mid,
+treble, energy, hit, pulse, each smoothed by `Reaction` from the twenty bands and
+onsets). Each family scales one parameter by it; with `sound=None` the code path
+is the original one, so saved patterns keep their exact drawings (verified by
+hashing all 100 patterns at several times and widths before and after). `pulse`
+glides toward a count of hits, so ripple rings travel on kicks without jumping.
+
+**Depth.** `DotField` records which dots are main strokes; `Frame.depth` marks
+cells holding only fine detail, which the ribbon draws mixed 45% toward the
+surface color. Colors are computed per column (with sparks and brightness lift)
+once per frame and reused for all three rows; equal styles are merged into runs.
+
+**Reveal.** A pattern change keeps the outgoing variation and its frozen time.
+For 0.7 s each Braille dot switches from old to new at its own fixed
+pseudo-random moment (`scatter`), so the change looks grainy rather than wiped.
+The new label's letters arrive over 0.25 s, hold to 1.2 s, and scatter by 1.8 s.
+The timer runs for the reveal even when paused after `x`; pausing, Still, and
+Off cancel a reveal in progress, and a song that loads paused shows none.
+Measured cost of a reveal frame: 2.9 ms at 156 columns, 7.3 ms at 400.

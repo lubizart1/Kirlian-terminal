@@ -1023,3 +1023,21 @@ Owner report: pressing `?` again stacked another guide instead of closing it.
 then clears it (the guide is the only notification the app shows, so
 `clear_notifications()` is exact). A test pressed `?` twice (0 guides) and three
 times (1 guide); before the fix the second press left 2. `pytest` — 176 passed.
+
+## 2026-10-28: pattern reveal, music per family, depth and gradient
+
+Built the owner's choices 1-3 from the `x` suggestions (see architecture).
+
+Checks: `pytest` — 190 passed. New tests: patterns without sound equal the saved
+drawings; each family's frame changes with its own driver (tides with bass,
+constellations with treble, ripples with pulse, and so on); filaments contain both
+main and fine cells; a dissolve at 0 and 1 equals the old and new frames and is
+neither halfway; pressing `x` shows the new name, then settles with no timer
+left from the reveal; Still motion changes the pattern without a reveal. Existing
+tests caught two timing issues during the work (a reveal kept the timer alive
+after pausing, and a song restored paused started a reveal); both fixed.
+
+A real-mpv run on a copy of one of the owner's tracks (deleted afterwards)
+captured the dissolve half done and the "Tides · Drift" name over the ribbon;
+measured sound at that moment: bass 0.87, mid 0.64, treble 0.33, energy 0.95.
+Not checked in a real terminal or by the owner's eye.

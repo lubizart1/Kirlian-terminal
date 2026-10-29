@@ -15,10 +15,53 @@ from textual.timer import Timer
 from textual.widgets import Static
 
 from .animations import AnimationClock, Variation
-from .appearance import INK, Appearance
+from .appearance import INK, SURFACE, Appearance
 from .audio import Levels, Reaction
 from .palette import mix, ribbon_color
+from .patterns import Frame
 from .playback import PlaybackState
+
+TRANSITION = 0.7  # Seconds for one pattern to dissolve into the next.
+NAME_IN, NAME_HOLD, NAME_GONE = 0.25, 1.2, 1.8  # Name letters arrive, hold, scatter.
+
+
+def scatter(column: int, row: int, salt: int = 0) -> float:
+    """A fixed pseudo-random order for each dot, 0 to 1, so dissolves look grainy."""
+    value = (column * 73856093) ^ (row * 19349663) ^ (salt * 83492791)
+    return ((value * 2654435761) % 4294967296) / 4294967296
+
+
+def smooth(progress: float) -> float:
+    progress = min(1.0, max(0.0, progress))
+    return progress * progress * (3 - 2 * progress)
+
+
+def dissolve(
+    old: Frame, new: Frame, progress: float, characters: str
+) -> tuple[list[str], list[list[float]]]:
+    """Each dot switches from the old pattern to the new one at its own moment."""
+    rows, depth = [], []
+    old_rows, new_rows = old.text.splitlines(), new.text.splitlines()
+    for row, (old_line, new_line) in enumerate(zip(old_rows, new_rows, strict=False)):
+        line, line_depth = [], []
+        for column, (before, after) in enumerate(zip(old_line, new_line, strict=False)):
+            if characters == "ascii":
+                fresh = scatter(column, row, 1) < progress
+                line.append(after if fresh else before)
+                source = new if fresh else old
+                line_depth.append(source.depth[row][column])
+                continue
+            old_mask, new_mask = ord(before) - 0x2800, ord(after) - 0x2800
+            mask = 0
+            for bit in range(8):
+                fresh = scatter(column, row * 8 + bit, 2) < progress
+                mask |= (1 << bit) & (new_mask if fresh else old_mask)
+            line.append(chr(0x2800 + mask))
+            from_new = mask & new_mask
+            line_depth.append(new.depth[row][column] if from_new else old.depth[row][column])
+        rows.append("".join(line))
+        depth.append(line_depth)
+    return rows, depth
 
 
 class Animation(Static):
@@ -31,7 +74,10 @@ class Animation(Static):
         self.fraction = 0.0
         self.album_colors: tuple[str, ...] = ()
         self.color_key = None
-        self.color_bands: list[tuple[str, str]] = []
+        self.column_colors: list[tuple[str, str]] = []
+        self.outgoing: Variation | None = None
+        self.outgoing_time = 0.0
+        self.switched_at = 0.0
         self.reaction = Reaction()
         self.last_draw = time.monotonic()
 
@@ -41,6 +87,8 @@ class Animation(Static):
 
     def configure(self, appearance: Appearance) -> None:
         self.appearance = appearance
+        if appearance.motion != "gentle":
+            self.outgoing = None  # Still and Off: no dissolve in progress either.
         self.clock.running(self.playing and appearance.motion == "gentle", time.monotonic())
         self.schedule()
         self.draw()
@@ -55,14 +103,19 @@ class Animation(Static):
     def observe(self, state: PlaybackState) -> None:
         before = (self.playing, self.clock.serial, self.fraction)
         self.playing = not (state.paused or state.idle or state.loading)
+        if not self.playing and before[0]:
+            # Pausing freezes the frame, including a dissolve that was under way.
+            self.outgoing = None
         if not self.playing:
             self.reaction.quiet()
             self.clock.set_rate(1.0, time.monotonic())
         self.fraction = min(1, max(0, state.position / state.duration)) if state.duration else 0
         serial = state.started_serial if not state.loading and not state.idle else 0
-        self.clock.observe(
-            serial, self.playing and self.appearance.motion == "gentle", time.monotonic()
-        )
+        now = time.monotonic()
+        previous, elapsed = self.clock.variation, self.clock.time(now)
+        self.clock.observe(serial, self.playing and self.appearance.motion == "gentle", now)
+        if self.clock.variation != previous and self.playing:
+            self.begin_transition(previous, elapsed)  # A new song reveals its pattern.
         self.schedule()
         # The timer owns moving frames. Player position events only need a draw
         # for a state transition or a changed progress highlight while still.
@@ -71,8 +124,21 @@ class Animation(Static):
         ):
             self.draw()
 
+    @property
+    def transitioning(self) -> bool:
+        return self.outgoing is not None and time.monotonic() - self.switched_at < NAME_GONE
+
+    def begin_transition(self, outgoing: Variation, outgoing_time: float) -> None:
+        """Dissolve from the old pattern and briefly show the new one's name."""
+        if self.appearance.motion != "gentle":
+            return  # Still and Off motion change patterns without movement.
+        self.outgoing, self.outgoing_time = outgoing, outgoing_time
+        self.switched_at = time.monotonic()
+        self.schedule()
+
     def schedule(self) -> None:
-        active = self.playing and self.appearance.motion == "gentle"
+        moving = self.playing and self.appearance.motion == "gentle"
+        active = moving or self.transitioning
         if active and self.timer is None:
             self.timer = self.set_interval(0.1, self.draw)
         elif not active and self.timer is not None:
@@ -87,62 +153,115 @@ class Animation(Static):
             self.update(Text(""), layout=False)
             return
         width = max(1, self.size.width)
-        frame = self.clock.variation.ribbon_frame(
-            self.clock.time(time.monotonic()), width, self.appearance.characters
-        )
-        text = Text()
-        played = int(self.fraction * width)
-        colors = self.album_colors or (self.appearance.accent,)
-        color_key = (colors, width, bool(self.album_colors))
-        if color_key != self.color_key:
-            self.color_key = color_key
-            self.color_bands = []
-            for start in range(0, width, 4):
-                color = ribbon_color(colors, start / max(1, width - 1))
-                highlight = mix(color, "#ffffff", 0.3) if self.album_colors else INK
-                self.color_bands.append((color, highlight))
         now = time.monotonic()
         self.reaction.decay(now - self.last_draw)
         self.last_draw = now
-        bands = [
-            self.lit(band, color, highlight, width)
-            for band, (color, highlight) in enumerate(self.color_bands)
-        ]
-        for index, line in enumerate(frame.splitlines()):
+        characters = self.appearance.characters
+        sound = self.reaction.sound if self.playing else None
+        frame = self.clock.variation.render(self.clock.time(now), width, characters, sound)
+        rows = frame.text.splitlines()
+        depth = [list(row) for row in frame.depth]
+        since = now - self.switched_at
+        if self.outgoing is not None and since < TRANSITION:
+            old = self.outgoing.render(self.outgoing_time, width, characters, sound)
+            rows, depth = dissolve(old, frame, smooth(since / TRANSITION), characters)
+        name = self.name_overlay(since, width) if self.outgoing is not None else {}
+        if self.outgoing is not None and since >= NAME_GONE:
+            self.outgoing = None
+            self.schedule()
+        self.update(self.paint(rows, depth, name, width), layout=False)
+
+    def name_overlay(self, since: float, width: int) -> dict[int, str]:
+        """The new pattern's name on the middle row: letters arrive, hold, then scatter."""
+        label = f"  {self.clock.variation.label}  "
+        if since >= NAME_GONE or len(label) > width:
+            return {}
+        start = (width - len(label)) // 2
+        cells = {}
+        for index, character in enumerate(label):
+            order = scatter(index, 0, 7)
+            arrived = since >= NAME_IN * order
+            remaining = since < NAME_HOLD + (NAME_GONE - NAME_HOLD) * order
+            if arrived and remaining:
+                cells[start + index] = character
+        return cells
+
+    def column_styles(self, width: int) -> list[tuple[str, str, str, str]]:
+        """Per column: main, fine, played main, played fine. Blended cell by cell."""
+        colors = self.album_colors or (self.appearance.accent,)
+        key = (colors, width, bool(self.album_colors))
+        if key != self.color_key:
+            self.color_key = key
+            self.column_colors = []
+            for column in range(width):
+                color = ribbon_color(colors, column / max(1, width - 1))
+                highlight = mix(color, "#ffffff", 0.3) if self.album_colors else INK
+                self.column_colors.append((color, highlight))
+        reaction = self.reaction
+        glow = reaction.brightness * 0.22
+        styles = []
+        for column, (color, highlight) in enumerate(self.column_colors):
+            lift = glow
+            center = (column + 0.5) / width
+            for position, strength in reaction.sparks:
+                distance = abs(center - position)
+                if distance < 0.07:
+                    lift += strength * 0.65 * (1 - distance / 0.07)
+            if lift > 0.01:
+                lift = min(0.85, lift)
+                color, highlight = mix(color, "#ffffff", lift), mix(highlight, "#ffffff", lift)
+            # Fine strands sit back: closer to the surface, so the main thread reads first.
+            styles.append(
+                (color, mix(color, SURFACE, 0.45), highlight, mix(highlight, SURFACE, 0.4))
+            )
+        return styles
+
+    def paint(
+        self, rows: list[str], depth: list[list[float]], name: dict[int, str], width: int
+    ) -> Text:
+        styles = self.column_styles(width)
+        played = int(self.fraction * width)
+        text = Text()
+        for index, line in enumerate(rows):
             if index:
                 text.append("\n")
-            for band, start in enumerate(range(0, len(line), 4)):
-                end = min(start + 4, len(line))
-                split = max(start, min(end, played))
-                color, highlight = bands[band]
-                text.append(line[start:split], highlight)
-                text.append(line[split:end], color)
-        self.update(text, layout=False)
-
-    def lit(self, band: int, color: str, highlight: str, width: int) -> tuple[str, str]:
-        """Lift a band toward white for bright sound and for nearby sparks."""
-        reaction = self.reaction
-        lift = reaction.brightness * 0.22
-        center = (band * 4 + 2) / max(1, width)
-        for position, strength in reaction.sparks:
-            distance = abs(center - position)
-            if distance < 0.07:
-                lift += strength * 0.65 * (1 - distance / 0.07)
-        if lift <= 0.01:
-            return color, highlight
-        lift = min(0.85, lift)
-        return mix(color, "#ffffff", lift), mix(highlight, "#ffffff", lift)
+            run, run_style = [], None
+            for column, character in enumerate(line[:width]):
+                if index == 1 and column in name:
+                    character, style = name[column], f"bold {INK}"
+                else:
+                    main, fine, played_main, played_fine = styles[column]
+                    back = depth[index][column] < 1 if column < len(depth[index]) else False
+                    if column < played:
+                        style = played_fine if back else played_main
+                    else:
+                        style = fine if back else main
+                if style != run_style and run:
+                    text.append("".join(run), run_style)
+                    run = []
+                run.append(character)
+                run_style = style
+            if run:
+                text.append("".join(run), run_style)
+        return text
 
     def set_palette(self, colors: tuple[str, ...]) -> None:
         self.album_colors = colors
         self.draw()
 
     def select(self, variation: Variation) -> None:
-        self.clock.select(variation, time.monotonic())
+        now = time.monotonic()
+        previous, elapsed = self.clock.variation, self.clock.time(now)
+        self.clock.select(variation, now)
+        if variation != previous:
+            self.begin_transition(previous, elapsed)
         self.draw()
 
     def shuffle(self) -> None:
-        self.clock.shuffle(time.monotonic())
+        now = time.monotonic()
+        previous, elapsed = self.clock.variation, self.clock.time(now)
+        self.clock.shuffle(now)
+        self.begin_transition(previous, elapsed)
         self.draw()
 
     def on_unmount(self) -> None:

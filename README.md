@@ -332,7 +332,13 @@ Seeking keeps the pattern; pause freezes it. Motion runs at most 10 times per
 second and stops ticking when paused, loading, idle, still, or off. The region
 retains its height when hidden. Patterns are generated locally without model calls.
 
-The ribbon now moves with the music: it speeds up in loud passages and slows in
+Pressing `x` dissolves the current pattern into a new one and shows its name on
+the ribbon for a moment. Each pattern family answers a different part of the music
+(tides follow the bass, ripples push out on hits, constellations flare with the
+treble; see the [pattern catalog](docs/patterns.md)), and fine detail is drawn
+behind the main thread in softer color.
+
+The ribbon also moves with the music: it speeds up in loud passages and slows in
 quiet ones, brightens when the sound is bright, and flashes along its length on
 hits. These come from levels mpv measures as it plays, not from guesses; the
 pattern itself still comes from the catalog. With Still or Off motion the ribbon

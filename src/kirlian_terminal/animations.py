@@ -8,8 +8,8 @@ import random
 import secrets
 from dataclasses import dataclass, field
 
-from .patterns import FAMILIES, PROFILES
-from .patterns import ribbon_frame as catalog_frame
+from .patterns import FAMILIES, PROFILES, Frame, Sound
+from .patterns import render as catalog_render
 
 LEGACY_FAMILIES = ("filaments", "ripples")
 WIDTH = 24
@@ -77,10 +77,19 @@ class Variation:
                         cells[y][x] = "."
         return "\n".join("".join(row) for row in cells)
 
+    def render(
+        self, seconds: float, width: int, characters: str = "dots", sound: Sound | None = None
+    ) -> Frame:
+        """Catalog patterns answer the music; saved v1 ribbons keep their exact drawing."""
+        if self.version == 2:
+            return catalog_render(self.family, self.seed, seconds, width, characters, sound)
+        text = self.ribbon_frame(seconds, width, characters)
+        return Frame(text, tuple((1.0,) * len(row) for row in text.splitlines()))
+
     def ribbon_frame(self, seconds: float, width: int, characters: str = "dots") -> str:
         """The catalog uses v2 recipes; keep saved v1 ribbons pixel-for-pixel."""
         if self.version == 2:
-            return catalog_frame(self.family, self.seed, seconds, width, characters)
+            return catalog_render(self.family, self.seed, seconds, width, characters).text
         width = max(1, min(400, width))
         rng = random.Random(self.seed)
         phase = rng.uniform(0, math.tau)

@@ -19,6 +19,7 @@ from dataclasses import asdict, dataclass, field, replace
 
 from .i18n import N_
 from .library import Library
+from .patterns import Sound
 
 BANDS = (31, 62, 125, 250, 500, 1000, 2000, 4000, 8000, 16000)
 GAIN_LIMIT = 12.0
@@ -235,25 +236,54 @@ class Reaction:
     baseline: float = 0.0
     sparks: list[list[float]] = field(default_factory=list)  # [position 0..1, strength]
     spark_seed: int = 0
+    bass: float = 0.0
+    mid: float = 0.0
+    treble: float = 0.0
+    hit: float = 0.0
+    pulse: float = 0.0
+    pulse_target: float = 0.0
+    measured: bool = False
 
     def feed(self, levels: Levels) -> None:
+        self.measured = True
         self.energy += (levels.energy - self.energy) * 0.35
         self.brightness += (levels.brightness - self.brightness) * 0.2
+        if levels.bands:
+            # Bass below 200 Hz, mids to 2.5 kHz, treble above, scaled like the amp's bars.
+            for name, low, high in (("bass", 0, 6), ("mid", 6, 14), ("treble", 14, 20)):
+                band = levels.bands[low:high]
+                loud = clamp((sum(band) / len(band) + 60) / 50, 0, 1)
+                current = getattr(self, name)
+                setattr(self, name, current + (loud - current) * 0.4)
         # An onset is spectral change well above its recent average.
         if levels.flux > self.baseline * 2.2 + 0.002 and levels.energy > 0.25:
             self.spark_seed = (self.spark_seed * 1103515245 + 12345) % 2**31
             self.sparks.append([(self.spark_seed % 1000) / 1000, min(1.0, levels.energy + 0.2)])
             del self.sparks[:-6]
+            self.hit = 1.0
+            self.pulse_target += 1.0
         self.baseline += (levels.flux - self.baseline) * 0.1
 
     def decay(self, seconds: float) -> None:
         for spark in self.sparks:
             spark[1] -= seconds * 2.5
         self.sparks = [spark for spark in self.sparks if spark[1] > 0]
+        self.hit = max(0.0, self.hit - seconds * 3)
+        # Glide toward the next ring step instead of jumping a whole step on a kick.
+        self.pulse += (self.pulse_target - self.pulse) * min(1.0, seconds * 6)
 
     def quiet(self) -> None:
         self.energy = self.brightness = self.baseline = 0.0
+        self.bass = self.mid = self.treble = self.hit = 0.0
+        self.measured = False
         self.sparks.clear()
+
+    @property
+    def sound(self) -> Sound | None:
+        """What patterns respond to, or None before any measurement (the saved drawing)."""
+        if not self.measured:
+            return None
+        return Sound(self.bass, self.mid, self.treble, self.energy, self.hit, self.pulse)
 
     @property
     def rate(self) -> float:

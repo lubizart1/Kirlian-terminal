@@ -194,3 +194,82 @@ def test_title_rhythm_hits_syllables_rests_between_words_and_stays_bounded():
     assert rhythm("Queen's Rhythm") == [ACCENT, REST, ACCENT, REST]
     assert len(rhythm("a " * 40)) == 16
     assert rhythm("") == rhythm("—") == [ACCENT, REST, WEAK, REST]
+
+
+def test_without_sound_every_pattern_keeps_its_saved_drawing():
+    from kirlian_terminal.patterns import render
+
+    for variation in CATALOG[::7]:
+        for characters in ("dots", "ascii"):
+            frame = render(variation.family, variation.seed, 4.2, 96, characters)
+            assert frame.text == variation.ribbon_frame(4.2, 96, characters)
+
+
+@pytest.mark.parametrize(
+    "family,driver",
+    [
+        ("filaments", "mid"),
+        ("tides", "bass"),
+        ("braids", "energy"),
+        ("ripples", "pulse"),
+        ("orbits", "bass"),
+        ("fronds", "energy"),
+        ("mycelium", "energy"),
+        ("embers", "energy"),
+        ("seeds", "bass"),
+        ("constellations", "treble"),
+    ],
+)
+def test_each_family_answers_its_own_part_of_the_music(family, driver):
+    from kirlian_terminal.patterns import Sound, render
+
+    calm, driven = Sound(), Sound(**{driver: 1.0 if driver != "pulse" else 0.5})
+    quiet = render(family, 0, 3.0, 120, "dots", calm).text
+    loud = render(family, 0, 3.0, 120, "dots", driven).text
+    assert quiet != loud
+
+
+def test_fine_strands_are_drawn_behind_the_main_thread():
+    from kirlian_terminal.patterns import render
+
+    depth = render("filaments", 0, 3.0, 120, "dots").depth
+    values = {value for row in depth for value in row}
+    assert values == {0.5, 1.0}
+
+
+def test_dissolve_moves_dot_by_dot_from_old_to_new():
+    from kirlian_terminal.patterns import render
+    from kirlian_terminal.visuals import dissolve
+
+    old = render("tides", 0, 3.0, 80, "dots")
+    new = render("embers", 4, 3.0, 80, "dots")
+    assert dissolve(old, new, 0.0, "dots")[0] == old.text.splitlines()
+    assert dissolve(old, new, 1.0, "dots")[0] == new.text.splitlines()
+    halfway = dissolve(old, new, 0.5, "dots")[0]
+    assert halfway not in (old.text.splitlines(), new.text.splitlines())
+
+
+async def test_x_dissolves_and_names_the_new_pattern_then_settles(
+    tmp_path, audio_factory, monkeypatch
+):
+    from kirlian_terminal import visuals
+
+    library, paths = populated(tmp_path, audio_factory)
+    app = KirlianApp(library, player=FakePlayer(), characters="dots")
+    async with app.run_test(size=(120, 30)) as pilot:
+        animation = app.query_one(Animation)
+        state = PlaybackState(paused=False, idle=False, started_serial=1, path=paths[0])
+        app.on_player_update(PlayerUpdate(state))
+        await pilot.pause(visuals.NAME_GONE + 0.2)  # Let the song's own reveal finish.
+        assert animation.outgoing is None
+        await pilot.press("x")
+        await pilot.pause(visuals.NAME_IN + 0.3)
+        assert animation.clock.variation.label in animation.render().plain
+        await pilot.pause(visuals.NAME_GONE)
+        assert animation.outgoing is None
+        assert animation.clock.variation.label not in animation.render().plain
+
+        app.appearance = replace(app.appearance, motion="still")
+        app.apply_appearance()
+        await pilot.press("x")
+        assert animation.outgoing is None  # Still motion changes patterns without moving.
