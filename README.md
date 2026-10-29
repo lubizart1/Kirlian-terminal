@@ -72,7 +72,7 @@ testing, add `--data-dir .local/tryout`. Run `uv run kirlian --help` for options
 | `c` | Switch cover display between terminal graphics and compatible blocks; remembered |
 | `f` / `r` | Choose folder / rescan |
 | `p` | Preview and save appearance preferences |
-| `?` | Keyboard help |
+| `?` | Show or hide the keyboard guide |
 | `i` | Song-notes settings: keys, provider order and fallbacks, models, on/off |
 | `[` / `]` | Previous / next note for the playing song |
 | `o` | Open the shown note's source in your browser |

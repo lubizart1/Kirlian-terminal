@@ -549,3 +549,22 @@ async def test_a_dropped_connection_is_retried_next_play_and_unused_keys_are_sug
         play(paths[0], 3)  # The same song again: a dropped connection is retried.
         await wait_for(pilot, lambda: calls.count("perplexity") == 3)
         assert "anthropic" not in calls  # Unused providers are suggested, never billed.
+
+
+async def test_question_mark_toggles_one_key_guide(tmp_path, audio_factory):
+    library, _ = populated(tmp_path, audio_factory)
+
+    def guides():
+        return len(app._notifications)  # Textual's list of notifications on screen.
+
+    app = KirlianApp(library, player=FakePlayer())
+    async with app.run_test(size=(120, 40)) as pilot:
+        await pilot.press("question_mark")
+        await pilot.pause(0.2)
+        assert guides() == 1
+        await pilot.press("question_mark")
+        await pilot.pause(0.2)
+        assert guides() == 0
+        await pilot.press("question_mark", "question_mark", "question_mark")
+        await pilot.pause(0.2)
+        assert guides() == 1

@@ -9,6 +9,7 @@ import os
 import sqlite3
 import sys
 import threading
+import time
 import webbrowser
 from collections import OrderedDict
 from collections.abc import Callable
@@ -688,6 +689,7 @@ class KirlianApp(App):
         # True while the screen is rebuilt in another language: widgets come and go, so
         # player events, levels, and messages only update app state until it is done.
         self.rebuilding = False
+        self.help_until = 0.0  # When the shown key guide times out.
         self.last_player_key: object = None
         self.last_error = ""
         self.cover_key: str | None = None
@@ -2441,7 +2443,17 @@ class KirlianApp(App):
             else _("Cover display: terminal graphics. If blank, press c for compatible blocks.")
         )
 
+    HELP_SECONDS = 12
+
     def action_help(self) -> None:
+        """? shows the key guide; pressing it again while shown hides it."""
+        now = time.monotonic()
+        if now < self.help_until:
+            # Help is the only notification this app shows, so clearing all is exact.
+            self.clear_notifications()
+            self.help_until = 0.0
+            return
+        self.help_until = now + self.HELP_SECONDS
         self.notify(
             "\n".join(
                 (
@@ -2458,7 +2470,7 @@ class KirlianApp(App):
                 )
             ),
             title=_("Keyboard controls"),
-            timeout=12,
+            timeout=self.HELP_SECONDS,
         )
 
     async def action_quit(self) -> None:

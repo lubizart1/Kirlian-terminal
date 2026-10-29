@@ -1015,3 +1015,11 @@ recompose (failed with the ValueError before the fix, passes after); `pytest` â€
 175 passed; a real-mpv run with a song playing and the amp open switched through
 French, Japanese, Spanish, German, English, and Korean without an error, keeping
 the album view and the amp.
+
+## 2026-10-28: `?` toggles the key guide
+
+Owner report: pressing `?` again stacked another guide instead of closing it.
+`action_help` now records when the shown guide times out; pressing `?` before
+then clears it (the guide is the only notification the app shows, so
+`clear_notifications()` is exact). A test pressed `?` twice (0 guides) and three
+times (1 guide); before the fix the second press left 2. `pytest` â€” 176 passed.
