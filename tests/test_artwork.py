@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
+import asyncio
 import hashlib
 import io
 
@@ -46,6 +47,17 @@ def test_missing_corrupt_and_oversized_artwork(tmp_path):
     assert decode(output.getvalue()) is None
 
 
+def test_postscript_cover_is_never_handed_to_ghostscript(monkeypatch):
+    from PIL import EpsImagePlugin
+
+    def ghostscript(*args, **kwargs):
+        raise AssertionError("Ghostscript ran on cover art")
+
+    monkeypatch.setattr(EpsImagePlugin, "Ghostscript", ghostscript)
+    eps = b"%!PS-Adobe-3.0 EPSF-3.0\n%%BoundingBox: 0 0 8 8\nshowpage\n"
+    assert decode(eps) is None
+
+
 async def test_slow_old_cover_cannot_replace_current_selection(
     tmp_path, audio_factory, monkeypatch
 ):
@@ -60,13 +72,14 @@ async def test_slow_old_cover_cannot_replace_current_selection(
     root = tmp_path / "Music"
     audio_factory(root / "other.wav", title="Other song", album="Other", artist="Artist")
     library.scan(root, lambda _: None, threading.Event())
-    started, release = threading.Event(), threading.Event()
+    started, release, returned = threading.Event(), threading.Event(), threading.Event()
 
     def slow_loader(paths):
         if any(path.endswith("other.wav") for path in paths):
             return Image.new("RGB", (10, 10), "blue")
         started.set()
         release.wait(10)
+        returned.set()
         return Image.new("RGB", (10, 10), "red")
 
     monkeypatch.setattr(app_module, "load_artwork", slow_loader)
@@ -88,5 +101,7 @@ async def test_slow_old_cover_cannot_replace_current_selection(
             assert app.query_one("#cover").image.getpixel((0, 0)) == (0, 0, 255)
         finally:
             release.set()
-        await pilot.pause(0.2)
+        # The stale load has really finished before checking it changed nothing.
+        assert await asyncio.to_thread(returned.wait, 5)
+        await pilot.pause(0.1)
         assert app.query_one("#cover").image.getpixel((0, 0)) == (0, 0, 255)

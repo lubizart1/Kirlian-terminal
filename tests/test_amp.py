@@ -109,6 +109,9 @@ async def test_amp_only_displays_and_the_sound_screen_changes_mpv(tmp_path, audi
         await pilot.press(*["k"] * 7, "left")  # Preamp -1 dB.
         await pilot.pause(0.1)
         assert player.calls[-1] == ("tune", "volume@pre", "volume", "-1dB")
+        await pilot.press("0")  # Resetting a named row, not a band, must not crash.
+        await pilot.pause(0.1)
+        assert app.amp.preamp == 0 and app.is_running
         await pilot.press("j", "j", "right")  # ReplayGain: per track.
         await pilot.pause(0.1)
         assert app.amp.replaygain == "track"
@@ -194,3 +197,27 @@ def test_spectrum_bands_ride_after_the_two_real_channels():
     assert len(levels.bands) == len(SPECTRUM) and levels.bands[0] == -13.0
     assert Levels.parse({"lavfi.astats.1.RMS_level": "-9"}).bands == ()
     assert METER.count("bandpass=") == len(SPECTRUM) and "pan=stereo|c0=c0|c1=c1" in METER
+
+
+async def test_quick_successive_changes_leave_mpv_on_the_latest_settings(tmp_path, audio_factory):
+    """Each change is a diff; a slow earlier one must not land after a later one."""
+    import asyncio
+
+    class SlowPlayer(AmpPlayer):
+        async def tune(self, target, command, value):
+            await asyncio.sleep(0.02)
+            await super().tune(target, command, value)
+
+    library, _ = populated(tmp_path, audio_factory)
+    player = SlowPlayer()
+    app = KirlianApp(library, player=player)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        app.change_amp(app.amp.with_gain(0, 3).with_gain(9, 6))  # Turns it on: one rebuild.
+        app.change_amp(app.amp.with_gain(0, 4).with_gain(9, 2))
+        app.change_amp(app.amp.with_gain(9, 7))
+        await app.workers.wait_for_complete(
+            [worker for worker in app.workers if worker.group == "amp-audio"]
+        )
+        live = {call[1]: call[3] for call in player.calls if call[0] == "tune"}
+        assert live == {"equalizer@b0": "4", "equalizer@b9": "7"}

@@ -1,8 +1,22 @@
 # Contributing
 
-This project is at its first playback milestone. Start with the
-[specification](docs/specification.md) and the [development record](docs/development.md).
+Start with the [specification](docs/specification.md), the
+[architecture](docs/architecture.md), and the [development record](docs/development.md).
 Keep changes small enough to try in a real terminal.
+
+## Checks and releases
+
+Run the commands in [Testing and listening](docs/testing.md) before pushing. GitHub
+runs them again on every push to `main` and every pull request
+(`.github/workflows/checks.yml`); a red check means do not merge.
+
+To release, set `version` in `pyproject.toml`, run `uv lock`, commit, and push a tag
+that matches it, for example `git tag v0.2.0 && git push origin v0.2.0`. The
+release workflow reruns every check, builds the package, and opens a **draft**
+GitHub release with the wheel and source archive attached. Nothing is public
+until you press *Publish release* on the draft; nothing is uploaded to PyPI.
+Dependabot opens monthly pull requests for GitHub Actions and Python dependency
+updates; merge them only when their checks pass.
 
 Document changes alongside the code:
 

@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Optional sourced song notes. Only title, artist, album, and year leave the machine.
+"""Optional sourced song notes. Only title, artist, album, year, and language leave the machine.
 
 Each provider is asked the same question and returns notes with a source URL plus
 the pages its search actually retrieved. A note is kept only when its URL matches
@@ -16,6 +16,7 @@ import json
 import os
 import re
 import socket
+import sqlite3
 import ssl
 import urllib.error
 import urllib.request
@@ -159,7 +160,10 @@ def same_page(left: str, right: str) -> bool:
         host = parts.netloc.casefold().removeprefix("www.")
         return host, parts.path.rstrip("/"), parts.query
 
-    return normal(left) == normal(right)
+    try:
+        return normal(left) == normal(right)
+    except ValueError:  # e.g. a malformed IPv6 host such as "https://[x".
+        return False
 
 
 def clip(text: str, limit: int) -> str:
@@ -178,7 +182,7 @@ def json_object(answer: object) -> dict | None:
         return None
     try:
         value = json.loads(answer[start : end + 1])
-    except ValueError:
+    except (ValueError, RecursionError):
         return None
     return value if isinstance(value, dict) else None
 
@@ -195,13 +199,15 @@ def verified_facts(answer: object, sources: list[Source]) -> list[Fact]:
         headline = clip(str(item.get("headline") or ""), HEADLINE_LIMIT)
         body = clip(str(item.get("body") or ""), BODY_LIMIT)
         url = str(item.get("source_url") or "")
+        if not url.isprintable() or any(c.isspace() for c in url):
+            continue
         matches = [s for s in sources if s.get("url") and same_page(s["url"], url)]
         if not headline or not body or not matches:
             continue
         # The same page can be listed more than once; prefer an entry with a title.
         source = max(matches, key=lambda s: (bool(s.get("title")), bool(s.get("published"))))
-        source_url = source["url"]
-        if urlsplit(source_url).scheme not in {"http", "https"}:
+        source_url = source["url"].strip()
+        if not source_url.isprintable() or urlsplit(source_url).scheme not in {"http", "https"}:
             continue
         title = clip(source.get("title") or urlsplit(source_url).netloc, 70)
         kind = str(item.get("kind") or "story").casefold()
@@ -469,7 +475,7 @@ def fetch_payload(
             f"{type(error).__name__}: {error}",
             transient=True,
         ) from None
-    except ValueError:
+    except (ValueError, RecursionError):
         raise FactsError(_("{provider} sent an unreadable response.", provider=name)) from None
     if not isinstance(payload, dict):
         raise FactsError(_("{provider} sent an unreadable response.", provider=name))
@@ -498,7 +504,14 @@ def request_facts(
 ) -> list[Fact]:
     """Blocking; run off the UI loop."""
     payload = fetch_payload(provider, track, key, model, timeout)
-    return [replace(f, provider=provider.name) for f in verified_facts(*provider.read(payload))]
+    try:
+        facts = verified_facts(*provider.read(payload))
+    except Exception:
+        # Provider text is untrusted; never let an odd shape escape with the key in scope.
+        raise FactsError(
+            _("{provider} sent an unreadable response.", provider=provider.name)
+        ) from None
+    return [replace(f, provider=provider.name) for f in facts]
 
 
 class Credentials:
@@ -558,17 +571,19 @@ class FactCache:
             db.execute("DELETE FROM facts WHERE key NOT LIKE ?", (f"v{PROMPT_VERSION}\x1f%",))
 
     @staticmethod
-    def key(provider_id: str, song: str) -> str:
+    def key(provider_id: str, song: str, code: str) -> str:
         # English keys predate translation; other languages are cached separately.
-        code = language()
         provider = provider_id if code == "en" else f"{provider_id}:{code}"
         return f"v{PROMPT_VERSION}\x1f{provider}\x1f{song}"
 
-    def get(self, provider_id: str, song: str) -> list[Fact] | None:
-        with self.library.connect() as db:
-            row = db.execute(
-                "SELECT facts FROM facts WHERE key = ?", (self.key(provider_id, song),)
-            ).fetchone()
+    def get(self, provider_id: str, song: str, code: str | None = None) -> list[Fact] | None:
+        """Best effort: a locked or full database means "not cached", never a crash."""
+        key = self.key(provider_id, song, code or language())
+        try:
+            with self.library.connect() as db:
+                row = db.execute("SELECT facts FROM facts WHERE key = ?", (key,)).fetchone()
+        except sqlite3.Error:
+            return None
         if row is None:
             return None
         try:
@@ -576,9 +591,11 @@ class FactCache:
         except (ValueError, TypeError):
             return None
 
-    def put(self, provider_id: str, song: str, facts: list[Fact]) -> None:
-        with self.library.connect() as db:
+    def put(self, provider_id: str, song: str, facts: list[Fact], code: str | None = None) -> None:
+        """`code` is the language the notes were requested in, which may have changed since."""
+        key = self.key(provider_id, song, code or language())
+        with contextlib.suppress(sqlite3.Error), self.library.connect() as db:
             db.execute(
                 "INSERT OR REPLACE INTO facts VALUES (?, ?)",
-                (self.key(provider_id, song), json.dumps([vars(fact) for fact in facts])),
+                (key, json.dumps([vars(fact) for fact in facts])),
             )

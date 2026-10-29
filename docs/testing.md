@@ -9,6 +9,7 @@ command-line tool to run the optional generated-format checks):
 uv sync --locked
 uv run ruff check .
 uv run ruff format --check .
+uv run python scripts/i18n_catalog.py
 uv run pytest -q
 uv build
 ```
@@ -26,7 +27,10 @@ background indexing. Integration checks exercise a real mpv process: selecting a
 queue position, appending duplicates, pause, seek, volume, previous/next, natural
 track transitions, errors, and cleanup that leaves an unrelated player running.
 
-The GitHub workflow defines Linux checks for Python 3.12 and 3.13. A workflow file
+`.github/workflows/checks.yml` runs the same commands on every push to `main` and
+every pull request: lint, formatting, and translation coverage once; the test suite
+with real mpv and ffmpeg on Ubuntu and macOS with Python 3.12, 3.13, and 3.14; then a
+build whose wheel is installed into a fresh environment and started. A workflow file
 is not evidence that a run passed. Headless tests do not establish terminal or
 audio-device support.
 

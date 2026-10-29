@@ -20,6 +20,7 @@ MAX_PIXELS = 16_000_000
 MAX_EDGE = 1024
 COVER_NAMES = ("cover", "folder", "front", "album", "artwork")
 EXTENSIONS = (".jpg", ".jpeg", ".png", ".webp")
+IMAGE_FORMATS = ("JPEG", "PNG", "WEBP", "GIF", "BMP")
 
 
 def embedded(path: Path) -> Iterator[bytes]:
@@ -50,7 +51,8 @@ def decode(data: bytes) -> Image.Image | None:
     try:
         with warnings.catch_warnings():
             warnings.simplefilter("error", Image.DecompressionBombWarning)
-            with Image.open(io.BytesIO(data)) as source:
+            # Only plain image decoders: Pillow's EPS reader would run Ghostscript on tags.
+            with Image.open(io.BytesIO(data), formats=IMAGE_FORMATS) as source:
                 if source.width * source.height > MAX_PIXELS:
                     return None
                 # Decode and normalize off the UI thread; never hand it lazy file IO.
@@ -59,7 +61,7 @@ def decode(data: bytes) -> Image.Image | None:
                 background = Image.new("RGBA", image.size, "#100f13")
                 background.alpha_composite(image)
                 return background.convert("RGB")
-    except (OSError, ValueError, Image.DecompressionBombError, Image.DecompressionBombWarning):
+    except Exception:  # Untrusted bytes: any decoder failure means "no artwork".
         return None
 
 

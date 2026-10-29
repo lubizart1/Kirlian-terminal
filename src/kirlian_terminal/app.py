@@ -414,7 +414,7 @@ class FactsSettings(ModalScreen[None]):
                 _(
                     "Providers are asked from the top. The primary answers every new song; a "
                     "fallback is asked only if the ones above it fail. Sent: title, artist, "
-                    "album, year. Never: audio, artwork, or file paths."
+                    "album, year, language. Never: audio, artwork, or file paths."
                 ),
                 classes="dialog-hint",
             )
@@ -640,7 +640,8 @@ class KirlianApp(App):
         self.fact_index = 0
         self.fact_path = ""
         self.fact_revision = 0
-        self.facts_asked: set[tuple[str, str]] = set()  # (provider id, song) tried this session
+        # (provider id, language, song) tried this session.
+        self.facts_asked: set[tuple[str, str, str]] = set()
         self.fact_loading = False
         self.artwork_mode = (
             artwork
@@ -701,6 +702,8 @@ class KirlianApp(App):
         self.amp = AmpSettings.load(library)
         self.tempo = Tempo()
         self.amp_installed = ""  # The filter list mpv last rebuilt from.
+        # Each amp change is a diff against the previous one; apply them in order.
+        self.amp_lock = asyncio.Lock()
         self.saved_animations: list[Variation] = []
         self.recalled_index = -1
         try:
@@ -867,9 +870,13 @@ class KirlianApp(App):
         """Reload saved playlists, and the open playlist's entries, off the UI loop."""
         self.playlist_list = await asyncio.to_thread(self.playlists.all)
         if self.view == "playlist":
-            self.playlist_entries = await asyncio.to_thread(
-                self.playlists.entries, int(self.view_value)
-            )
+            opened = self.view_value
+            entries = await asyncio.to_thread(self.playlists.entries, int(opened))
+            # A slower load for a playlist the listener has since left must not
+            # replace the open one's entries; edits act on these rows.
+            if self.view != "playlist" or self.view_value != opened:
+                return
+            self.playlist_entries = entries
         if self.is_running:
             self.render_rows()
 
@@ -1791,7 +1798,8 @@ class KirlianApp(App):
             self.library.set_setting("facts", "invited")
             self.status(_("Optional: press i for short notes on how each song was made."))
 
-    @work(group="facts")
+    # A traceback here would print local variables, including the API key.
+    @work(group="facts", exit_on_error=False)
     async def load_facts(self, track: Track, revision: int) -> None:
         """Ask providers in order; later ones only when an earlier one fails.
 
@@ -1801,19 +1809,27 @@ class KirlianApp(App):
         await asyncio.sleep(self.FACT_DELAY)
         if revision != self.fact_revision:
             return
+        if not track.tagged:
+            # Never send a filename or folder name in place of a missing tag.
+            self.status(_("Song notes need title and album tags; this file has none."))
+            return
         song = fact_key(track)
+        # The listener may switch language mid-request; keep the answer under the
+        # language it was asked in.
+        code = active_language()
         errors: list[str] = []
         facts: list[Fact] | None = None
         for provider in self.facts_config.providers:
-            facts = await asyncio.to_thread(self.fact_cache.get, provider.id, song)
+            facts = await asyncio.to_thread(self.fact_cache.get, provider.id, song, code)
             if facts is not None or revision != self.fact_revision:
                 break
-            if (provider.id, song) in self.facts_asked:
+            asked = (provider.id, code, song)
+            if asked in self.facts_asked:
                 continue
             api_key = await asyncio.to_thread(self.credentials.key, provider)
             if not api_key:
                 continue
-            self.facts_asked.add((provider.id, song))
+            self.facts_asked.add(asked)
             self.fact_loading_provider = provider
             self.fact_loading = True
             self.update_context()
@@ -1829,13 +1845,13 @@ class KirlianApp(App):
                 errors.append(str(error))
                 if error.transient:
                     # Ask again the next time this song starts, not on every update.
-                    self.facts_asked.discard((provider.id, song))
+                    self.facts_asked.discard(asked)
                 continue
             finally:
                 if self.is_running and revision == self.fact_revision:
                     self.fact_loading = False
                     self.update_context()
-            await asyncio.to_thread(self.fact_cache.put, provider.id, song, facts)
+            await asyncio.to_thread(self.fact_cache.put, provider.id, song, facts, code)
             break
         if not self.is_running or revision != self.fact_revision:
             return
@@ -1985,7 +2001,7 @@ class KirlianApp(App):
 
         self.push_screen(KeyDialog(provider, source), done)
 
-    @work(group="facts-settings")
+    @work(group="facts-settings", exit_on_error=False)  # The key is a local here.
     async def save_facts_key(
         self, screen: FactsSettings, provider: Provider, key: str, remember: bool
     ) -> None:
@@ -2130,6 +2146,10 @@ class KirlianApp(App):
     @work(group="amp-audio")
     async def send_amp(self, before: AmpSettings, after: AmpSettings) -> None:
         """Tune the running equalizer stage by stage; rebuild only when it turns on or off."""
+        async with self.amp_lock:
+            await self.apply_amp_change(before, after)
+
+    async def apply_amp_change(self, before: AmpSettings, after: AmpSettings) -> None:
         try:
             if before.enabled != after.enabled:
                 await self.player.apply_amp(after)
@@ -2153,10 +2173,11 @@ class KirlianApp(App):
 
     @work(group="amp-audio")
     async def reinstall_amp(self, amp: AmpSettings) -> None:
-        try:
-            await self.player.apply_amp(amp)
-        except (PlaybackError, AttributeError):
-            self.amp_installed = ""
+        async with self.amp_lock:
+            try:
+                await self.player.apply_amp(amp)
+            except (PlaybackError, AttributeError):
+                self.amp_installed = ""
 
     @work(group="amp-save", exclusive=True)
     async def save_amp(self) -> None:

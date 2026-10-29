@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
+import asyncio
 import threading
 from dataclasses import replace
 
@@ -110,13 +111,14 @@ async def test_stale_palette_cannot_recolor_new_track(tmp_path, audio_factory, m
     root = tmp_path / "Music"
     other = audio_factory(root / "Other" / "other.wav", album="Other", artist="Other")
     library.scan(root, lambda _: None, threading.Event())
-    started, release = threading.Event(), threading.Event()
+    started, release, returned = threading.Event(), threading.Event(), threading.Event()
 
     def slow_artwork(source):
         if str(other) in source:
             return Image.new("RGB", (20, 20), "blue")
         started.set()
         release.wait(10)
+        returned.set()
         return Image.new("RGB", (20, 20), "red")
 
     monkeypatch.setattr(app_module, "load_artwork", slow_artwork)
@@ -138,5 +140,7 @@ async def test_stale_palette_cannot_recolor_new_track(tmp_path, audio_factory, m
             assert rgb(blue[0])[2] > rgb(blue[0])[0]
         finally:
             release.set()
-        await pilot.pause(0.2)
+        # The stale palette has really been computed before checking it changed nothing.
+        assert await asyncio.to_thread(returned.wait, 5)
+        await pilot.pause(0.1)
         assert animation.album_colors == blue

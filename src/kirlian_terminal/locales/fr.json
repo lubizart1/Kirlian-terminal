@@ -121,7 +121,6 @@
   "Which {provider} model writes your notes?": "Quel modèle {provider} rédige vos notes ?",
   "{provider} searches the web, then this model reads the pages and writes the notes. Larger models usually find better stories and readings, take longer, and cost more per song. This changes song notes only.": "{provider} cherche sur le Web, puis ce modèle lit les pages et rédige les notes. Les modèles plus grands trouvent souvent de meilleures histoires et interprétations, mais sont plus lents et coûtent plus cher par morceau. Seules les notes de morceaux sont concernées.",
   "Song notes · Behind the record": "Notes de morceaux · Coulisses du disque",
-  "Providers are asked from the top. The primary answers every new song; a fallback is asked only if the ones above it fail. Sent: title, artist, album, year. Never: audio, artwork, or file paths.": "Les fournisseurs sont sollicités de haut en bas. Le principal répond pour chaque nouveau morceau ; un secours n'est sollicité que si ceux au-dessus échouent. Envoyé : titre, artiste, album, année. Jamais : audio, pochette ou chemins de fichiers.",
   "Saved in keychain": "Dans le trousseau",
   "This session only": "Cette session seulement",
   "From shell ({variable})": "Depuis le shell ({variable})",
@@ -377,5 +376,7 @@
   "flat": "à plat",
   "Amp open. E opens the sound settings; w hides it.": "Ampli ouvert. E ouvre les réglages du son ; w le masque.",
   "w amp: frequency bars and level meters": "w ampli : barres de fréquences et vumètres",
-  "E sound: equalizer, balance, ReplayGain, speed, pitch": "E son : égaliseur, balance, ReplayGain, vitesse, hauteur"
+  "E sound: equalizer, balance, ReplayGain, speed, pitch": "E son : égaliseur, balance, ReplayGain, vitesse, hauteur",
+  "Providers are asked from the top. The primary answers every new song; a fallback is asked only if the ones above it fail. Sent: title, artist, album, year, language. Never: audio, artwork, or file paths.": "Les fournisseurs sont sollicités de haut en bas. Le principal répond pour chaque nouveau morceau ; un secours n'est sollicité que si ceux au-dessus échouent. Envoyé : titre, artiste, album, année, langue. Jamais : audio, pochette ou chemins de fichiers.",
+  "Song notes need title and album tags; this file has none.": "Les notes nécessitent les tags titre et album ; ce fichier n'en a pas."
 }

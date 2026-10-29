@@ -24,9 +24,7 @@ from .facts import (
     json_object,
     verified_facts,
 )
-from .library import Track
-
-SAMPLE = ("John Cale", "Paris 1919", "Paris 1919", "1973")
+from .library import Track, display_text
 
 
 def sample_track(artist: str, title: str, album: str, year: str) -> Track:
@@ -82,13 +80,15 @@ def check_provider(
         if not isinstance(item, dict):
             continue
         [fact] = verified_facts({"facts": [item]}, sources) or [None]
-        headline = str(item.get("headline") or "(no headline)")[:60]
+        # Provider text is untrusted: strip terminal control sequences before printing.
+        headline = display_text(str(item.get("headline") or "(no headline)"))[:60]
         if fact:
-            print(f"    ✓ [{fact.kind}] {fact.headline}", file=out)
-            print(f"        {fact.body}", file=out)
-            print(f"        Source: {fact.source_label} · {fact.source_url}", file=out)
+            print(f"    ✓ [{fact.kind}] {display_text(fact.headline)}", file=out)
+            print(f"        {display_text(fact.body)}", file=out)
+            label, link = display_text(fact.source_label), display_text(fact.source_url)
+            print(f"        Source: {label} · {link}", file=out)
         else:
-            url = str(item.get("source_url") or "(none)")[:100]
+            url = display_text(str(item.get("source_url") or "(none)"))[:100]
             print(f"    ✗ {headline} — source {url} was not a retrieved page", file=out)
     if not kept:
         print("  No note would be shown for this song.", file=out)
@@ -125,7 +125,9 @@ def run_facts_check(
     track = sample_track(*song)
     year = f", {track.year}" if track.year else ""
     print(f'Song: {track.artist} — "{track.title}" ({track.album}{year})', file=out)
-    print("Sent: title, artist, album, and year only. The key is never printed.\n", file=out)
+    print(
+        "Sent: title, artist, album, year, and language only. The key is never printed.\n", file=out
+    )
     entries = []
     failures = 0
     for provider in providers:

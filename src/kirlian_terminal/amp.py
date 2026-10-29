@@ -482,7 +482,7 @@ class SoundSettings(ModalScreen[None]):
             return
         targets = {"preamp": 0, "balance": COLUMNS - 1}
         if row in targets or row.startswith("band"):
-            column = targets.get(row, int(row.removeprefix("band") or 0) + 1)
+            column = targets[row] if row in targets else int(row.removeprefix("band")) + 1
             self.app.amp_adjust(column, None)
             self.show(self.app.amp)
 

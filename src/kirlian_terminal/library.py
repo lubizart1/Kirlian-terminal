@@ -47,6 +47,9 @@ class Track:
     year: str
     format: str
     available: bool = True
+    # Title and album both came from tags, not the filename or folder. Song notes
+    # only ever send tag text, so untagged files are never asked about.
+    tagged: bool = True
 
 
 @dataclass(frozen=True)
@@ -85,7 +88,9 @@ def read_track(path: Path) -> Track:
     disc_match = DISC_FOLDER.fullmatch(release.name)
     if disc_match:
         release = release.parent
-    album = tag("album", "TALB", display_text(release.name))
+    album_tag = tag("album", "TALB")
+    title_tag = tag("title", "TIT2")
+    album = album_tag or display_text(release.name)
     artist = tag("artist", "TPE1", "Unknown artist")
     compilation = tag("compilation", "TCMP") in {"1", "True", "true"}
     album_artist = tag("albumartist", "TPE2", "Various Artists" if compilation else artist)
@@ -94,7 +99,7 @@ def read_track(path: Path) -> Track:
     inferred_disc = number(re.search(r"\d+", path.parent.name)[0]) if disc_match else 1
     return Track(
         path=str(path),
-        title=tag("title", "TIT2", display_text(path.stem)),
+        title=title_tag or display_text(path.stem),
         artist=artist,
         album=album,
         album_artist=album_artist,
@@ -104,6 +109,7 @@ def read_track(path: Path) -> Track:
         duration=float(getattr(getattr(audio, "info", None), "length", 0)),
         year=tag("date", "TDRC")[:4],
         format=path.suffix[1:].upper(),
+        tagged=bool(album_tag and title_tag),
     )
 
 
@@ -120,10 +126,15 @@ class Library:
                     artist TEXT NOT NULL, album TEXT NOT NULL, album_artist TEXT NOT NULL,
                     album_id TEXT NOT NULL, disc INTEGER NOT NULL, track INTEGER NOT NULL,
                     duration REAL NOT NULL, year TEXT NOT NULL, format TEXT NOT NULL,
-                    available INTEGER NOT NULL DEFAULT 1
+                    available INTEGER NOT NULL DEFAULT 1,
+                    tagged INTEGER NOT NULL DEFAULT 0
                 );
                 CREATE INDEX IF NOT EXISTS tracks_album ON tracks(album_id);
             """)
+            columns = {row[1] for row in db.execute("PRAGMA table_info(tracks)")}
+            if "tagged" not in columns:
+                # Older libraries: unknown until the next scan, so no song notes yet.
+                db.execute("ALTER TABLE tracks ADD COLUMN tagged INTEGER NOT NULL DEFAULT 0")
 
     @contextmanager
     def connect(self) -> Iterator[sqlite3.Connection]:
@@ -184,7 +195,8 @@ class Library:
                             db.execute(
                                 """INSERT OR REPLACE INTO tracks VALUES (
                                     :path, :root, :title, :artist, :album, :album_artist,
-                                    :album_id, :disc, :track, :duration, :year, :format, :available
+                                    :album_id, :disc, :track, :duration, :year, :format,
+                                    :available, :tagged
                                 )""",
                                 {**values, "root": str(root)},
                             )

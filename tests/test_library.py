@@ -1,6 +1,9 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 import hashlib
+import os
 import threading
+
+import pytest
 
 from kirlian_terminal.library import Library, albums_from, read_track
 
@@ -53,6 +56,8 @@ def test_tags_fallbacks_persistence_missing_files_and_no_music_writes(tmp_path, 
         "Unknown artist",
         2,
     )
+    # Filename and folder stand in for display only; song notes never send them.
+    assert not track.tagged
     assert hashlib.sha256(song.read_bytes()).hexdigest() == original
     song.unlink()
     scan(library, root)
@@ -88,6 +93,7 @@ def test_invalid_folder_does_not_replace_previous_library(tmp_path, audio_factor
     assert len(library.tracks()) == 1
 
 
+@pytest.mark.skipif(hasattr(os, "geteuid") and os.geteuid() == 0, reason="root reads any folder")
 def test_permission_denied_subfolder_is_reported_as_blocked(tmp_path, audio_factory):
     root = tmp_path / "Music"
     audio_factory(root / "Private" / "1.wav")

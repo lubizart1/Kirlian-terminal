@@ -31,6 +31,7 @@ TRACK = Track(
     format="FLAC",
 )
 URL = "https://www.example.org/cale-interview/"
+SAMPLE = ("John Cale", "Paris 1919", "Paris 1919", "1973")
 GOOD = {
     "headline": "Little Feat in the room",
     "body": "Lowell George\x1b[31m played on the album.",
@@ -149,6 +150,14 @@ def test_unusable_answers_and_non_web_sources():
     assert facts.verified_facts({"facts": "nope"}, []) == []
 
 
+def test_hostile_source_urls_are_dropped_not_raised():
+    escape = {"headline": "H", "body": "B", "source_url": URL + "\x1b]52;c;eA==\x07"}
+    broken = {"headline": "H", "body": "B", "source_url": "https://[x"}
+    assert facts.verified_facts({"facts": [escape, broken]}, [facts.source(URL)]) == []
+    # Nesting deep enough to exhaust the JSON parser's recursion is just unreadable.
+    assert facts.verified_facts("{" + "[" * 100_000 + "}", [facts.source(URL)]) == []
+
+
 def test_errors_name_the_provider(monkeypatch):
     def rejected(request, timeout):
         raise urllib.error.HTTPError(request.full_url, 401, "no", {}, None)
@@ -192,7 +201,7 @@ def test_credentials_are_per_provider_with_environment_and_session_fallbacks(mon
 def test_live_check_explains_kept_and_dropped_facts_without_revealing_the_key(
     tmp_path, monkeypatch
 ):
-    from kirlian_terminal.facts_check import SAMPLE, run_facts_check
+    from kirlian_terminal.facts_check import run_facts_check
 
     monkeypatch.setenv("PERPLEXITY_API_KEY", "sk-secret-value")
     monkeypatch.setattr(

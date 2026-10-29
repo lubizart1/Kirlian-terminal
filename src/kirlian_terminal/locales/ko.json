@@ -121,7 +121,6 @@
   "Which {provider} model writes your notes?": "어떤 {provider} 모델이 노트를 작성할까요?",
   "{provider} searches the web, then this model reads the pages and writes the notes. Larger models usually find better stories and readings, take longer, and cost more per song. This changes song notes only.": "{provider}이(가) 웹을 검색하면, 이 모델이 페이지를 읽고 노트를 작성해요. 큰 모델일수록 대체로 더 좋은 이야기와 해석을 찾지만, 시간이 더 걸리고 노래당 비용도 더 들어요. 이 설정은 곡 노트에만 적용돼요.",
   "Song notes · Behind the record": "곡 노트 · 음반 뒷이야기",
-  "Providers are asked from the top. The primary answers every new song; a fallback is asked only if the ones above it fail. Sent: title, artist, album, year. Never: audio, artwork, or file paths.": "제공자에게는 위에서부터 차례로 물어봐요. 기본 제공자가 모든 새 노래에 답하고, 대체 제공자는 위의 제공자가 실패할 때만 물어봐요. 보내는 정보: 제목, 아티스트, 앨범, 연도. 보내지 않는 정보: 오디오, 아트워크, 파일 경로.",
   "Saved in keychain": "키체인에 저장됨",
   "This session only": "이번 세션만",
   "From shell ({variable})": "셸에서 ({variable})",
@@ -377,5 +376,7 @@
   "flat": "평탄",
   "Amp open. E opens the sound settings; w hides it.": "앰프를 열었어요. E로 사운드 설정을 열고, w로 숨겨요.",
   "w amp: frequency bars and level meters": "w 앰프: 주파수 막대와 레벨 미터",
-  "E sound: equalizer, balance, ReplayGain, speed, pitch": "E 사운드: 이퀄라이저, 밸런스, ReplayGain, 속도, 음높이"
+  "E sound: equalizer, balance, ReplayGain, speed, pitch": "E 사운드: 이퀄라이저, 밸런스, ReplayGain, 속도, 음높이",
+  "Providers are asked from the top. The primary answers every new song; a fallback is asked only if the ones above it fail. Sent: title, artist, album, year, language. Never: audio, artwork, or file paths.": "제공자에게는 위에서부터 차례로 물어봐요. 기본 제공자가 모든 새 노래에 답하고, 대체 제공자는 위의 제공자가 실패할 때만 물어봐요. 보내는 정보: 제목, 아티스트, 앨범, 연도, 언어. 보내지 않는 정보: 오디오, 아트워크, 파일 경로.",
+  "Song notes need title and album tags; this file has none.": "노래 메모에는 제목과 앨범 태그가 필요해요. 이 파일에는 없어요."
 }

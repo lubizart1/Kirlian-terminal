@@ -121,7 +121,6 @@
   "Which {provider} model writes your notes?": "由哪个 {provider} 模型撰写你的笔记？",
   "{provider} searches the web, then this model reads the pages and writes the notes. Larger models usually find better stories and readings, take longer, and cost more per song. This changes song notes only.": "{provider} 先搜索网络，再由该模型阅读网页并撰写笔记。更大的模型通常能找到更好的故事和解读，但耗时更长，每首歌的费用也更高。此设置仅影响歌曲笔记。",
   "Song notes · Behind the record": "歌曲笔记 · 唱片背后",
-  "Providers are asked from the top. The primary answers every new song; a fallback is asked only if the ones above it fail. Sent: title, artist, album, year. Never: audio, artwork, or file paths.": "服务商按从上到下的顺序询问。首选服务商回答每首新歌；只有上方的服务商都失败时，才会询问备用服务商。会发送：标题、艺人、专辑、年份。绝不发送：音频、封面图或文件路径。",
   "Saved in keychain": "已存入钥匙串",
   "This session only": "仅限本次会话",
   "From shell ({variable})": "来自 shell（{variable}）",
@@ -377,5 +376,7 @@
   "flat": "归零",
   "Amp open. E opens the sound settings; w hides it.": "功放已打开。E 打开声音设置；w 隐藏功放。",
   "w amp: frequency bars and level meters": "w 功放：频谱条和电平表",
-  "E sound: equalizer, balance, ReplayGain, speed, pitch": "E 声音：均衡器、声道平衡、ReplayGain、速度、音高"
+  "E sound: equalizer, balance, ReplayGain, speed, pitch": "E 声音：均衡器、声道平衡、ReplayGain、速度、音高",
+  "Providers are asked from the top. The primary answers every new song; a fallback is asked only if the ones above it fail. Sent: title, artist, album, year, language. Never: audio, artwork, or file paths.": "服务商按从上到下的顺序询问。首选服务商回答每首新歌；只有上方的服务商都失败时，才会询问备用服务商。会发送：标题、艺人、专辑、年份、语言。绝不发送：音频、封面图或文件路径。",
+  "Song notes need title and album tags; this file has none.": "歌曲笔记需要标题和专辑标签；此文件没有。"
 }

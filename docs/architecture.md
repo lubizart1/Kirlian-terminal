@@ -44,7 +44,7 @@ previous browser view and position.
 | `src/kirlian_terminal/appearance.py` | Validated preferences and curated themes |
 | `src/kirlian_terminal/palette.py` | Bounded local artwork palette extraction and ribbon color blending |
 | `src/kirlian_terminal/animations.py` | Versioned seeds, Braille/ASCII generators, independent animation clock |
-| `src/kirlian_terminal/patterns.py` | The 100-pattern catalog's bounded geometry and character rendering |
+| `src/kirlian_terminal/patterns.py` | The 180-pattern catalog's bounded geometry and character rendering |
 | `src/kirlian_terminal/visuals.py` | Fixed-height filament widget and responsive progress line |
 | `src/kirlian_terminal/playlists.py` | Saved playlists and ordered, duplicate-preserving entries |
 | `src/kirlian_terminal/facts.py` | Song-facts providers, response readers, source matching, credentials, fact cache |
@@ -76,7 +76,7 @@ Displayed metadata is plain text with terminal control characters removed.
 
 - License: decided — GPL-3.0-or-later, consistent with Mutagen. See `licensing.md`.
 - Listening-position restoration: still deferred, including persistent queue-entry identity.
-- Animation catalogue: the filament is accepted; additional families remain deferred.
+- Animation catalogue: 180 patterns in 18 families; see `patterns.md`.
 - Visual reference: the owner supplied the album-view mock during the refinement pass.
 
 ## References
@@ -410,7 +410,7 @@ one of those citations, ignoring scheme, `www.`, and a trailing slash; the card
 shows that citation's title, year, and URL. A model-written URL alone is never
 shown. Headlines, bodies, and titles are clipped and stripped of terminal controls.
 
-Only title, artist, album, and year are sent. The request uses `urllib` from the
+Only title, artist, album, year, and language are sent. The request uses `urllib` from the
 standard library with a 25-second timeout, in a worker thread. It starts two
 seconds after mpv reports a new song; a revision counter discards an answer that
 arrives after the song changed, though the answer is still cached. Answers,
@@ -735,3 +735,28 @@ its index, seed, and saved `v2` code (checked by comparing all 100 earlier
 patterns before and after). Each new family marks main and fine strokes for
 depth and answers one part of the music, like the original ten. Labels stay
 English proper names, as before.
+
+## 2026-10-28: pre-launch hardening
+
+- **Untrusted input never reaches a traceback.** Textual prints worker tracebacks
+  with local variables, and the facts workers hold the API key. Provider text that
+  broke URL parsing or the JSON parser, or a locked fact cache, used to raise there.
+  Now malformed URLs simply fail to match, unreadable answers become `FactsError`,
+  the cache is best effort, and the two workers holding a key run with
+  `exit_on_error=False` as a last guard.
+- **Cover art decodes with plain image formats only** (JPEG, PNG, WebP, GIF, BMP).
+  Pillow's EPS reader would hand PostScript from a tag or `cover.jpg` to Ghostscript.
+- **Song notes send tag text only.** Tracks record whether title and album came
+  from tags (`tracks.tagged`); filename and folder stand-ins are never sent. Older
+  libraries get the column as "not tagged" until the launch rescan fills it in.
+- **Answers are cached under the language they were asked in**, so switching
+  language mid-request cannot file English notes under French.
+- **Ordered amp updates.** Each amp change is a diff applied over several mpv
+  commands; an `asyncio.Lock` applies them strictly in order, so a slow earlier
+  change cannot land after a later one.
+- **A playlist load is kept only if that playlist is still open.**
+- **CI** (`checks.yml`): lint, format, and translation coverage once; tests with
+  real mpv on Ubuntu and macOS for Python 3.12–3.14; a build that installs and
+  starts the wheel. `release.yml` turns a `v*` tag matching the package version into
+  a draft GitHub release only, so publishing stays a deliberate step. Dependabot
+  proposes monthly updates.

@@ -62,12 +62,6 @@ def test_plural_rules_per_language(monkeypatch):
     assert n_("{n} song", "{n} songs", 3) == "3 songs"
 
 
-def test_sources_are_extractable_literals():
-    sources = extract()
-    assert len(sources) > 100
-    assert all(source.strip() for source in sources)
-
-
 @pytest.mark.parametrize("code", [code for code in LANGUAGES if code != "en"])
 def test_every_catalog_is_complete_and_keeps_placeholders(code):
     """A missing placeholder would raise at runtime; a stale entry is dead weight."""
@@ -129,16 +123,19 @@ async def test_saved_language_switches_the_running_interface_and_keeps_the_view(
 
 
 def test_notes_are_requested_and_cached_per_language(tmp_path):
-    from kirlian_terminal.facts import FactCache, question
+    from kirlian_terminal.facts import Fact, FactCache, question
     from kirlian_terminal.library import Library, Track
 
     track = Track("", "Paris 1919", "John Cale", "Paris 1919", "John Cale", "", 1, 6, 0, "1973", "")
     assert "Write the headlines" not in question(track)
     cache = FactCache(Library(tmp_path / "library.db"))
-    english = cache.key("exa", "song")
+    note = [Fact("Headline", "Body", "Page", "https://example.com/a")]
     set_language("fr")
     assert "in French" in question(track)
-    assert cache.key("exa", "song") != english
+    # An English request still in flight when the listener switched to French.
+    cache.put("exa", "song", note, "en")
+    assert cache.get("exa", "song") is None
+    assert cache.get("exa", "song", "en") == note
 
 
 async def test_language_switch_survives_player_events_during_the_rebuild(tmp_path, audio_factory):

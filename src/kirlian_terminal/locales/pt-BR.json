@@ -121,7 +121,6 @@
   "Which {provider} model writes your notes?": "Qual modelo de {provider} escreve suas notas?",
   "{provider} searches the web, then this model reads the pages and writes the notes. Larger models usually find better stories and readings, take longer, and cost more per song. This changes song notes only.": "{provider} busca na web e este modelo lê as páginas e escreve as notas. Modelos maiores costumam achar histórias e leituras melhores, mas demoram mais e custam mais por música. Isso muda apenas as notas das músicas.",
   "Song notes · Behind the record": "Notas das músicas · Por trás do disco",
-  "Providers are asked from the top. The primary answers every new song; a fallback is asked only if the ones above it fail. Sent: title, artist, album, year. Never: audio, artwork, or file paths.": "Os provedores são consultados de cima para baixo. O principal responde a cada música nova; uma reserva só é consultada se as de cima falharem. Enviado: título, artista, álbum, ano. Nunca: áudio, capa ou caminhos de arquivos.",
   "Saved in keychain": "Salva no chaveiro",
   "This session only": "Só nesta sessão",
   "From shell ({variable})": "Do shell ({variable})",
@@ -377,5 +376,7 @@
   "flat": "zerar",
   "Amp open. E opens the sound settings; w hides it.": "Amp aberto. E abre os ajustes de som; w o oculta.",
   "w amp: frequency bars and level meters": "w amp: barras de frequência e medidores de nível",
-  "E sound: equalizer, balance, ReplayGain, speed, pitch": "E som: equalizador, balanço, ReplayGain, velocidade, tom"
+  "E sound: equalizer, balance, ReplayGain, speed, pitch": "E som: equalizador, balanço, ReplayGain, velocidade, tom",
+  "Providers are asked from the top. The primary answers every new song; a fallback is asked only if the ones above it fail. Sent: title, artist, album, year, language. Never: audio, artwork, or file paths.": "Os provedores são consultados de cima para baixo. O principal responde a cada música nova; uma reserva só é consultada se as de cima falharem. Enviado: título, artista, álbum, ano, idioma. Nunca: áudio, capa ou caminhos de arquivos.",
+  "Song notes need title and album tags; this file has none.": "As notas precisam das tags de título e álbum; este arquivo não tem."
 }

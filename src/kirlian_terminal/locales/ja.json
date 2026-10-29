@@ -121,7 +121,6 @@
   "Which {provider} model writes your notes?": "どの {provider} モデルでノートを書きますか？",
   "{provider} searches the web, then this model reads the pages and writes the notes. Larger models usually find better stories and readings, take longer, and cost more per song. This changes song notes only.": "{provider} がウェブを検索し、このモデルがページを読んでノートを書きます。大きなモデルほど良いエピソードや解釈を見つけやすい一方、時間がかかり、1 曲あたりの費用も高くなります。変わるのは曲ノートだけです。",
   "Song notes · Behind the record": "曲ノート · レコードの舞台裏",
-  "Providers are asked from the top. The primary answers every new song; a fallback is asked only if the ones above it fail. Sent: title, artist, album, year. Never: audio, artwork, or file paths.": "プロバイダには上から順に問い合わせます。メインは新しい曲すべてに答え、予備はその上のプロバイダが失敗したときだけ使われます。送信するもの：タイトル、アーティスト、アルバム、年。送信しないもの：音声、ジャケット画像、ファイルパス。",
   "Saved in keychain": "キーチェーンに保存済み",
   "This session only": "このセッションのみ",
   "From shell ({variable})": "シェルから ({variable})",
@@ -377,5 +376,7 @@
   "flat": "0 に戻す",
   "Amp open. E opens the sound settings; w hides it.": "アンプを開きました。E でサウンド設定、w で隠します。",
   "w amp: frequency bars and level meters": "w アンプ：周波数バーとレベルメーター",
-  "E sound: equalizer, balance, ReplayGain, speed, pitch": "E サウンド：イコライザー、バランス、ReplayGain、速度、ピッチ"
+  "E sound: equalizer, balance, ReplayGain, speed, pitch": "E サウンド：イコライザー、バランス、ReplayGain、速度、ピッチ",
+  "Providers are asked from the top. The primary answers every new song; a fallback is asked only if the ones above it fail. Sent: title, artist, album, year, language. Never: audio, artwork, or file paths.": "プロバイダには上から順に問い合わせます。メインは新しい曲すべてに答え、予備はその上のプロバイダが失敗したときだけ使われます。送信するもの：タイトル、アーティスト、アルバム、年、言語。送信しないもの：音声、ジャケット画像、ファイルパス。",
+  "Song notes need title and album tags; this file has none.": "曲のメモにはタイトルとアルバムのタグが必要です。このファイルにはありません。"
 }

@@ -121,7 +121,6 @@
   "Which {provider} model writes your notes?": "Quale modello {provider} scrive le tue note?",
   "{provider} searches the web, then this model reads the pages and writes the notes. Larger models usually find better stories and readings, take longer, and cost more per song. This changes song notes only.": "{provider} cerca sul web, poi questo modello legge le pagine e scrive le note. I modelli più grandi di solito trovano storie e interpretazioni migliori, impiegano più tempo e costano di più per brano. Cambia solo le note sui brani.",
   "Song notes · Behind the record": "Note sui brani · Dietro il disco",
-  "Providers are asked from the top. The primary answers every new song; a fallback is asked only if the ones above it fail. Sent: title, artist, album, year. Never: audio, artwork, or file paths.": "I provider vengono interpellati dall'alto. Il principale risponde per ogni nuovo brano; una riserva viene interpellata solo se quelli sopra falliscono. Inviati: titolo, artista, album, anno. Mai: audio, copertine o percorsi dei file.",
   "Saved in keychain": "Salvata nel portachiavi",
   "This session only": "Solo questa sessione",
   "From shell ({variable})": "Dalla shell ({variable})",
@@ -377,5 +376,7 @@
   "flat": "a zero",
   "Amp open. E opens the sound settings; w hides it.": "Amp aperto. E apre le impostazioni del suono; w lo nasconde.",
   "w amp: frequency bars and level meters": "w amp: barre di frequenza e indicatori di livello",
-  "E sound: equalizer, balance, ReplayGain, speed, pitch": "E suono: equalizzatore, bilanciamento, ReplayGain, velocità, intonazione"
+  "E sound: equalizer, balance, ReplayGain, speed, pitch": "E suono: equalizzatore, bilanciamento, ReplayGain, velocità, intonazione",
+  "Providers are asked from the top. The primary answers every new song; a fallback is asked only if the ones above it fail. Sent: title, artist, album, year, language. Never: audio, artwork, or file paths.": "I provider vengono interpellati dall'alto. Il principale risponde per ogni nuovo brano; una riserva viene interpellata solo se quelli sopra falliscono. Inviati: titolo, artista, album, anno, lingua. Mai: audio, copertine o percorsi dei file.",
+  "Song notes need title and album tags; this file has none.": "Le note richiedono i tag titolo e album; questo file non li ha."
 }

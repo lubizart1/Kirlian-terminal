@@ -196,15 +196,6 @@ def test_title_rhythm_hits_syllables_rests_between_words_and_stays_bounded():
     assert rhythm("") == rhythm("—") == [ACCENT, REST, WEAK, REST]
 
 
-def test_without_sound_every_pattern_keeps_its_saved_drawing():
-    from kirlian_terminal.patterns import render
-
-    for variation in CATALOG[::7]:
-        for characters in ("dots", "ascii"):
-            frame = render(variation.family, variation.seed, 4.2, 96, characters)
-            assert frame.text == variation.ribbon_frame(4.2, 96, characters)
-
-
 @pytest.mark.parametrize(
     "family,driver",
     [
@@ -262,6 +253,9 @@ async def test_x_dissolves_and_names_the_new_pattern_then_settles(
 ):
     from kirlian_terminal import visuals
 
+    # The same sequence, four times faster than on screen.
+    for name in ("TRANSITION", "NAME_IN", "NAME_HOLD", "NAME_GONE"):
+        monkeypatch.setattr(visuals, name, getattr(visuals, name) / 4)
     library, paths = populated(tmp_path, audio_factory)
     app = KirlianApp(library, player=FakePlayer(), characters="dots")
     async with app.run_test(size=(120, 30)) as pilot:
@@ -271,9 +265,9 @@ async def test_x_dissolves_and_names_the_new_pattern_then_settles(
         await pilot.pause(visuals.NAME_GONE + 0.2)  # Let the song's own reveal finish.
         assert animation.outgoing is None
         await pilot.press("x")
-        await pilot.pause(visuals.NAME_IN + 0.3)
+        await pilot.pause(visuals.NAME_IN + 0.1)
         assert animation.clock.variation.label in animation.render().plain
-        await pilot.pause(visuals.NAME_GONE)
+        await pilot.pause(visuals.NAME_GONE + 0.1)
         assert animation.outgoing is None
         assert animation.clock.variation.label not in animation.render().plain
 

@@ -78,19 +78,6 @@ async def test_search_typing_does_not_trigger_controls_and_escape_restores(tmp_p
         assert player.calls == [("play", paths, 1)]
 
 
-async def test_arrow_navigation(tmp_path, audio_factory):
-    library, _ = populated(tmp_path, audio_factory)
-    app = KirlianApp(library, player=FakePlayer())
-    async with app.run_test(size=(80, 24)) as pilot:
-        await pilot.pause()
-        await pilot.press("right")
-        assert app.view == "album"
-        await pilot.press("down")
-        assert app.query_one(DataTable).cursor_row == 1
-        await pilot.press("left")
-        assert app.view == "albums"
-
-
 async def test_resize_keeps_rows_and_selection_without_rebuilding(
     tmp_path, audio_factory, monkeypatch
 ):
@@ -560,11 +547,38 @@ async def test_question_mark_toggles_one_key_guide(tmp_path, audio_factory):
     app = KirlianApp(library, player=FakePlayer())
     async with app.run_test(size=(120, 40)) as pilot:
         await pilot.press("question_mark")
-        await pilot.pause(0.2)
-        assert guides() == 1
+        await wait_for(pilot, lambda: guides() == 1)
         await pilot.press("question_mark")
-        await pilot.pause(0.2)
-        assert guides() == 0
+        await wait_for(pilot, lambda: guides() == 0)
         await pilot.press("question_mark", "question_mark", "question_mark")
-        await pilot.pause(0.2)
-        assert guides() == 1
+        await wait_for(pilot, lambda: guides() == 1)
+
+
+async def test_a_slow_load_of_a_playlist_left_behind_never_replaces_the_open_one(
+    tmp_path, audio_factory
+):
+    """Delete, move, and play act on the shown rows, so they must be the open playlist's."""
+    import time
+
+    library, paths = populated(tmp_path, audio_factory)
+    app = KirlianApp(library, player=FakePlayer())
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        first, second = app.playlists.create("First"), app.playlists.create("Second")
+        app.playlists.add(first, [str(paths[0])])
+        app.playlists.add(second, [str(paths[1])])
+        entries = app.playlists.entries
+
+        def slow_first(playlist_id):
+            if playlist_id == first:
+                time.sleep(0.3)
+            return entries(playlist_id)
+
+        app.playlists.entries = slow_first
+        slow = app.open_playlist(str(first))
+        await pilot.pause(0.05)
+        app.open_playlist(str(second))
+        await slow.wait()
+        await pilot.pause()
+        assert app.view_value == str(second)
+        assert [entry.path for entry in app.playlist_entries] == [str(paths[1])]

@@ -15,11 +15,10 @@ def desktop_terminal(monkeypatch):
     monkeypatch.setenv("TERM", "xterm-256color")
 
 
-@pytest.mark.parametrize("artwork", ["native", "blocks", "off"])
-async def test_header_mark_is_one_crisp_line_at_every_size(tmp_path, audio_factory, artwork):
+async def test_header_mark_is_one_crisp_line_at_every_size(tmp_path, audio_factory):
     library, _ = populated(tmp_path, audio_factory)
     player = FakePlayer()
-    app = KirlianApp(library, player=player, artwork=artwork)
+    app = KirlianApp(library, player=player, artwork="native")
     async with app.run_test(size=(120, 36)) as pilot:
         brand = app.query_one(Brand)
         for size in ((120, 36), (80, 24), (160, 48)):

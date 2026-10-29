@@ -1,29 +1,79 @@
 name: Checks
-on: [push, pull_request]
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: read
 
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
+  lint:
+    name: Lint, format, translations
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.13"
+          enable-cache: true
+      - run: uv sync --locked
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - name: Every language catalog covers every string
+        run: uv run python scripts/i18n_catalog.py
+
   test:
+    name: Tests (${{ matrix.os }}, Python ${{ matrix.python }})
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
     strategy:
+      fail-fast: false
       matrix:
-        python: ["3.12", "3.13"]
         os: [ubuntu-latest, macos-latest]
+        python: ["3.12", "3.13", "3.14"]
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
         with:
           python-version: ${{ matrix.python }}
-      - name: Install playback engine on Linux
+          enable-cache: true
+      - name: Install the playback engine (Linux)
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y mpv ffmpeg
-      - name: Install playback engine on macOS
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends mpv ffmpeg
+      - name: Install the playback engine (macOS)
         if: runner.os == 'macOS'
         run: brew install mpv ffmpeg
       - run: uv sync --locked
-      - run: uv run ruff check .
-      - run: uv run ruff format --check .
       - run: uv run pytest -q
+
+  build:
+    name: Build package
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [lint, test]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.13"
+          enable-cache: true
       - run: uv build
+      - name: The built wheel installs and starts
+        run: |
+          uv venv /tmp/smoke
+          uv pip install --python /tmp/smoke/bin/python dist/*.whl
+          /tmp/smoke/bin/kirlian --version
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          retention-days: 14

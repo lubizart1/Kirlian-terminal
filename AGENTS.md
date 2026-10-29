@@ -10,7 +10,7 @@ Work in this repository independently of the other Kirlian application.
   deferred. Maintain deliberate graphics and text fallbacks; terminal protocol
   checks are not real-terminal visual certification.
 - Keep local playback offline. The only permitted network call is the opt-in facts
-  request to the chosen provider, which sends title, artist, album, and year only,
+  request to the chosen provider, which sends title, artist, album, year, and language only,
   never audio, artwork, or paths, and never runs before the listener turns facts
   on. Only show facts whose source URL the provider's search actually retrieved. Keep API
   keys out of SQLite, logs, and the repository. Never write to music files,

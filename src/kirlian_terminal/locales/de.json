@@ -121,7 +121,6 @@
   "Which {provider} model writes your notes?": "Welches {provider}-Modell schreibt deine Notizen?",
   "{provider} searches the web, then this model reads the pages and writes the notes. Larger models usually find better stories and readings, take longer, and cost more per song. This changes song notes only.": "{provider} durchsucht das Web, dann liest dieses Modell die Seiten und schreibt die Notizen. Größere Modelle finden meist bessere Geschichten und Deutungen, brauchen länger und kosten mehr pro Song. Das betrifft nur die Song-Notizen.",
   "Song notes · Behind the record": "Song-Notizen · Hinter der Platte",
-  "Providers are asked from the top. The primary answers every new song; a fallback is asked only if the ones above it fail. Sent: title, artist, album, year. Never: audio, artwork, or file paths.": "Anbieter werden von oben nach unten gefragt. Der primäre beantwortet jeden neuen Song; ein Ersatz wird nur gefragt, wenn alle darüber scheitern. Gesendet: Titel, Künstler, Album, Jahr. Nie: Audio, Artwork oder Dateipfade.",
   "Saved in keychain": "Im Schlüsselbund",
   "This session only": "Nur diese Sitzung",
   "From shell ({variable})": "Aus der Shell ({variable})",
@@ -377,5 +376,7 @@
   "flat": "neutral",
   "Amp open. E opens the sound settings; w hides it.": "Amp offen. E öffnet die Klangeinstellungen; w blendet ihn aus.",
   "w amp: frequency bars and level meters": "w Amp: Frequenzbalken und Pegelanzeigen",
-  "E sound: equalizer, balance, ReplayGain, speed, pitch": "E Klang: Equalizer, Balance, ReplayGain, Tempo, Tonhöhe"
+  "E sound: equalizer, balance, ReplayGain, speed, pitch": "E Klang: Equalizer, Balance, ReplayGain, Tempo, Tonhöhe",
+  "Providers are asked from the top. The primary answers every new song; a fallback is asked only if the ones above it fail. Sent: title, artist, album, year, language. Never: audio, artwork, or file paths.": "Anbieter werden von oben nach unten gefragt. Der primäre beantwortet jeden neuen Song; ein Ersatz wird nur gefragt, wenn alle darüber scheitern. Gesendet: Titel, Künstler, Album, Jahr, Sprache. Nie: Audio, Artwork oder Dateipfade.",
+  "Song notes need title and album tags; this file has none.": "Song-Notizen brauchen Titel- und Album-Tags; diese Datei hat keine."
 }

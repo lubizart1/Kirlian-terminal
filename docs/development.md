@@ -1052,3 +1052,36 @@ family. Checks: `pytest` — 198 passed, including all 180 patterns distinct and
 bounded at several widths, the shuffle pool visiting all 180 without repeating at
 the boundary, each new family changing with its own part of the music, and the
 earlier saved drawings unchanged. Not seen in a real terminal.
+
+## 2026-10-28: pre-launch review
+
+Three read-only reviews (crashes and races, security and privacy, test value) plus
+a random-key run against real mpv: 400 keypresses per seed across five window
+sizes, typing, and an unreadable file, on copies of owner tracks.
+
+Fixed, each with a test that failed before the fix:
+
+- `0` (reset) on the Sound screen's Preamp or Balance row crashed the app
+  (`int("preamp")` evaluated eagerly). Found by the random-key run.
+- A provider answer with a malformed URL (`https://[x`) or deeply nested JSON, or a
+  locked fact cache, raised inside the facts worker; Textual's crash traceback
+  would have printed the API key from the worker's locals.
+- PostScript cover art reached Pillow's EPS reader and Ghostscript.
+- Untagged files sent their filename and folder name as title and album.
+- An English request in flight when switching to French was cached as French.
+- Rapid amp changes could leave mpv on an older band value than the screen showed.
+- A slow load of a playlist the listener had left replaced the open playlist's
+  rows, so delete or move could act on the wrong playlist.
+
+Also: `--check-facts` strips control sequences from provider text before printing;
+consent texts now say the language is sent. CI now runs lint and translations once,
+tests on Ubuntu and macOS with Python 3.12–3.14, and a wheel install smoke test; a
+tag-triggered workflow drafts (never publishes) a GitHub release; Dependabot is
+monthly. `actionlint` reports no problems; the workflows have not yet run on GitHub.
+
+Test suite: removed a tautological pattern test, a key-forwarding test covered by
+other workflows, an arbitrary string-count test, and a 3× brand matrix that could
+not differ; stale-result tests now wait for the stale worker to finish instead of a
+fixed sleep; the dissolve test runs at 4× speed (4.7 s → 1.7 s). Full suite on
+Python 3.13 and 3.14 locally. A real-terminal pass by the owner is still the
+release check for visuals and audio.

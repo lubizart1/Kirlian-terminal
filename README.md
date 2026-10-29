@@ -169,8 +169,9 @@ precedence over a saved one; unset it in your shell to stop using it. Without a
 usable system credential store, saved keys last for the session only.
 
 Only the song title, artist, album, year, and the language to write in are sent, two
-seconds after a song
-starts. Audio, artwork, and file paths are never sent. Each provider is asked about
+seconds after a song starts. Audio, artwork, and file paths are never sent. A file
+without title and album tags is not asked about at all, because the player would
+otherwise be showing its filename and folder name in their place. Each provider is asked about
 each song once; answers, including "nothing found", are kept locally per provider,
 so reordering providers lets you compare them on songs you have already heard.
 The card appears while the side panel shows the playing song's album, so it hides

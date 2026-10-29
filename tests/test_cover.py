@@ -83,13 +83,14 @@ async def test_native_preparation_does_not_block_navigation_or_upload_stale_imag
 
     messages = native_renderer(monkeypatch)
     encode = graphics.encode_pixels
-    started, release = threading.Event(), threading.Event()
+    started, release, returned = threading.Event(), threading.Event(), threading.Event()
 
     def slow_encode(image):
         assert threading.current_thread() is not threading.main_thread()
         if image.getpixel((0, 0))[:3] == (255, 0, 0):
             started.set()
             release.wait(5)
+            returned.set()
         return encode(image)
 
     monkeypatch.setattr(graphics, "encode_pixels", slow_encode)
@@ -110,6 +111,8 @@ async def test_native_preparation_does_not_block_navigation_or_upload_stale_imag
             cover.image = Image.new("RGB", (300, 300), "blue")
             await wait_for_native(cover.native)
             release.set()
+            # The stale encode has really finished before checking it was not uploaded.
+            assert await asyncio.to_thread(returned.wait, 5)
             await asyncio.sleep(0.1)
             assert len([m for m in messages if m.get("a") == "t"]) == 1
             encoded = "".join(m.get("payload", "") for m in messages)
