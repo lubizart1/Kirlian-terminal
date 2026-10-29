@@ -1,6 +1,7 @@
 # Working on Kirlian Terminal
 
-Read `README.md`, `docs/specification.md`, and `docs/testing.md` before editing.
+Read `README.md`, `docs/architecture.md`, and `docs/testing.md` before editing.
+Private notes and old diaries live in the git-ignored `notes/` folder; never commit them.
 Work in this repository independently of the other Kirlian application.
 
 - Current authorized scope: local playback, the supplied visual mock, local artwork,

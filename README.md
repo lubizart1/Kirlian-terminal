@@ -415,7 +415,6 @@ optional song-notes call to the providers you chose, described above.
 
 ## Project notes
 
-- [Product specification](docs/specification.md): supplied handoff and release boundaries.
 - [Architecture and decisions](docs/architecture.md): why the project is organized this way.
 - [Testing and listening](docs/testing.md): automated checks and a manual walkthrough.
 - [Contributing](CONTRIBUTING.md): development and documentation expectations.

@@ -582,3 +582,19 @@ async def test_a_slow_load_of_a_playlist_left_behind_never_replaces_the_open_one
         await pilot.pause()
         assert app.view_value == str(second)
         assert [entry.path for entry in app.playlist_entries] == [str(paths[1])]
+
+
+async def test_an_upgraded_library_is_rescanned_once_so_song_notes_keep_working(
+    tmp_path, audio_factory
+):
+    import sqlite3
+
+    library, _ = populated(tmp_path, audio_factory)
+    with sqlite3.connect(library.database) as db:  # The library as an older version left it.
+        db.execute("ALTER TABLE tracks DROP COLUMN tagged")
+    upgraded = Library(library.database)
+    assert not any(track.tagged for track in upgraded.tracks())
+    app = KirlianApp(upgraded, player=FakePlayer())
+    async with app.run_test() as pilot:
+        await wait_for(pilot, lambda: app.tracks and all(t.tagged for t in app.tracks))
+    assert upgraded.setting("rescan") is None

@@ -133,8 +133,9 @@ class Library:
             """)
             columns = {row[1] for row in db.execute("PRAGMA table_info(tracks)")}
             if "tagged" not in columns:
-                # Older libraries: unknown until the next scan, so no song notes yet.
+                # Older libraries cannot know which titles came from tags; rescan once.
                 db.execute("ALTER TABLE tracks ADD COLUMN tagged INTEGER NOT NULL DEFAULT 0")
+                db.execute("INSERT OR REPLACE INTO settings VALUES ('rescan', '1')")
 
     @contextmanager
     def connect(self) -> Iterator[sqlite3.Connection]:
@@ -215,6 +216,7 @@ class Library:
                     "UPDATE tracks SET available=0 WHERE path=?",
                     [(row[0],) for row in known if row[0] not in seen],
                 )
+                db.execute("DELETE FROM settings WHERE key = 'rescan'")
             report(ScanProgress(indexed, skipped, True, blocked=blocked))
         except (OSError, sqlite3.Error) as error:
             message = _("Could not finish indexing: {error}", error=error)

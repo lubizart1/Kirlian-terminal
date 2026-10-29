@@ -70,7 +70,9 @@ free of personal paths and private listening metadata.
 
 ## Not yet verified
 
-Automated tests do not replace these checks. Remove an item once it has been checked.
+Automated tests do not replace these checks. Some need hardware, terminals, or
+languages we do not have, so reports from listeners are welcome: open an issue with
+the **Report a check** template. Remove an item once it has been checked.
 
 - **Listening:** a full real-album pass for audio quality and gapless transitions;
   equalizer bands and presets, pitch shifting, and tape mode by ear.

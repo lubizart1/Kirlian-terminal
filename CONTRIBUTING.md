@@ -1,7 +1,6 @@
 # Contributing
 
-Start with the [specification](docs/specification.md), the
-[architecture](docs/architecture.md), and [testing](docs/testing.md).
+Start with the [architecture](docs/architecture.md) and [testing](docs/testing.md).
 Keep changes small enough to try in a real terminal.
 
 ## Checks and releases

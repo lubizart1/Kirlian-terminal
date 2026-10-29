@@ -1,0 +1,44 @@
+name: Report a check
+description: Tell us how Kirlian Terminal works on your terminal, system, provider, or language.
+labels: [check report]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for testing. Please leave out API keys, personal file paths, and private music details.
+  - type: dropdown
+    id: area
+    attributes:
+      label: What did you check?
+      options:
+        - Terminal display (covers, ribbon, layout)
+        - Listening (sound quality, gaps, equalizer, pitch, tape)
+        - Song notes provider
+        - Translation
+        - Something else
+    validations:
+      required: true
+  - type: textarea
+    id: setup
+    attributes:
+      label: Setup
+      description: OS and version, terminal (and multiplexer, if any), window size, Python and mpv versions, Kirlian version (`kirlian --version`). For song notes, the provider and model. For translations, the language.
+    validations:
+      required: true
+  - type: textarea
+    id: result
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what you saw. Screenshots welcome.
+    validations:
+      required: true
+  - type: dropdown
+    id: verdict
+    attributes:
+      label: Overall
+      options:
+        - Works well
+        - Works with problems
+        - Does not work
+    validations:
+      required: true

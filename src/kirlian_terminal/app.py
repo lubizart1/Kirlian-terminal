@@ -855,10 +855,14 @@ class KirlianApp(App):
             self.watch_levels()
         except PlaybackError as error:
             self.status(str(error))
+        folder = self.library.setting("music_folder")
         if self.initial_folder:
             self.start_scan(str(self.initial_folder))
-        elif not self.library.setting("music_folder"):
+        elif not folder:
             self.action_folder()
+        elif self.library.setting("rescan"):
+            # Once after an upgrade that stores something new about each track.
+            self.start_scan(folder)
 
     async def refresh_library(self) -> None:
         self.tracks = await asyncio.to_thread(self.library.tracks)
