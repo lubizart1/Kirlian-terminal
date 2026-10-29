@@ -12,8 +12,8 @@ Perplexity, or Parallel) and are off until you turn them on.
 Includes background indexing, album/artist/song browsing, search, an active queue,
 saved playlists, keyboard playback controls, local covers, a filament ribbon, the
 Kirlian header, local appearance preferences, and optional sourced song facts.
-See the [verification record](docs/development.md)
-for actual checks and remaining limitations. macOS and Linux are the intended platforms.
+See [testing](docs/testing.md#not-yet-verified)
+for what has and has not been checked. macOS and Linux are the intended platforms.
 
 ## Install and run
 
@@ -256,8 +256,7 @@ Cover decoding and native image preparation run in background workers. Recent
 Kitty covers stay cached in memory and in the terminal, so revisiting them or
 repainting the interface does not upload them again. These caches are bounded;
 switching to blocks or quitting releases the native images. Nothing is written
-to your music folder. See the [performance checks](docs/development.md#2026-10-13-cover-latency-and-interface-responsiveness)
-for measured results and their limits.
+to your music folder.
 
 The header is one line of ordinary terminal type: a spark (`✺`) and **kirlian**
 in bold, matching the album-view mock. It needs no image support or custom font
@@ -407,8 +406,7 @@ optional song-notes call to the providers you chose, described above.
 - Long titles are clipped in the table; the context pane provides more space on
   wider terminals. It hides below 110 columns, taking the fact card with it. The
   minimum target is 80 × 24.
-- Notes were checked live with Anthropic only (one song, see the development
-  record). The other providers are tested against hand-written responses in their
+- Notes were checked live with Anthropic only (one song). The other providers are tested against hand-written responses in their
   documented formats. Default models will age; change them with `m` in settings.
 - Google Gemini is not offered: its grounding returns redirect links rather than
   the source pages, which the source check cannot match.
@@ -419,8 +417,6 @@ optional song-notes call to the providers you chose, described above.
 
 - [Product specification](docs/specification.md): supplied handoff and release boundaries.
 - [Architecture and decisions](docs/architecture.md): why the project is organized this way.
-- [Development record](docs/development.md): changes, evidence, and remaining work.
-- [Listening interface studies](docs/design-studies.md): accepted play bar, branding, and personalization direction.
 - [Testing and listening](docs/testing.md): automated checks and a manual walkthrough.
 - [Contributing](CONTRIBUTING.md): development and documentation expectations.
 

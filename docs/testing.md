@@ -68,12 +68,25 @@ architecture, terminal and size, Python and mpv versions, audio device, formats,
 album completeness, each action checked, and observed failures. Keep public notes
 free of personal paths and private listening metadata.
 
-## Acceptance boundary
+## Not yet verified
 
-The owner reviews Milestone 1 before work starts on saved playlists, listening
-position restoration, artwork, animation, or facts. A manual full-album listening
-pass and actual macOS/Linux terminal checks remain distinct from automated tests.
-See the [development record](development.md) for current results.
+Automated tests do not replace these checks. Remove an item once it has been checked.
+
+- **Listening:** a full real-album pass for audio quality and gapless transitions;
+  equalizer bands and presets, pitch shifting, and tape mode by ear.
+- **Terminals:** Linux terminals and the Linux console; native covers while
+  switching panes, resizing, and quitting in Herdr (see [terminals](terminals.md));
+  CJK text width and font fallback; the 180 patterns in a real terminal.
+- **Song notes:** live requests to providers other than Anthropic. Default model
+  names will age.
+- **macOS privacy:** whether granting folder access exposes downloaded
+  (non-streaming) Music app files.
+- **Translations:** drafted by AI, not yet reviewed by native speakers. Flagged:
+  key names left in English inside sentences ("Pulsa space…"); the word chosen
+  for "fallback" in each language; macOS settings paths written from memory;
+  Korean particles after placeholders (이(가)); mixed gender in pt-BR "Reserva"
+  descriptions; German "bewegen" used for both focus and reordering.
+- **CI:** the workflows have not yet run on GitHub.
 
 
 ## Artwork and animation review

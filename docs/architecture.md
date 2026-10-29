@@ -87,7 +87,7 @@ Displayed metadata is plain text with terminal control characters removed.
 - [Mutagen](https://mutagen.readthedocs.io/en/latest/)
 - [uv projects](https://docs.astral.sh/uv/guides/projects/)
 
-These references describe dependencies. The development record describes what has
+These references describe dependencies. [Testing](testing.md) describes what has
 actually been verified in this application.
 
 
@@ -597,7 +597,7 @@ and unlisted languages to English). Switching was first deferred to the next lau
 for in the active language and cached per language (English keeps its earlier
 keys). The CLI, `--check-facts` output, Textual binding descriptions, and key
 names remain English. Translations were drafted by AI agents per language and
-need native review; the development record lists their flagged judgment calls.
+need native review; [testing](testing.md#not-yet-verified) lists the flagged judgment calls.
 
 ## 2026-10-28: switch language without relaunching
 

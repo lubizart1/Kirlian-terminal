@@ -1,7 +1,7 @@
 # Contributing
 
 Start with the [specification](docs/specification.md), the
-[architecture](docs/architecture.md), and the [development record](docs/development.md).
+[architecture](docs/architecture.md), and [testing](docs/testing.md).
 Keep changes small enough to try in a real terminal.
 
 ## Checks and releases
@@ -22,8 +22,9 @@ Document changes alongside the code:
 
 - Update the README when installation, shortcuts, or visible behavior changes.
 - Explain substantial decisions and tradeoffs in `docs/architecture.md`.
-- Record what changed, what was checked, and what remains uncertain in
-  `docs/development.md`. Use dates and reproducible commands.
+- Say what changed and how it was checked in the commit message. Add anything
+  still unchecked to "Not yet verified" in `docs/testing.md`, and remove items
+  once they are checked.
 - Keep planned behavior distinct from implemented and manually verified behavior.
 
 Use generated audio in automated tests. Do not commit recordings, album artwork,

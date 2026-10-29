@@ -1,6 +1,6 @@
 # Working on Kirlian Terminal
 
-Read `README.md`, `docs/specification.md`, and `docs/development.md` before editing.
+Read `README.md`, `docs/specification.md`, and `docs/testing.md` before editing.
 Work in this repository independently of the other Kirlian application.
 
 - Current authorized scope: local playback, the supplied visual mock, local artwork,
@@ -22,8 +22,9 @@ Work in this repository independently of the other Kirlian application.
 - Keep filesystem scanning and other blocking work off the UI event loop.
 - Prefer a small Python package over services, plugins, or speculative abstractions.
 - Update the README for changed setup or behavior. Record meaningful design
-  decisions in `docs/architecture.md` and changes, checks, limitations, and open
-  questions in `docs/development.md` in the same change as the code.
+  decisions in `docs/architecture.md` and keep the "Not yet verified" list in
+  `docs/testing.md` current, in the same change as the code. Describe changes and
+  checks in the commit message; there is no separate diary.
 - Test album identity/order, queue behavior, input focus, and playback events.
   Record manual listening separately; passing tests does not establish audio quality.
 - Public artifacts must not contain credentials, personal music, absolute user

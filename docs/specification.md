@@ -248,4 +248,4 @@ The player now uses that layout. Local appearance choices are palette, motion,
 character drawing, and header; preview must preserve playback and cancel cleanly.
 Terminal compatibility uses native-image, rich-text, and basic-ornament fallbacks.
 Real-terminal acceptance remains separate from protocol/unit checks; see
-[terminal compatibility](terminals.md) and [development evidence](development.md).
+[terminal compatibility](terminals.md) and [testing](testing.md).
