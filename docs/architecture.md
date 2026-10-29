@@ -696,3 +696,11 @@ centroid; pitch +5 semitones raised a 440 Hz centroid to about 604 Hz; speed 1.5
 without correction raised it to about 691 Hz. These are session-only (`Tempo`) so
 a song never starts slowed by surprise. mpv applies them after the app's filters,
 so bars show the pre-speed spectrum.
+
+## 2026-10-28: rebuilding guard
+
+A language switch recomposes the screen while mpv keeps reporting. `rebuilding`
+marks that window: handlers update app state only (`display_state`, caches) and
+skip widget queries; `apply_language` redraws everything from state after
+`prepare_screen`. New code that touches widgets from player events, workers, or
+timers must respect this flag.

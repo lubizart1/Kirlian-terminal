@@ -993,3 +993,25 @@ from positions 3-22; and layout at 80 × 24 and 120 × 44.
 
 Not verified by ear: band and preset curves, the sound of pitch shifting, and
 whether turning the equalizer on mid-song is audible.
+
+## 2026-10-28: crash when switching language while playing
+
+Owner report with traceback: `ValueError: More values provided than there are
+columns` from `LibraryTable.add_row` after saving a new language. Cause: while the
+screen is recomposed, mpv keeps sending playback events; one arrived after the new
+table mounted but before `prepare_screen` added its columns, and `render_rows`
+drew into it. A real-mpv run then showed a second form of the same race:
+`NoMatches` for `#play-state`, because an event arrived while old widgets were
+already removed.
+
+Fix: `rebuilding` is set for the duration of the recompose. Player events still
+update `display_state`, and the level reader, status line, context pane, cover,
+and ribbon palette skip widget work until the rebuilt screen has been prepared,
+which then redraws everything from app state. `render_rows` also returns while
+the table has no columns.
+
+Checks: a regression test injects three player events immediately after the
+recompose (failed with the ValueError before the fix, passes after); `pytest` —
+175 passed; a real-mpv run with a song playing and the amp open switched through
+French, Japanese, Spanish, German, English, and Korean without an error, keeping
+the album view and the amp.

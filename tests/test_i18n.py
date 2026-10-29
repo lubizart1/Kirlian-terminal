@@ -139,3 +139,48 @@ def test_notes_are_requested_and_cached_per_language(tmp_path):
     set_language("fr")
     assert "in French" in question(track)
     assert cache.key("exa", "song") != english
+
+
+async def test_language_switch_survives_player_events_during_the_rebuild(tmp_path, audio_factory):
+    """Playback keeps reporting while the screen is rebuilt; nothing may draw too early."""
+    import json
+
+    from test_app import FakePlayer, populated
+    from textual.widgets import OptionList, Select
+
+    from kirlian_terminal.app import KirlianApp, PlayerUpdate
+    from kirlian_terminal.playback import PlaybackState
+
+    library, paths = populated(tmp_path, audio_factory)
+    library.set_setting("appearance", json.dumps({"language": "fr"}))
+    app = KirlianApp(library, player=FakePlayer())
+    rebuild = app.recompose
+
+    async def recompose_while_playing():
+        await rebuild()
+        # mpv events land between the new widgets mounting and their setup.
+        for second in range(3):
+            state = PlaybackState(
+                path=paths[0], paused=False, idle=False, started_serial=1, position=second
+            )
+            app.on_player_update(PlayerUpdate(state))
+
+    app.recompose = recompose_while_playing
+    async with app.run_test(size=(120, 40)) as pilot:
+        await pilot.pause()
+        await pilot.press("enter")
+        app.on_player_update(
+            PlayerUpdate(PlaybackState(path=paths[0], paused=False, idle=False, started_serial=1))
+        )
+        await pilot.pause()
+        assert app.view == "album"
+        await pilot.press("p")
+        app.query_one("#pref-language", Select).value = "es"
+        await pilot.pause()
+        await pilot.press("ctrl+s")
+        for _attempt in range(40):
+            await pilot.pause(0.02)
+            if not app.personalizing:
+                break
+        assert str(app.query_one("#nav", OptionList).get_option_at_index(0).prompt) == "Álbumes"
+        assert app.view == "album" and len(app.rows) == 2

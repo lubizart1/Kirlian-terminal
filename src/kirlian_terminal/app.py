@@ -685,6 +685,9 @@ class KirlianApp(App):
         self.stop_scan = threading.Event()
         self.scanning = False
         self.ready = False
+        # True while the screen is rebuilt in another language: widgets come and go, so
+        # player events, levels, and messages only update app state until it is done.
+        self.rebuilding = False
         self.last_player_key: object = None
         self.last_error = ""
         self.cover_key: str | None = None
@@ -818,7 +821,11 @@ class KirlianApp(App):
         self.palette_key = None
         self.last_player_key = None
         self._column_layout = None
-        await self.recompose()
+        self.rebuilding = True
+        try:
+            await self.recompose()
+        finally:
+            self.rebuilding = False
         self.prepare_screen()
         sections = ("albums", "artists", "songs", "playlists", "queue")
         section = {"album": "albums", "artist": "artists", "playlist": "playlists"}.get(
@@ -943,7 +950,7 @@ class KirlianApp(App):
             table.refresh_columns()
 
     def status(self, message: str) -> None:
-        if self.is_running:
+        if self.is_running and not self.rebuilding:
             status = self.query_one("#status", Static)
             status.update(Text(display_text(message)))
             status.display = bool(message)
@@ -1012,6 +1019,10 @@ class KirlianApp(App):
         if not self.is_running or not self.query("#tracks"):
             return
         table = self.query_one(DataTable)
+        if not table.columns:
+            # A rebuilt screen can receive player events before its columns are added;
+            # prepare_screen draws the rows once they exist.
+            return
         previous = self.selected()
         old_position = table.cursor_row
         rows: list[Row] = []
@@ -1208,7 +1219,7 @@ class KirlianApp(App):
         return self.rows[index] if 0 <= index < len(self.rows) else None
 
     def update_context(self) -> None:
-        if not self.is_running or not self.query("#tracks"):
+        if not self.is_running or self.rebuilding or not self.query("#tracks"):
             return
         row = self.selected()
         track = None
@@ -1277,6 +1288,8 @@ class KirlianApp(App):
             self.show_cover(None, "")
 
     def show_cover(self, image: PILImage.Image | None, placeholder: str | None = None) -> None:
+        if self.rebuilding:
+            return  # update_context shows it from the cache once the screen is back.
         cover = self.query_one("#cover", CoverImage)
         cover.image = image
         cover.display = image is not None and cover.mode != "off"
@@ -1647,6 +1660,8 @@ class KirlianApp(App):
             return
         state = message.state
         self.display_state = state
+        if self.rebuilding:
+            return  # Drawn from display_state once the rebuilt screen is ready.
         track = self.by_path.get(state.path)
         title = track.title if track else display_text(Path(state.path).name) if state.path else ""
         artist = track.artist if track else _("Local music")
@@ -1717,6 +1732,8 @@ class KirlianApp(App):
         self.update_footer()
 
     def update_ribbon_palette(self, state: PlaybackState) -> None:
+        if self.rebuilding:
+            return
         track = self.by_path.get(state.path)
         album = self.album(track.album_id) if track else None
         key = (album.id if album else f"file:{state.path}") if state.path and not state.idle else ""
@@ -1747,7 +1764,8 @@ class KirlianApp(App):
         self.palette_cache[key] = colors
         while len(self.palette_cache) > 64:
             self.palette_cache.popitem(last=False)
-        self.query_one(Animation).set_palette(colors)
+        if not self.rebuilding:
+            self.query_one(Animation).set_palette(colors)
 
     def observe_fact_song(self, state: PlaybackState) -> None:
         """Facts follow the playing song once it has actually started."""
@@ -2082,7 +2100,7 @@ class KirlianApp(App):
                 await asyncio.sleep(0.25)
                 continue
             levels = await read()
-            if levels is not None and self.is_running:
+            if levels is not None and self.is_running and not self.rebuilding:
                 self.query_one(Animation).react(levels)
                 if self.amp.visible:
                     self.query_one(AmpPanel).measure(levels)
