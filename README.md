@@ -319,10 +319,11 @@ block covers, a hidden record pane, or artwork display turned off. Missing artwo
 uses the selected interface palette; monochrome covers stay neutral. `NO_COLOR`
 still renders the interface in grayscale. Everything is extracted locally.
 
-There are **100 patterns: ten motion families with ten variations each**. Filaments,
-tides, braids, ripples, orbits, fronds, mycelium, embers, seeds, and constellations
-share the same quiet, three-row area. [Explore the pattern catalog](docs/patterns.md).
-Each new song draws from a shuffle pool that visits all 100 before refilling and
+There are **180 patterns: eighteen motion families with ten variations each**.
+Filaments, tides, braids, ripples, orbits, fronds, mycelium, embers, seeds,
+constellations, aurora, rain, loops, heartbeat, comets, lattice, petals, and dunes
+share the same three-row area. [Explore the pattern catalog](docs/patterns.md).
+Each new song draws from a shuffle pool that visits all 180 before refilling and
 prefers a different family next. `x` draws another pattern from the same pool,
 `s` keeps it, and `S` recalls saved patterns from their beginning. Pattern names
 appear when shuffling or saving. Existing saved filament and ripple seeds retain

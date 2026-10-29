@@ -22,6 +22,15 @@ FAMILIES = (
     "embers",
     "seeds",
     "constellations",
+    # Added 2026-10-28; appended so earlier families keep their seeds.
+    "aurora",
+    "rain",
+    "loops",
+    "heartbeat",
+    "comets",
+    "lattice",
+    "petals",
+    "dunes",
 )
 HEIGHT = 3
 MAX_WIDTH = 400
@@ -289,6 +298,152 @@ def render(
                         y + dx * math.sin(turn) + dy * math.cos(turn),
                     )
                 field.line(x - 2, y, x - 6, y - 0.7 * math.cos(t + particle), back=True)
+
+    elif family == "aurora":
+        # Curtains of light hang from a rippling hem; treble lengthens them.
+        stride = max(1, round(2 / density))
+        for x in range(0, extent, stride):
+            u = x / max(1, extent - 1)
+            envelope = math.sin(math.pi * u) ** 0.4
+            hem = 1.4 + 1.0 * math.sin(x / (spacing * 1.3) + t) + 0.5 * math.sin(x / 9 - t * 1.7)
+            glow = 0.25 + 0.75 * (0.5 + 0.5 * math.sin(x / (spacing * 0.45) - t * 0.8))
+            reach = 11 * profile.amplitude * envelope * glow
+            if s:
+                reach *= 0.55 + 0.9 * s.treble
+            field.dot(x, hem)
+            for k in range(1, int(reach) + 1):
+                if k < 3 or (k + x // stride) % 2 == 0:
+                    field.dot(x + k * 0.2 * profile.direction, hem + k, back=True)
+
+    elif family == "rain":
+        # Slanting streaks; louder music brings heavier rain, splashes at the bottom.
+        count = max(3, round(extent / (10 * profile.spacing) * density))
+        if s:
+            count = max(3, round(count * (0.5 + 1.3 * s.energy)))
+        slant = 0.6 * profile.direction
+        for _drop in range(count):
+            origin = rng.uniform(0, extent)
+            speed = rng.uniform(0.8, 1.3)
+            fall = (rng.uniform(0, 16) + seconds * profile.speed * 30 * speed) % 16 - 2
+            x = origin + fall * slant
+            for k in range(3):
+                field.dot(x - k * slant, fall - k, back=k > 0)
+            if fall > 10.5:
+                field.dot(x - 1.5, 11, back=True)
+                field.dot(x + 1.5, 11, back=True)
+
+    elif family == "loops":
+        # Lissajous figures, each with a faint echo a moment behind.
+        count = max(1, round(extent / (spacing * 2.6)))
+        ratio_x, ratio_y = 1 + variant % 3, 2 + variant % 2
+        for loop in range(count):
+            cx = (loop + 0.5) * extent / count
+            rx = min(extent / count * 0.42, spacing * 1.1) * (0.75 + 0.5 * s.energy if s else 1)
+            ry = amplitude * 0.85
+            points = max(40, round(rx * 6))
+            for echo, lag in ((False, 0.0), (True, 0.5)):
+                turn = t + loop * 0.9 - lag
+                for k in range(points):
+                    angle = k / points * math.tau
+                    if echo and k % 3:
+                        continue
+                    field.dot(
+                        cx + rx * math.sin(ratio_x * angle + turn),
+                        center + ry * math.sin(ratio_y * angle),
+                        back=echo,
+                    )
+
+    elif family == "heartbeat":
+        # A trace with beats travelling along it; hits make the spikes jump.
+        height = amplitude * 1.35 * (0.55 + 0.6 * s.hit + 0.35 * s.energy if s else 1.0)
+        period = spacing * 5
+
+        def beat(dx: float) -> float:
+            if -6 <= dx < -3:
+                return -0.15 * math.sin((dx + 6) / 3 * math.pi)
+            if 0 <= dx < 1.5:
+                return -dx / 1.5
+            if 1.5 <= dx < 3:
+                return -1 + (dx - 1.5) / 1.5 * 1.5
+            if 3 <= dx < 5:
+                return 0.5 - (dx - 3) / 2 * 0.5
+            if 7 <= dx < 11:
+                return -0.25 * math.sin((dx - 7) / 4 * math.pi)
+            return 0.0
+
+        travel = (seconds * profile.speed * 40) * profile.direction
+        for x in range(extent):
+            offset = 0.0
+            for k in range(int(extent / period) + 2):
+                start = (k * period + travel) % (extent + period) - period / 2
+                offset += beat((x - start) / (1.8 * profile.spacing))
+            field.dot(x, center + height * offset, back=offset == 0 and x % 2 == 1)
+
+    elif family == "comets":
+        # Bright heads trailing long, fading tails; hits flare the heads.
+        count = max(2, round(extent / (spacing * 2.5) * density))
+        for comet in range(count):
+            speed = rng.uniform(0.7, 1.2)
+            x = (rng.uniform(0, extent) + seconds * profile.speed * 70 * speed) % (extent + 40)
+            x = (x - 20) if profile.direction > 0 else extent - (x - 20)
+
+            def path(position: float, comet: int = comet) -> float:
+                return center + amplitude * 0.8 * math.sin(position / spacing + comet * 1.3)
+
+            y = path(x)
+            field.dot(x, y)
+            field.dot(x + profile.direction, y)
+            if not s or s.hit > 0.3 or comet % 2 == 0:
+                field.dot(x, y - 1)
+                field.dot(x, y + 1)
+            for k in range(2, round(34 * density)):
+                tail = x - k * profile.direction
+                if k < 5 or k % 2 == 0:
+                    field.dot(tail, path(tail), back=True)
+
+    elif family == "lattice":
+        # A drifting diamond net; the bass widens its mesh.
+        gap = spacing * 0.9 * (0.8 + 0.45 * s.bass if s else 1.0)
+        for x in range(extent):
+            u = x / max(1, extent - 1)
+            half = 1 + math.sin(math.pi * u) ** 0.6 * amplitude
+            for y in range(HEIGHT * 4):
+                if abs(y - center) > half:
+                    continue
+                if (x + y * 1.6 + t * 6) % gap < 1:
+                    field.dot(x, y)
+                if (x - y * 1.6 - t * 4) % gap < 1:
+                    field.dot(x, y, back=True)
+
+    elif family == "petals":
+        # Small turning flowers; loud passages open them wider.
+        count = max(1, round(extent / (spacing * 2.4) * density))
+        lobes = 2 + variant % 4
+        for flower in range(count):
+            cx = (flower + 0.5) * extent / count + 3 * math.sin(t * 0.3 + flower)
+            radius = min(extent / count * 0.4, spacing) * (0.7 + 0.5 * s.energy if s else 1.0)
+            turn = t * 0.5 + flower
+            points = max(48, round(radius * 8))
+            for k in range(points):
+                angle = k / points * math.tau
+                r = math.cos(lobes * angle)
+                x = cx + radius * r * math.cos(angle + turn)
+                y = center + amplitude * 0.9 * r * math.sin(angle + turn)
+                field.dot(x, y, back=abs(r) < 0.45)
+            field.dot(cx, center)
+
+    elif family == "dunes":
+        # Three ranges of hills sliding at different speeds; the bass lifts the nearest.
+        layers = ((1.0, 1.0, 1.4, False), (0.5, 0.7, -0.6, True), (0.25, 0.45, -2.6, True))
+        for index, (pace, height, offset, back) in enumerate(layers):
+            lift = 0.5 + 0.9 * s.bass if s and index == 0 else 1.0
+            for x in range(extent):
+                if back and x % 2:
+                    continue
+                wave = math.sin(x / (spacing * 0.55) + t * pace * 2 + index * 2.1)
+                ripple = 0.4 * math.sin(x / (spacing * 0.25) - t * pace * 1.2)
+                y = center + offset + amplitude * 0.75 * height * lift * (wave + ripple)
+                field.dot(x, y, back=back)
 
     else:  # constellations
         count = max(2, round(extent / (25 * profile.spacing) * density))

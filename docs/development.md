@@ -1041,3 +1041,14 @@ A real-mpv run on a copy of one of the owner's tracks (deleted afterwards)
 captured the dissolve half done and the "Tides · Drift" name over the ribbon;
 measured sound at that moment: bass 0.87, mid 0.64, treble 0.33, energy 0.95.
 Not checked in a real terminal or by the owner's eye.
+
+## 2026-10-28: 180 patterns
+
+Added eight families with ten variations each (see architecture and
+`docs/patterns.md`). First renders showed aurora curtains too short, comets too
+few, a flat heartbeat, and nearly straight dunes; their reach, counts, beat width,
+and hill spacing were tuned against text renders and a preview of one pattern per
+family. Checks: `pytest` — 198 passed, including all 180 patterns distinct and
+bounded at several widths, the shuffle pool visiting all 180 without repeating at
+the boundary, each new family changing with its own part of the music, and the
+earlier saved drawings unchanged. Not seen in a real terminal.

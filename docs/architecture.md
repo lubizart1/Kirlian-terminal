@@ -726,3 +726,12 @@ The new label's letters arrive over 0.25 s, hold to 1.2 s, and scatter by 1.8 s.
 The timer runs for the reveal even when paused after `x`; pausing, Still, and
 Off cancel a reveal in progress, and a song that loads paused shows none.
 Measured cost of a reveal frame: 2.9 ms at 156 columns, 7.3 ms at 400.
+
+## 2026-10-28: eight more families
+
+Aurora, rain, loops, heartbeat, comets, lattice, petals, and dunes bring the
+catalog to 180. They are appended to `FAMILIES`, so every earlier family keeps
+its index, seed, and saved `v2` code (checked by comparing all 100 earlier
+patterns before and after). Each new family marks main and fine strokes for
+depth and answers one part of the music, like the original ten. Labels stay
+English proper names, as before.

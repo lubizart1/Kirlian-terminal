@@ -2,7 +2,7 @@
 """Render the actual pattern catalog to a shareable SVG, without opening music.
 
 uv run python scripts/preview_patterns.py --output .local/patterns.svg
-Add --all for a contact sheet of all 100 patterns instead of ten representatives.
+Add --all for a contact sheet of every pattern instead of one Drift per family.
 """
 
 import argparse

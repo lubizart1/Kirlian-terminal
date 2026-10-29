@@ -1,6 +1,6 @@
 # Ribbon pattern catalog
 
-The player has 100 local patterns: ten families, each with ten named variations.
+The player has 180 local patterns: eighteen families, each with ten named variations.
 They occupy the existing three-row ribbon and inherit the playing album's palette.
 While a song plays, each family answers one part of the measured music (below);
 without measurements, every pattern draws exactly its saved shape.
@@ -17,6 +17,14 @@ without measurements, every pattern draws exactly its saved shape.
 | Embers | Sparse drifting sparks with short trails | More sparks when loud; a burst on hits |
 | Seeds | Small floating forms turning in a slow current | Swell with bass; turn with mids |
 | Constellations | Loose clusters, dotted connections, and tiny changing stars | Cymbals and treble make stars flare |
+| Aurora | Curtains of light hanging from a rippling hem | Treble lengthens the curtains |
+| Rain | Slanting streaks with small splashes; some variations rise | Louder music brings heavier rain |
+| Loops | Lissajous figures, each with a faint echo behind it | Loops widen when loud |
+| Heartbeat | A trace with beats travelling along it | Hits make the spikes jump |
+| Comets | Bright heads with long fading tails | Hits flare the heads |
+| Lattice | A drifting diamond net | The bass widens the mesh |
+| Petals | Small turning flowers, two to five lobes | Flowers open wider when loud |
+| Dunes | Three ranges of hills sliding at different speeds | The bass lifts the nearest range |
 
 Each family includes **Drift, Undercurrent, Glimmer, Breath, Current, Stillwater,
 Weave, Dusk, Bloom, and Whisper**. The recipes vary pace, direction, spacing,
@@ -28,7 +36,7 @@ stable patterns; they are not generated labels for arbitrary random seeds.
 - Starting a song or pressing `x` draws another pattern. The old one dissolves
   into it dot by dot over 0.7 s, and the new pattern's name appears on the ribbon,
   holds, then scatters (about 1.8 s in all). Still and Off motion skip this. A session pool visits
-  all 100 before refilling and prefers another family whenever one remains.
+  all 180 before refilling and prefers another family whenever one remains.
 - `s` saves the current pattern locally. `S` cycles saved patterns from the start.
   Manual recall can revisit a favorite without waiting for the shuffle pool.
 - Pause freezes the pattern. Resume continues its phase. Seeking changes the
@@ -53,14 +61,14 @@ uv run python scripts/preview_patterns.py --characters ascii --seconds 20
 
 The preview uses a fixed illustrative palette, local fonts, and no external assets.
 It is a sample of the drawing, not a screenshot proving rendering in a particular
-terminal. `--all` includes all 100; the default shows Drift from each family.
+terminal. `--all` includes all 180; the default shows Drift from each family.
 
 Run `uv run python scripts/benchmark_patterns.py` to measure pure frame generation
 at 76, 156, and 400 columns in both character modes. This excludes Textual layout,
 terminal transport, and album artwork. Results depend on hardware and load.
 
 The renderer caps width at 400 cells, stores only the current three rows, and draws
-at the existing maximum of 10 frames per second. It does not cache 100 animation
+at the existing maximum of 10 frames per second. It does not cache 180 animation
 sequences, read music, access the network, or request a screen layout per frame.
 
 ## Depth and color

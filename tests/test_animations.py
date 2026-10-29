@@ -20,8 +20,8 @@ from kirlian_terminal.visuals import Animation
 
 
 def test_catalog_has_one_hundred_named_stable_patterns():
-    assert len(CATALOG) == len(set(CATALOG)) == 100
-    assert len({v.label for v in CATALOG}) == 100
+    assert len(CATALOG) == len(set(CATALOG)) == 180
+    assert len({v.label for v in CATALOG}) == 180
     for family in FAMILIES:
         assert len([v for v in CATALOG if v.family == family]) == 10
     for variation in CATALOG:
@@ -56,7 +56,7 @@ def test_catalog_frames_are_bounded_deterministic_and_distinct(width, characters
             assert frame != variation.ribbon_frame(19, width, characters), variation.label
         frames.add(frame)
     if width >= 76:
-        assert len(frames) == 100
+        assert len(frames) == len(CATALOG)
 
 
 @pytest.mark.parametrize(
@@ -76,14 +76,14 @@ def test_pre_catalog_saved_ribbons_keep_their_exact_drawing(family, characters, 
 def test_shuffle_uses_whole_catalog_and_does_not_repeat_at_cycle_boundary():
     clock = AnimationClock()
     seen = [clock.variation]
-    for index in range(99):
+    for index in range(len(CATALOG) - 1):
         before = clock.variation
         clock.shuffle(index)
         assert clock.variation != before
         seen.append(clock.variation)
     assert set(seen) == set(CATALOG)
     seen = []
-    for index in range(100):
+    for index in range(len(CATALOG)):
         before = clock.variation
         clock.shuffle(index)
         assert clock.variation != before
@@ -218,6 +218,14 @@ def test_without_sound_every_pattern_keeps_its_saved_drawing():
         ("embers", "energy"),
         ("seeds", "bass"),
         ("constellations", "treble"),
+        ("aurora", "treble"),
+        ("rain", "energy"),
+        ("loops", "energy"),
+        ("heartbeat", "hit"),
+        ("comets", "hit"),
+        ("lattice", "bass"),
+        ("petals", "energy"),
+        ("dunes", "bass"),
     ],
 )
 def test_each_family_answers_its_own_part_of_the_music(family, driver):
