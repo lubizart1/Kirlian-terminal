@@ -188,7 +188,7 @@ def run_artwork_check(report_path: Path | None = None) -> None:
         print("This session reports an embedded Ghostty engine, not the standalone app.")
         print("Its host may accept images without displaying them. Auto mode uses blocks.")
         print("Enable graphics in the host, then retry with --artwork native.")
-        print("See docs/terminals.md for Herdr and multiplexer setup.")
+        print("See the README, 'Sharp covers inside a multiplexer', for Herdr and tmux.")
     for letter, sample in report["samples"].items():
         print(f"{letter} {sample['encoding']}: {sample['reply']}")
     for key, value in report["environment"].items():

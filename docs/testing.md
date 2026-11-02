@@ -80,7 +80,7 @@ the **Report a check** template. Remove an item once it has been checked.
 - **Listening:** a full real-album pass for audio quality and gapless transitions;
   equalizer bands and presets, pitch shifting, and tape mode by ear.
 - **Terminals:** Linux terminals and the Linux console; native covers while
-  switching panes, resizing, and quitting in Herdr (see [terminals](terminals.md));
+  switching panes, resizing, and quitting in Herdr;
   CJK text width and font fallback; the 180 patterns in a real terminal.
 - **Song notes:** live requests to providers other than Anthropic. Default model
   names will age.
@@ -139,7 +139,7 @@ In a known native-capable terminal, test `--artwork native` in color and NO_COLO
 Watch the cover through browsing, preferences, resize, and exit; there must be
 no orphaned or stale image. The logo is now character drawing in every mode;
 check its Drawn/Simple, ASCII, and compact variants independently of cover support. Record the terminal/version and font.
-See [the compatibility matrix](terminals.md); automated protocol output alone must
+See [Tested and working](../README.md#tested-and-working); automated protocol output alone must
 not be recorded as a visual pass for any emulator.
 
 For native failures, use `uv run kirlian --check-artwork` after quitting the player.

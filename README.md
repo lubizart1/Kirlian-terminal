@@ -316,12 +316,6 @@ The header is one line of ordinary terminal type: a spark (`✺`) and **kirlian*
 in bold, matching the album-view mock. It needs no image support or custom font
 and looks the same at every window size. Plain ASCII uses `*`.
 
-Owner-provided screenshots confirm sharp covers in the standalone Ghostty app
-and block covers in Herdr. After the Herdr setup work, the owner reports success
-and supplies a new screenshot with a sharp cover and character header. The
-screenshot does not include terminal identity; see the
-[compatibility record](docs/terminals.md) for the scope of these observations.
-
 Press `c` to compare native graphics with blocks; your choice is remembered. To
 override a saved choice for one launch:
 
@@ -335,8 +329,8 @@ kirlian --artwork off --characters ascii
 
 `NO_COLOR` produces grayscale covers without corrupting native image identifiers.
 A forced native mode can still be blank in an unsupported terminal; use `c` or
-relaunch with `--artwork blocks`. See the [terminal compatibility notes](docs/terminals.md)
-for verified checks and remaining gaps.
+relaunch with `--artwork blocks`. See [Tested and working](#tested-and-working) for
+what has been checked.
 
 If native artwork stays blank, quit the player and run `kirlian --check-artwork`.
 The version 2 check compares uncompressed RGB (A), uncompressed RGBA (B), compressed
@@ -350,12 +344,20 @@ reply of `OK` alone does not prove that the picture was visible.
 A reply of `libghostty` identifies an embedded engine rather than the standalone
 Ghostty app. Its host can accept image commands without displaying them. Automatic
 mode conservatively uses block covers for that identity. Use `--artwork auto`
-to override a previously saved native choice. In Herdr, enable its Kitty graphics
-setting and reattach the client, then test `--artwork native`. Herdr 0.8.2 uses
-`[experimental] kitty_graphics = true`; newer releases document a `[terminal]`
-setting. Tmux uses a separate passthrough mechanism. See
-[multiplexer setup](docs/terminals.md#multiplexers) for exact configuration and
-verification limits.
+to override a previously saved native choice.
+
+**Sharp covers inside a multiplexer.** Both the multiplexer and the terminal around
+it must pass images through; otherwise covers use blocks, which always work.
+
+- **Herdr:** turn on Kitty graphics in `~/.config/herdr/config.toml` (Herdr 0.8.2:
+  `kitty_graphics = true` under `[experimental]`; newer releases document it under
+  `[terminal]`, see the [Herdr documentation](https://herdr.dev/docs/configuration/#kitty-graphics)),
+  detach and reattach the client, then run `kirlian --artwork native`.
+- **tmux 3.3 or newer:** add `set -g allow-passthrough on` to your tmux
+  configuration ([tmux FAQ](https://github.com/tmux/tmux/wiki/FAQ#what-is-the-passthrough-escape-sequence-and-how-do-i-use-it)).
+  Kirlian wraps its image commands for tmux automatically.
+
+If a cover stays blank, press `c` to switch back to blocks.
 
 Linux terminal apps can use native artwork when supported. The bare Linux virtual
 console defaults to block artwork and an ASCII ribbon; disabling covers is optional.
@@ -494,7 +496,7 @@ Checked by hand on macOS. Reports from other setups are welcome; see
 | Kitty | Works well: sharp covers, ribbon, amp, playback. Kitty's default font is small; enlarge it with `Cmd` `+` for the session, or set `font_size 14` (any size) in `~/.config/kitty/kitty.conf`. |
 | Warp | Works. Warp runs inside a terminal multiplexer, so covers use the compatible blocks and look pixelated by design. |
 | macOS Terminal | Works. It has 256 colors and draws block borders with gaps, so there the player uses simple box borders for fields and buttons and dithers covers into its 256 colors. Rechecking after these fixes. |
-| Herdr (any terminal) | Works. Also a multiplexer: blocky covers, unless graphics are enabled in Herdr's settings (see [terminals](docs/terminals.md)). |
+| Herdr (any terminal) | Works. Also a multiplexer: blocky covers, unless graphics are enabled in Herdr's settings (see *Sharp covers inside a multiplexer* above). |
 
 ## Current limits
 

@@ -154,7 +154,7 @@ The Kitty adapter prepares pixels in a cancellable worker and sends zlib-compres
 RGBA (`f=32`) in base64 chunks of at most 4096 characters, so no terminal PNG decoder
 is needed. Placeholder colors encode image ids, so the adapter bypasses line filters
 and the app keeps truecolor output; under `NO_COLOR` the pixels are grayscaled
-instead. Cleanup deletes only owned image ids. See [terminal compatibility](terminals.md)
+instead. Cleanup deletes only owned image ids. See [Tested and working](../README.md#tested-and-working)
 for per-terminal expectations, multiplexers, and `--check-artwork`.
 
 ## Ribbon patterns

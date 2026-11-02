@@ -1,6 +1,8 @@
 # Contributing
 
 Start with the [architecture](docs/architecture.md) and [testing](docs/testing.md).
+Working with a coding agent? Point it at [AGENTS.md](AGENTS.md); keep personal
+instructions in `AGENTS.local.md`, which git ignores.
 Keep changes small enough to try in a real terminal.
 
 ## Checks and releases

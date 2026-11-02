@@ -32,3 +32,6 @@ src/kirlian_terminal/locales/_template.json
 
 # Private working notes and old development diaries; never published
 notes/
+
+# Personal instructions for coding agents; see AGENTS.md
+AGENTS.local.md
