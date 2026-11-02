@@ -6,7 +6,8 @@ from pathlib import Path
 
 from textual.widgets import DataTable, Input
 
-from kirlian_terminal.app import FolderDialog, KirlianApp, PlayerUpdate
+from kirlian_terminal.app import KirlianApp, PlayerUpdate
+from kirlian_terminal.dialogs import FolderDialog
 from kirlian_terminal.facts import FactsConfig
 from kirlian_terminal.library import Library
 from kirlian_terminal.playback import PlaybackState
@@ -390,7 +391,7 @@ async def test_facts_settings_adds_a_key_orders_providers_and_typing_is_not_a_sh
 ):
     import keyring
 
-    from kirlian_terminal.app import FactsSettings, KeyDialog
+    from kirlian_terminal.dialogs import FactsSettings, KeyDialog
 
     for name in ("EXA_API_KEY", "OPENAI_API_KEY", "ANTHROPIC_API_KEY"):
         monkeypatch.delenv(name, raising=False)

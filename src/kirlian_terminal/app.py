@@ -13,7 +13,7 @@ import time
 import webbrowser
 from collections import OrderedDict
 from collections.abc import Callable
-from dataclasses import dataclass, replace
+from dataclasses import replace
 from pathlib import Path
 
 from PIL import Image as PILImage
@@ -34,7 +34,17 @@ from .appearance import INK, OPTIONS, PALETTES, QUIET, Appearance, themes
 from .artwork import load_artwork
 from .audio import PREAMP_RANGE, PRESETS, REPLAYGAIN, AmpSettings, Tempo, clamp
 from .brand import ASCII_SPARK, SPARK, Brand
+from .browse import Row, Shelf, clock, listing
 from .cover import CoverImage, RecordPane
+from .dialogs import (
+    ConfirmDialog,
+    FactsSettings,
+    FolderDialog,
+    KeyDialog,
+    ModelDialog,
+    NameDialog,
+    PlaylistPicker,
+)
 from .facts import (
     PROVIDERS,
     Credentials,
@@ -56,11 +66,6 @@ from .playback import PlaybackError, PlaybackState, Player
 from .playlists import Entry, Playlist, Playlists
 from .resume import Place
 from .visuals import Animation, Progress, TitleRhythm
-
-
-def clock(seconds: float) -> str:
-    minutes, seconds = divmod(max(0, int(seconds)), 60)
-    return f"{minutes}:{seconds:02d}"
 
 
 def scan_message(progress: ScanProgress) -> str:
@@ -104,15 +109,6 @@ def scan_message(progress: ScanProgress) -> str:
 MARQUEE_STEP = 0.2  # Seconds per character when a long title scrolls.
 
 
-@dataclass(frozen=True)
-class Row:
-    kind: str
-    value: str
-    title: str
-    detail: str = ""
-    duration: str = ""
-
-
 class ScanUpdate(Message):
     def __init__(self, progress: ScanProgress) -> None:
         super().__init__()
@@ -123,443 +119,6 @@ class PlayerUpdate(Message):
     def __init__(self, state: PlaybackState) -> None:
         super().__init__()
         self.state = replace(state)
-
-
-class FolderDialog(ModalScreen[str | None]):
-    BINDINGS = [Binding("escape", "cancel", "Cancel")]
-
-    def compose(self) -> ComposeResult:
-        with Vertical(id="folder-dialog"):
-            yield Label(_("Kirlian · Your music, locally"))
-            yield Static(_("Choose a folder to begin. Make it yours later with p."))
-            yield Static(
-                _("Your files and tags stay untouched. Indexing happens in the background.")
-            )
-            yield Input(placeholder="~/Music", id="folder-path")
-            yield Static("", id="folder-error")
-            yield Button(_("Open folder"), variant="primary")
-
-    def on_mount(self) -> None:
-        self.query_one(Input).focus()
-
-    def on_input_submitted(self) -> None:
-        self.submit()
-
-    def on_button_pressed(self) -> None:
-        self.submit()
-
-    @work(exclusive=True)
-    async def submit(self) -> None:
-        value = self.query_one(Input).value.strip()
-        folder = Path(value).expanduser()
-        try:
-            valid = bool(value) and await asyncio.to_thread(folder.is_dir)
-        except (OSError, ValueError):
-            valid = False
-        if not valid:
-            self.query_one("#folder-error", Static).update(_("Enter an existing, readable folder."))
-            return
-        self.dismiss(str(folder))
-
-    def action_cancel(self) -> None:
-        self.dismiss(None)
-
-
-class NameDialog(ModalScreen[str | None]):
-    """Names are stored as typed; display_text guards them when drawn."""
-
-    BINDINGS = [Binding("escape", "cancel", "Cancel")]
-
-    def __init__(self, title: str, value: str = "") -> None:
-        super().__init__()
-        self.title_text = title
-        self.value = value
-
-    def compose(self) -> ComposeResult:
-        with Vertical(classes="dialog"):
-            yield Label(self.title_text)
-            yield Input(value=self.value, placeholder=_("Playlist name"), id="playlist-name")
-            yield Static(_("Enter saves · Esc cancels"), classes="dialog-hint")
-
-    def on_mount(self) -> None:
-        self.query_one(Input).focus()
-
-    def on_input_submitted(self, event: Input.Submitted) -> None:
-        if name := event.value.strip():
-            self.dismiss(name)
-
-    def action_cancel(self) -> None:
-        self.dismiss(None)
-
-
-class PlaylistPicker(ModalScreen[int | None]):
-    """Returns a playlist id, or 0 to create a new playlist."""
-
-    BINDINGS = [Binding("escape", "cancel", "Cancel")]
-
-    def __init__(self, playlists: list[Playlist], count: int) -> None:
-        super().__init__()
-        self.playlists = playlists
-        self.count = count
-
-    def compose(self) -> ComposeResult:
-        with Vertical(classes="dialog"):
-            yield Label(n_("Add {n} song to…", "Add {n} songs to…", self.count))
-            yield OptionList(
-                _("+ New playlist…"),
-                *(Text(display_text(p.name)) for p in self.playlists),
-                id="playlist-choices",
-            )
-            yield Static(_("Enter chooses · Esc cancels"), classes="dialog-hint")
-
-    def on_mount(self) -> None:
-        self.query_one(OptionList).focus()
-
-    def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
-        event.stop()
-        index = event.option_index
-        self.dismiss(self.playlists[index - 1].id if index else 0)
-
-    def action_cancel(self) -> None:
-        self.dismiss(None)
-
-
-class ConfirmDialog(ModalScreen[bool]):
-    BINDINGS = [Binding("escape", "cancel", "Cancel")]
-
-    def __init__(self, message: str, confirm: str) -> None:
-        super().__init__()
-        self.message = message
-        self.confirm = confirm
-
-    def compose(self) -> ComposeResult:
-        with Vertical(classes="dialog"):
-            yield Static(Text(self.message))
-            with Horizontal(classes="dialog-buttons"):
-                yield Button(self.confirm, id="confirm", variant="error")
-                yield Button(_("Cancel"), id="cancel")
-
-    def on_mount(self) -> None:
-        self.query_one("#cancel", Button).focus()
-
-    def on_button_pressed(self, event: Button.Pressed) -> None:
-        self.dismiss(event.button.id == "confirm")
-
-    def action_cancel(self) -> None:
-        self.dismiss(False)
-
-
-class KeyDialog(ModalScreen[tuple[str, bool] | None]):
-    """Add or replace one provider's key. Returns (key, keep in keychain)."""
-
-    BINDINGS = [Binding("escape", "cancel", "Cancel")]
-
-    def __init__(self, provider: Provider, source: str) -> None:
-        super().__init__()
-        self.provider = provider
-        self.source = source
-
-    def compose(self) -> ComposeResult:
-        p = self.provider
-        with Vertical(classes="dialog"):
-            yield Label(_("{provider} API key", provider=p.name))
-            note = {
-                "environment": _(
-                    "{variable} is set in your environment and takes precedence; a key saved "
-                    "here is used once it is unset.",
-                    variable=p.environment,
-                ),
-                "keychain": _("Replacing the saved key. The old one is overwritten."),
-                "session": _("Replacing this session's key."),
-            }.get(
-                self.source,
-                _(
-                    "Create one at {signup}. {provider} bills your account.",
-                    signup=p.signup,
-                    provider=p.name,
-                ),
-            )
-            yield Static(note, classes="dialog-hint")
-            yield Input(
-                password=True, placeholder=_("{provider} API key", provider=p.name), id="facts-key"
-            )
-            yield Static("", id="facts-error")
-            with Horizontal(classes="dialog-buttons"):
-                yield Button(_("Save to keychain"), id="keep", variant="primary")
-                yield Button(_("This session only"), id="session")
-                yield Button(_("Cancel"), id="cancel")
-
-    def on_mount(self) -> None:
-        self.query_one(Input).focus()
-
-    def on_input_submitted(self, event: Input.Submitted) -> None:
-        event.stop()
-        self.choose("keep")
-
-    def on_button_pressed(self, event: Button.Pressed) -> None:
-        event.stop()
-        self.choose(event.button.id or "cancel")
-
-    def choose(self, choice: str) -> None:
-        if choice == "cancel":
-            self.dismiss(None)
-            return
-        key = self.query_one(Input).value.strip()
-        if not key:
-            self.query_one("#facts-error", Static).update(_("Paste a key, or press Esc."))
-            return
-        self.dismiss((key, choice == "keep"))
-
-    def action_cancel(self) -> None:
-        self.dismiss(None)
-
-
-class ModelDialog(ModalScreen[str | None]):
-    """Pick the model that writes the notes. Returns a model name, "" for the default."""
-
-    BINDINGS = [Binding("escape", "cancel", "Cancel")]
-
-    def __init__(self, provider: Provider, current: str) -> None:
-        super().__init__()
-        self.provider = provider
-        self.current = current
-
-    def compose(self) -> ComposeResult:
-        p = self.provider
-        with Vertical(classes="dialog"):
-            yield Label(_("Which {provider} model writes your notes?", provider=p.name))
-            yield Static(
-                _(
-                    "{provider} searches the web, then this model reads the pages and writes "
-                    "the notes. Larger models usually find better stories and readings, take "
-                    "longer, and cost more per song. This changes song notes only.",
-                    provider=p.name,
-                ),
-                classes="dialog-hint",
-            )
-            options = [
-                Text.assemble(
-                    ("● " if model == self.current else "  ", self.app.appearance.accent),
-                    (model, f"bold {INK}"),
-                    ("  " + _("default") if model == p.model else "", QUIET),
-                    "\n    " + i18n._(about),
-                )
-                for model, about in p.models
-            ]
-            options.append(
-                Text("  " + _("Another model…") + "\n    " + _("Type any model name it offers"))
-            )
-            yield OptionList(*options, id="model-choices")
-            yield Input(placeholder=_("{provider} model name", provider=p.name), id="facts-model")
-
-    def on_mount(self) -> None:
-        choices = self.query_one(OptionList)
-        names = [model for model, _about in self.provider.models]
-        known = self.current in names
-        choices.highlighted = names.index(self.current) if known else len(names)
-        model_input = self.query_one(Input)
-        model_input.display = not known
-        model_input.value = "" if known else self.current
-        choices.focus()
-
-    def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
-        event.stop()
-        models = self.provider.models
-        if event.option_index < len(models):
-            model = models[event.option_index][0]
-            self.dismiss("" if model == self.provider.model else model)
-        else:
-            model_input = self.query_one(Input)
-            model_input.display = True
-            model_input.focus()
-
-    def on_input_submitted(self, event: Input.Submitted) -> None:
-        event.stop()
-        model = event.value.strip()
-        self.dismiss("" if model == self.provider.model else model)
-
-    def action_cancel(self) -> None:
-        self.dismiss(None)
-
-
-class FactsSettings(ModalScreen[None]):
-    """Song-notes providers in the order they are asked, with keys and models.
-
-    Rows are sorted by role (primary, fallbacks, then unused), so moving a provider
-    moves its row, and the selection follows it. The line under the table explains
-    the selected provider and lists only the actions that apply to it.
-    """
-
-    BINDINGS = [
-        Binding("escape", "close", "Close"),
-        Binding("enter", "key", "Add or replace key", priority=True),
-        Binding("space", "use", "Use / stop using"),
-        Binding("J,shift+down", "move(1)", "Move down"),
-        Binding("K,shift+up", "move(-1)", "Move up"),
-        Binding("j", "cursor(1)", "Down", show=False),
-        Binding("k", "cursor(-1)", "Up", show=False),
-        *(Binding(str(n), f"place({n})", f"Make #{n}", show=False) for n in range(1, 6)),
-        Binding("m", "model", "Model"),
-        Binding("d", "forget", "Remove key"),
-        Binding("t", "toggle", "Notes on/off"),
-    ]
-
-    def __init__(self) -> None:
-        super().__init__()
-        self.row_ids: list[str] = list(PROVIDERS)
-        self.selected_id = self.row_ids[0]
-        self.config = FactsConfig()
-        self.sources: dict[str, str] = {}
-
-    def compose(self) -> ComposeResult:
-        with Vertical(classes="dialog", id="facts-settings"):
-            yield Label(_("Song notes · Behind the record"))
-            yield Static("", id="facts-state")
-            yield Static(
-                _(
-                    "Providers are asked from the top. The primary answers every new song; a "
-                    "fallback is asked only if the ones above it fail. Sent: title, artist, "
-                    "album, year, language. Never: audio, artwork, or file paths."
-                ),
-                classes="dialog-hint",
-            )
-            yield DataTable(id="facts-providers", cursor_type="row", zebra_stripes=False)
-            yield Static("", id="facts-detail")
-            yield Static("", id="facts-actions")
-            yield Static("", id="facts-note")
-
-    def on_mount(self) -> None:
-        table = self.query_one(DataTable)
-        for label in (_("Role"), _("Provider"), _("Key"), _("Writes notes with")):
-            table.add_column(label)
-        self.app.refresh_facts_settings(self)
-        table.focus()
-
-    @property
-    def provider(self) -> Provider:
-        return PROVIDERS[self.selected_id]
-
-    def role(self, provider_id: str) -> str:
-        order = self.config.order
-        if provider_id not in order:
-            return _("Not used")
-        position = order.index(provider_id)
-        return _("Primary") if position == 0 else _("Fallback {position}", position=position)
-
-    def key_label(self, p: Provider) -> str:
-        return {
-            "keychain": _("Saved in keychain"),
-            "session": _("This session only"),
-            "environment": _("From shell ({variable})", variable=p.environment),
-        }.get(self.sources.get(p.id, ""), _("No key"))
-
-    def show(self, config: FactsConfig, sources: dict[str, str], on: bool, note: str) -> None:
-        self.config, self.sources = config, sources
-        self.row_ids = config.order + [p for p in PROVIDERS if p not in config.order]
-        accent = self.app.appearance.accent
-        table = self.query_one(DataTable)
-        table.clear()
-        for provider_id in self.row_ids:
-            p = PROVIDERS[provider_id]
-            used = provider_id in config.order
-            table.add_row(
-                Text(self.role(provider_id), f"bold {accent}" if used else QUIET),
-                Text(p.name, INK if used else QUIET),
-                Text(self.key_label(p), INK if sources.get(p.id) else QUIET),
-                Text(config.model(p) or _("its own model"), INK if config.model(p) else QUIET),
-                key=provider_id,
-            )
-        table.move_cursor(row=self.row_ids.index(self.selected_id))
-        self.query_one("#facts-state", Static).update(
-            Text.assemble(
-                (
-                    _("Notes are on") if on else _("Notes are off"),
-                    f"bold {accent}" if on else "bold",
-                ),
-                ("  ·  ", QUIET),
-                ("t", "bold"),
-                (" " + (_("to turn off") if on else _("to turn on")), QUIET),
-            )
-        )
-        self.query_one("#facts-note", Static).update(Text(note, accent))
-        self.describe()
-
-    def describe(self) -> None:
-        """Explain the selected provider and list the actions that apply to it."""
-        p = self.provider
-        order = self.config.order
-        model = self.config.model(p)
-        if p.id not in order:
-            role = _("Not used. Press space to add it as the last fallback.")
-        elif order.index(p.id) == 0:
-            role = _("Primary: asked first for every new song.")
-        else:
-            above = PROVIDERS[order[order.index(p.id) - 1]].name
-            role = _("Fallback: asked only if {provider} fails.", provider=above)
-        writer = (
-            _("Notes are written by {model}.", model=model)
-            if model
-            else _("{provider} picks the model that writes the notes.", provider=p.name)
-        )
-        self.query_one("#facts-detail", Static).update(
-            Text.assemble((p.name, f"bold {INK}"), "  ", (f"{role} {writer}", QUIET))
-        )
-        actions = [("enter", _("replace key") if self.sources.get(p.id) else _("add key"))]
-        if p.id in order:
-            actions.append(("space", _("stop using")))
-            if len(order) > 1:
-                actions.append(("K/J or 1-5", _("move up/down")))
-        else:
-            actions.append(("space", _("use as fallback")))
-            actions.append(("1", _("make primary")))
-        if p.models:
-            actions.append(("m", _("change model")))
-        if self.sources.get(p.id) in {"keychain", "session"}:
-            actions.append(("d", _("remove key")))
-        actions.append(("esc", _("close")))
-        hints = Text()
-        for index, (key, label) in enumerate(actions):
-            hints.append("   " if index else "")
-            hints.append(key, f"bold {self.app.appearance.accent}")
-            hints.append(f" {label}", QUIET)
-        self.query_one("#facts-actions", Static).update(hints)
-
-    def action_cursor(self, step: int) -> None:
-        table = self.query_one(DataTable)
-        table.move_cursor(row=table.cursor_row + step)
-
-    def action_key(self) -> None:
-        self.app.edit_facts_key(self, self.provider)
-
-    def action_use(self) -> None:
-        self.app.use_facts_provider(self, self.provider)
-
-    def action_move(self, step: int) -> None:
-        self.app.move_facts_provider(self, self.provider, step)
-
-    def action_place(self, position: int) -> None:
-        self.app.place_facts_provider(self, self.provider, position)
-
-    def action_model(self) -> None:
-        self.app.edit_facts_model(self, self.provider)
-
-    def action_forget(self) -> None:
-        self.app.forget_facts_key(self, self.provider)
-
-    def action_toggle(self) -> None:
-        self.app.toggle_facts(self)
-
-    def action_close(self) -> None:
-        self.dismiss(None)
-
-    def on_data_table_row_highlighted(self, event: DataTable.RowHighlighted) -> None:
-        event.stop()  # The library table's handlers live on the app.
-        if 0 <= event.cursor_row < len(self.row_ids):
-            self.selected_id = self.row_ids[event.cursor_row]
-            self.describe()
-
-    def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
-        event.stop()
 
 
 class LibraryTable(DataTable):
@@ -805,7 +364,9 @@ class KirlianApp(App):
 
     def scroll_title(self) -> None:
         """Scroll the highlighted title if it is clipped (still motion keeps it clipped)."""
-        if self.rebuilding or isinstance(self.screen, ModalScreen) or not self.query("#tracks"):
+        if not self.is_running or not self.screen_stack or self.rebuilding:
+            return  # Also fires while quitting, after the screens are gone.
+        if isinstance(self.screen, ModalScreen) or not self.query("#tracks"):
             return
         in_album = self.view == "album" and not self.searching
         self.marquee.tick(
@@ -905,9 +466,6 @@ class KirlianApp(App):
             self.playlist_entries = entries
         if self.is_running:
             self.render_rows()
-
-    def playlist(self, playlist_id: str) -> Playlist | None:
-        return next((p for p in self.playlist_list if str(p.id) == playlist_id), None)
 
     def check_action(self, action: str, parameters: tuple[object, ...]) -> bool | None:
         if isinstance(self.focused, Input) and action not in {
@@ -1036,18 +594,17 @@ class KirlianApp(App):
         if widget.content != content:
             widget.update(content, layout=False)
 
-    def album(self, album_id: str) -> Album | None:
-        return next((album for album in self.albums if album.id == album_id), None)
-
-    def track_row(self, track: Track, detail: str | None = None) -> Row:
-        marker = "> " if self.player.state.path == track.path and not self.player.state.idle else ""
-        unavailable = " " + _("[unavailable]") if not track.available else ""
-        return Row(
-            "track",
-            track.path,
-            marker + track.title + unavailable,
-            detail if detail is not None else track.artist,
-            clock(track.duration),
+    def shelf(self) -> Shelf:
+        state = self.player.state
+        return Shelf(
+            self.tracks,
+            self.albums,
+            self.by_path,
+            self.playlist_list,
+            self.playlist_entries,
+            state.playlist,
+            state.index,
+            state.path if not state.idle else "",
         )
 
     def render_rows(self, position: int | None = None) -> None:
@@ -1060,122 +617,29 @@ class KirlianApp(App):
             return
         previous = self.selected()
         old_position = table.cursor_row
-        rows: list[Row] = []
-        heading = {
-            "albums": _("Albums"),
-            "artists": _("Artists"),
-            "songs": _("Songs"),
-            "playlists": _("Playlists"),
-            "queue": _("Queue"),
-        }.get(self.view, self.view.title())
-        if self.searching:
-            query = self.query_one("#search", Input).value.casefold().strip()
-            heading = _("Search")
-            if query:
-                rows.extend(
-                    Row("album", a.id, a.title, _("Album · {artist}", artist=a.artist))
-                    for a in self.albums
-                    if query in f"{a.title} {a.artist}".casefold()
-                )
-                artists = sorted({t.artist for t in self.tracks}, key=str.casefold)
-                rows.extend(
-                    Row("artist", a, a, _("Artist")) for a in artists if query in a.casefold()
-                )
-                rows.extend(
-                    self.track_row(
-                        t, _("Song · {artist} · {album}", artist=t.artist, album=t.album)
-                    )
-                    for t in self.tracks
-                    if query in f"{t.title} {t.artist} {t.album}".casefold()
-                )
-                rows.extend(
-                    Row("playlist", str(p.id), display_text(p.name), _("Playlist"))
-                    for p in self.playlist_list
-                    if query in p.name.casefold()
-                )
-        elif self.view == "albums":
-            rows = [
-                Row("album", a.id, a.title, a.artist, clock(sum(t.duration for t in a.tracks)))
-                for a in self.albums
-            ]
-        elif self.view == "artists":
-            rows = [
-                Row("artist", a, a)
-                for a in sorted({t.artist for t in self.tracks}, key=str.casefold)
-            ]
-        elif self.view == "songs":
-            rows = [
-                self.track_row(t) for t in sorted(self.tracks, key=lambda t: t.title.casefold())
-            ]
-        elif self.view == "album":
-            album = self.album(self.view_value)
-            heading = album.title if album else _("Album unavailable")
-            if album:
-                rows = [
-                    self.track_row(t, f"{t.disc}.{t.track:02d} · {t.artist}") for t in album.tracks
-                ]
-        elif self.view == "artist":
-            heading = self.view_value
-            rows = [
-                Row("album", a.id, a.title, a.artist)
-                for a in self.albums
-                if any(t.artist == self.view_value for t in a.tracks)
-            ]
-        elif self.view == "playlists":
-            rows = [Row("new-playlist", "", _("+ New playlist"), "")]
-            rows.extend(
-                Row("playlist", str(p.id), display_text(p.name), f"{p.size}")
-                for p in self.playlist_list
-            )
-        elif self.view == "playlist":
-            playlist = self.playlist(self.view_value)
-            heading = display_text(playlist.name) if playlist else _("Playlist unavailable")
-            for entry in self.playlist_entries if playlist else []:
-                track = self.by_path.get(entry.path)
-                if track:
-                    row = self.track_row(track)
-                    rows.append(replace(row, kind="entry", value=str(entry.id)))
-                else:
-                    name = display_text(Path(entry.path).name)
-                    title = _("{name} [unavailable]", name=name)
-                    rows.append(Row("entry", str(entry.id), title, ""))
-        elif self.view == "queue":
-            for index, item in enumerate(self.player.state.playlist):
-                track = self.by_path.get(item["filename"])
-                title = track.title if track else display_text(Path(item["filename"]).name)
-                marker = "> " if index == self.player.state.index else ""
-                rows.append(
-                    Row(
-                        "queue",
-                        str(index),
-                        marker + title,
-                        track.artist if track else "",
-                        clock(track.duration) if track else "",
-                    )
-                )
-        self.rows = rows
+        query = self.query_one("#search", Input).value if self.searching else None
+        shown = listing(self.view, self.view_value, query, self.shelf())
+        rows = self.rows = shown.rows
         self.marquee.forget()
         table.clear()
+        in_album = self.view == "album" and not self.searching
         for index, row in enumerate(rows):
-            if self.view == "album" and not self.searching and row.kind == "track":
+            if in_album and row.kind == "track":
                 track = self.by_path[row.value]
                 marker = ">" if row.title.startswith("> ") else " "
                 number = (
                     f"{track.disc}.{track.track:02d}" if track.disc > 1 else f"{track.track:02d}"
                 )
-                table.add_row(
+                cells = (
                     Text(f"{marker} {number}"),
                     Text(track.title, no_wrap=True, overflow="ellipsis"),
-                    Text(row.duration, justify="right"),
-                    key=str(index),
                 )
             else:
-                table.add_row(
+                cells = (
                     Text(row.title, no_wrap=True, overflow="ellipsis"),
                     Text(row.detail, no_wrap=True, overflow="ellipsis"),
-                    Text(row.duration, justify="right"),
-                    key=str(index),
                 )
+            table.add_row(*cells, Text(row.duration, justify="right"), key=str(index))
         target = old_position if position is None else position
         if position is None and previous:
             target = next(
@@ -1188,64 +652,14 @@ class KirlianApp(App):
             )
         if rows:
             table.move_cursor(row=min(max(0, target), len(rows) - 1))
-        self.query_one("#heading", Static).update(Text(heading))
-        album = self.album(self.view_value) if self.view == "album" and not self.searching else None
-        playlist = (
-            self.playlist(self.view_value)
-            if self.view == "playlist" and not self.searching
-            else None
-        )
+        self.query_one("#heading", Static).update(Text(shown.heading))
         breadcrumb = self.query_one("#breadcrumb", Static)
-        breadcrumb.update(
-            Text(
-                _("Albums / {artist}", artist=album.artist)
-                if album
-                else _("Playlists")
-                if playlist
-                else ""
-            )
-        )
-        breadcrumb.display = album is not None or playlist is not None
-        if album:
-            year = album.tracks[0].year
-            detail = (
-                f"{year + ' · ' if year else ''}"
-                + n_("{n} song", "{n} songs", len(album.tracks))
-                + f" · {clock(sum(t.duration for t in album.tracks))}"
-            )
-        elif playlist:
-            seconds = sum(
-                self.by_path[e.path].duration
-                for e in self.playlist_entries
-                if e.path in self.by_path
-            )
-            detail = n_("{n} song", "{n} songs", len(rows)) + f" · {clock(seconds)}"
-        elif self.view == "playlists" and not self.searching:
-            detail = n_("{n} playlist", "{n} playlists", len(self.playlist_list))
-        elif self.searching:
-            detail = n_("{n} result", "{n} results", len(rows))
-        elif self.view == "albums":
-            detail = n_("{n} album", "{n} albums", len(rows))
-        elif self.view == "artists":
-            detail = n_("{n} artist", "{n} artists", len(rows))
-        elif self.view == "songs":
-            detail = n_("{n} song", "{n} songs", len(rows))
-        elif self.view == "queue":
-            detail = n_("{n} in queue", "{n} in queue", len(rows))
-        else:
-            detail = f"{len(rows)} {self.view}"
-        self.query_one("#collection-detail", Static).update(Text(detail))
+        breadcrumb.update(Text(shown.breadcrumb))
+        breadcrumb.display = bool(shown.breadcrumb)
+        self.query_one("#collection-detail", Static).update(Text(shown.detail))
         empty = self.query_one("#empty", Static)
         empty.display = not rows
-        empty.update(
-            _("No matching music.")
-            if self.searching
-            else _("This playlist is empty. Select a song or album elsewhere and press +.")
-            if self.view == "playlist"
-            else _("Queue is empty. Append with a, or play a track.")
-            if self.view == "queue"
-            else _("No music here yet. Press f to choose a folder, or r to rescan.")
-        )
+        empty.update(shown.empty)
         self.size_columns()
         self.update_context()
         self.update_footer()
@@ -1272,9 +686,9 @@ class KirlianApp(App):
                 if index < len(playlist):
                     track = self.by_path.get(playlist[index]["filename"])
             album = (
-                self.album(track.album_id)
+                self.shelf().album(track.album_id)
                 if track
-                else (self.album(row.value) if row.kind == "album" else None)
+                else (self.shelf().album(row.value) if row.kind == "album" else None)
             )
         details = Text()
         note = Text()
@@ -1386,7 +800,7 @@ class KirlianApp(App):
             if not track.available:
                 self.status(_("This file is unavailable. Restore it and rescan with r."))
                 return
-            album = self.album(track.album_id)
+            album = self.shelf().album(track.album_id)
             if album:
                 paths = [t.path for t in album.tracks]
                 self.perform(self.player.play(paths, paths.index(track.path)))
@@ -1439,7 +853,7 @@ class KirlianApp(App):
             return []
         if row.kind == "track":
             return [row.value]
-        if row.kind == "album" and (album := self.album(row.value)):
+        if row.kind == "album" and (album := self.shelf().album(row.value)):
             return [t.path for t in album.tracks]
         if row.kind == "entry":
             return [e.path for e in self.playlist_entries if str(e.id) == row.value]
@@ -1476,7 +890,7 @@ class KirlianApp(App):
             playlist_id = await asyncio.to_thread(self.playlists.create, name)
         await asyncio.to_thread(self.playlists.add, playlist_id, paths)
         await self.refresh_playlists()
-        playlist = self.playlist(str(playlist_id))
+        playlist = self.shelf().playlist(str(playlist_id))
         if playlist:
             message = n_(
                 "Added {n} song to {playlist}.",
@@ -1499,7 +913,7 @@ class KirlianApp(App):
             if self.view == "playlist"
             else None
         )
-        if playlist_id and (playlist := self.playlist(playlist_id)):
+        if playlist_id and (playlist := self.shelf().playlist(playlist_id)):
             self.push_screen(
                 NameDialog(_("Rename playlist"), playlist.name),
                 lambda name: self.rename_playlist(playlist.id, name),
@@ -1517,7 +931,7 @@ class KirlianApp(App):
             return
         if row.kind == "entry":
             self.remove_entry(int(row.value))
-        elif row.kind == "playlist" and (playlist := self.playlist(row.value)):
+        elif row.kind == "playlist" and (playlist := self.shelf().playlist(row.value)):
             self.push_screen(
                 ConfirmDialog(
                     _(
@@ -1805,7 +1219,7 @@ class KirlianApp(App):
         if self.rebuilding:
             return
         track = self.by_path.get(state.path)
-        album = self.album(track.album_id) if track else None
+        album = self.shelf().album(track.album_id) if track else None
         key = (album.id if album else f"file:{state.path}") if state.path and not state.idle else ""
         if key == self.palette_key:
             return

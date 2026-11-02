@@ -22,7 +22,9 @@ other Kirlian application.
 | File (in `src/kirlian_terminal/`) | Responsibility |
 | --- | --- |
 | `__main__.py` | Options, mpv and database prerequisite checks, data path, diagnostics |
-| `app.py` | Textual app: views, search, dialogs, key actions, workers, player events |
+| `app.py` | Textual app: layout, key actions, workers, player events |
+| `browse.py` | What each view lists (rows, heading, summary) from plain data |
+| `dialogs.py` | Modal screens: folder, names, playlist picker, confirm, song-notes settings |
 | `playback.py` | Owned mpv process, IPC replies, observed `PlaybackState`, queue commands |
 | `library.py` | Read-only tag parsing, album identity, folder scan, tracks and settings |
 | `playlists.py` | Saved playlists with ordered, duplicate-preserving entries |
