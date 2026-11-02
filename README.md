@@ -20,24 +20,37 @@ for what has and has not been checked. macOS and Linux are the intended platform
 
 ## Install and run
 
-Requires Python 3.12+, [uv](https://docs.astral.sh/uv/getting-started/installation/),
-and [mpv](https://mpv.io/installation/). Install the playback engine first:
+On macOS or Linux:
 
 ```sh
-# macOS with Homebrew
-brew install mpv
-
-# Debian or Ubuntu
-sudo apt install mpv
+curl -fsSL https://github.com/lubizart1/Kirlian-terminal/releases/latest/download/install.sh | sh
 ```
 
-On other Linux distributions, install mpv with your package manager.
-From a checkout of this repository:
+Then start it with `kirlian`. The installer:
+
+- installs [mpv](https://mpv.io), the playback engine, with Homebrew on macOS. On
+  Linux it prints the command for your package manager (for example
+  `sudo apt-get install mpv`); it never uses sudo itself;
+- installs [uv](https://docs.astral.sh/uv/) if needed, which provides Python 3.13 in
+  its own environment and leaves your system Python alone;
+- downloads this release's package, checks it against the checksum published with
+  it, and installs the `kirlian` command.
+
+Run the same command again to update. To uninstall:
+`uv tool uninstall kirlian-terminal` (your library and settings stay in the
+application data folder until you delete it).
+
+### From source
+
+Requires Python 3.12+, [uv](https://docs.astral.sh/uv/getting-started/installation/),
+and mpv. From a checkout of this repository:
 
 ```sh
 uv sync --locked
 uv run kirlian
 ```
+
+From a checkout, put `uv run` before the `kirlian` commands below.
 
 Enter your music folder when prompted, open an album with Enter, and press Enter
 on a track to play. Albums appear as indexing progresses. Later launches use the
@@ -46,11 +59,11 @@ saved library; press `r` when you want to rescan.
 You can also choose the folder on launch:
 
 ```sh
-uv run kirlian --music "$HOME/Music"
+kirlian --music "$HOME/Music"
 ```
 
 Passing `--music` requests a scan on that launch. To use an isolated library for
-testing, add `--data-dir .local/tryout`. Run `uv run kirlian --help` for options.
+testing, add `--data-dir .local/tryout`. Run `kirlian --help` for options.
 
 ## Listening
 
@@ -195,11 +208,11 @@ as soon as the answer, or an error, arrives.
 To try a provider and key outside the player, make one live request:
 
 ```sh
-uv run kirlian --check-facts            # the provider chosen in the player
-uv run kirlian --check-facts openai     # a specific provider
-uv run kirlian --check-facts all        # every provider with a saved or exported key
-uv run kirlian --check-facts anthropic --model claude-opus-5-5
-uv run kirlian --check-facts exa --artist "Talk Talk" --title "New Grass" \
+kirlian --check-facts            # the provider chosen in the player
+kirlian --check-facts openai     # a specific provider
+kirlian --check-facts all        # every provider with a saved or exported key
+kirlian --check-facts anthropic --model claude-opus-5-5
+kirlian --check-facts exa --artist "Talk Talk" --title "New Grass" \
   --album "Laughing Stock" --year 1991
 ```
 
@@ -279,11 +292,11 @@ Press `c` to compare native graphics with blocks; your choice is remembered. To
 override a saved choice for one launch:
 
 ```sh
-uv run kirlian --artwork native
+kirlian --artwork native
 # Or return to capability detection:
-uv run kirlian --artwork auto
+kirlian --artwork auto
 # A deliberate text fallback:
-uv run kirlian --artwork off --characters ascii
+kirlian --artwork off --characters ascii
 ```
 
 `NO_COLOR` produces grayscale covers without corrupting native image identifiers.
@@ -291,7 +304,7 @@ A forced native mode can still be blank in an unsupported terminal; use `c` or
 relaunch with `--artwork blocks`. See the [terminal compatibility notes](docs/terminals.md)
 for verified checks and remaining gaps.
 
-If native artwork stays blank, quit the player and run `uv run kirlian --check-artwork`.
+If native artwork stays blank, quit the player and run `kirlian --check-artwork`.
 The version 2 check compares uncompressed RGB (A), uncompressed RGBA (B), compressed
 RGBA (C), PNG (D), the player's native placement (E), and block artwork (F).
 Enter the letters you can see; it prints terminal replies and settings. Add

@@ -1,9 +1,12 @@
 name: Release
 
-# Pushing a tag like v0.2.0 runs every check, builds the package, and creates a
-# DRAFT GitHub release with the wheel and source archive attached. Nothing is
+# Pushing a tag like v1.1.0 runs every check, builds the package, and creates a
+# DRAFT GitHub release with the wheel, source archive, and install.sh attached
+# (the installer carries this release's version and wheel checksum). Nothing is
 # published until you review the draft and press "Publish release". Nothing is
-# uploaded to PyPI.
+# uploaded to PyPI. Once published, this is the release that
+#   curl -fsSL https://github.com/lubizart1/Kirlian-terminal/releases/latest/download/install.sh | sh
+# installs.
 
 on:
   push:
@@ -36,6 +39,7 @@ jobs:
             exit 1
           fi
       - run: uv build
+      - run: packaging/render-install.sh
       - name: Create the draft release
         env:
           GH_TOKEN: ${{ github.token }}

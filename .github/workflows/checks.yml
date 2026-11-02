@@ -67,13 +67,36 @@ jobs:
           python-version: "3.13"
           enable-cache: true
       - run: uv build
-      - name: The built wheel installs and starts
-        run: |
-          uv venv /tmp/smoke
-          uv pip install --python /tmp/smoke/bin/python dist/*.whl
-          /tmp/smoke/bin/kirlian --version
+      - run: packaging/render-install.sh
       - uses: actions/upload-artifact@v4
         with:
           name: dist
           path: dist/
           retention-days: 14
+
+  installer:
+    name: Installer (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    needs: [build]
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      # No checkout and no setup-uv: the installer must bring its own uv and Python.
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+      - name: Linux needs mpv from the package manager first
+        if: runner.os == 'Linux'
+        run: |
+          sh dist/install.sh && exit 1 || echo "Without mpv the installer stops, as intended."
+          sudo apt-get update && sudo apt-get install -y --no-install-recommends mpv
+      - name: Install as a listener would (macOS installs mpv itself with Homebrew)
+        run: KIRLIAN_WHEEL=$(ls dist/*.whl) sh dist/install.sh
+      - name: The installed command starts
+        run: |
+          bin="$(uv tool dir --bin 2>/dev/null || echo "$HOME/.local/bin")"
+          "$bin/kirlian" --version

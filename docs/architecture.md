@@ -252,6 +252,19 @@ and model names are never translated; the CLI, `--check-facts`, and key names st
 - Listening-position restoration, including persistent queue-entry identity.
   Relaunching keeps the library but starts with an empty, stopped queue.
 
+## Distribution
+
+Listeners install with `curl -fsSL …/releases/latest/download/install.sh | sh`. The
+installer (`packaging/install.sh`) is POSIX `sh` in plain ASCII, so it runs under any
+locale. It relies on uv rather than a Homebrew formula or PyPI: uv brings its own
+Python 3.13 and isolates the app, and `uv tool install` gives updates by rerunning.
+mpv comes from Homebrew on macOS; on Linux the installer prints the package command,
+because it never runs sudo. The release workflow renders the installer with the
+version and the wheel's SHA-256 and attaches both to the release. The download is
+checked before anything is installed. The version lives only in `pyproject.toml`;
+`__version__` reads the installed package metadata. Homebrew stays possible later; a
+formula in homebrew-core needs a public, established project.
+
 ## References
 
 - [Textual workers](https://textual.textualize.io/guide/workers/)

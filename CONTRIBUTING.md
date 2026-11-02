@@ -12,7 +12,11 @@ runs them again on every push to `main` and every pull request
 To release, set `version` in `pyproject.toml`, run `uv lock`, commit, and push a tag
 that matches it, for example `git tag v0.2.0 && git push origin v0.2.0`. The
 release workflow reruns every check, builds the package, and opens a **draft**
-GitHub release with the wheel and source archive attached. Nothing is public
+GitHub release with the wheel, source archive, and `install.sh` attached. The
+installer is rendered from `packaging/install.sh` by `packaging/render-install.sh`
+with that release's version and wheel checksum; once the release is published,
+`releases/latest/download/install.sh` serves it. Test a local build with
+`uv build && packaging/render-install.sh && KIRLIAN_WHEEL=dist/<wheel> sh dist/install.sh`. Nothing is public
 until you press *Publish release* on the draft; nothing is uploaded to PyPI.
 Dependabot opens monthly pull requests for GitHub Actions and Python dependency
 updates; merge them only when their checks pass.

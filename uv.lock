@@ -191,7 +191,7 @@ wheels = [
 
 [[package]]
 name = "kirlian-terminal"
-version = "0.1.0a1"
+version = "1.0.0"
 source = { editable = "." }
 dependencies = [
     { name = "keyring" },

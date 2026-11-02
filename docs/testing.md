@@ -30,7 +30,9 @@ track transitions, errors, and cleanup that leaves an unrelated player running.
 `.github/workflows/checks.yml` runs the same commands on every push to `main` and
 every pull request: lint, formatting, and translation coverage once; the test suite
 with real mpv and ffmpeg on Ubuntu and macOS with Python 3.12, 3.13, and 3.14; then a
-build whose wheel is installed into a fresh environment and started. A workflow file
+build that renders `install.sh`, which is run on clean Ubuntu and macOS runners
+without uv or Python set up (Ubuntu first checks that it stops cleanly without mpv;
+macOS lets it install mpv with Homebrew), and the installed `kirlian` is started. A workflow file
 is not evidence that a run passed. Headless tests do not establish terminal or
 audio-device support.
 
@@ -89,6 +91,10 @@ the **Report a check** template. Remove an item once it has been checked.
   Korean particles after placeholders (이(가)); mixed gender in pt-BR "Reserva"
   descriptions; German "bewegen" used for both focus and reordering.
 - **CI:** the workflows have not yet run on GitHub.
+- **Installer download:** the `releases/latest/download/install.sh` path, the wheel
+  download, and its checksum were tested only against a local web server; the real
+  GitHub URLs work once the repository and a release are public. On Linux the
+  installer has only the CI run above.
 
 
 ## Artwork and animation review
