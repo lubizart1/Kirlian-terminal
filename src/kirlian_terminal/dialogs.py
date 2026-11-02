@@ -25,6 +25,7 @@ from .facts import (
 from .i18n import _, n_
 from .library import display_text
 from .playlists import Playlist
+from .stores import STORES
 
 
 class FolderDialog(ModalScreen[str | None]):
@@ -140,6 +141,35 @@ class PlaylistPicker(ModalScreen[int | None]):
         event.stop()
         index = event.option_index
         self.dismiss(self.playlists[index - 1].id if index else 0)
+
+    def action_cancel(self) -> None:
+        self.dismiss(None)
+
+
+class StorePicker(ModalScreen[str | None]):
+    """Returns a store id from stores.STORES."""
+
+    BINDINGS = [Binding("escape", "cancel", "Cancel")]
+
+    def __init__(self, album: str) -> None:
+        super().__init__()
+        self.album = album
+
+    def compose(self) -> ComposeResult:
+        with Vertical(classes="dialog"):
+            yield Label(_("Stream or buy {album}", album=display_text(self.album)))
+            yield OptionList(*(name for _sid, name, _url in STORES), id="store-choices")
+            yield Static(
+                _("Opens the store's search in your browser. Enter chooses · Esc cancels"),
+                classes="dialog-hint",
+            )
+
+    def on_mount(self) -> None:
+        self.query_one(OptionList).focus()
+
+    def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
+        event.stop()
+        self.dismiss(STORES[event.option_index][0])
 
     def action_cancel(self) -> None:
         self.dismiss(None)
@@ -323,6 +353,7 @@ class FactsSettings(ModalScreen[None]):
         Binding("m", "model", "Model"),
         Binding("d", "forget", "Remove key"),
         Binding("t", "toggle", "Notes on/off"),
+        Binding("a", "albums", "Album notes on/off"),
     ]
 
     def __init__(self) -> None:
@@ -400,6 +431,14 @@ class FactsSettings(ModalScreen[None]):
                 ("  ·  ", QUIET),
                 ("t", "bold"),
                 (" " + (_("to turn off") if on else _("to turn on")), QUIET),
+                ("     ", ""),
+                (
+                    _("Album notes too") if config.albums else _("No album notes"),
+                    f"bold {accent}" if on and config.albums else "bold",
+                ),
+                ("  ·  ", QUIET),
+                ("a", "bold"),
+                (" " + (_("to turn off") if config.albums else _("to turn on")), QUIET),
             )
         )
         self.query_one("#facts-note", Static).update(Text(note, accent))
@@ -448,6 +487,9 @@ class FactsSettings(ModalScreen[None]):
     def action_cursor(self, step: int) -> None:
         table = self.query_one(DataTable)
         table.move_cursor(row=table.cursor_row + step)
+
+    def action_albums(self) -> None:
+        self.app.toggle_album_notes(self)
 
     def action_key(self) -> None:
         self.app.edit_facts_key(self, self.provider)

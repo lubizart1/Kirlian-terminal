@@ -24,6 +24,7 @@ DataTable > .datatable--cursor, DataTable:focus > .datatable--cursor { backgroun
 #cover { width: 30; height: 15; margin-bottom: 1; }
 #cover-placeholder { height: 3; color: $k-quiet; }
 #record-details { height: auto; margin-bottom: 1; }
+#record-stores { height: auto; margin-bottom: 1; }
 #record-note { height: auto; border-top: solid $k-edge; padding-top: 1; }
 #fact-card { height: auto; border: round $k-edge; padding: 0 1; margin-top: 1; }
 #fact-heading { height: 2; }
@@ -43,6 +44,7 @@ DataTable > .datatable--cursor, DataTable:focus > .datatable--cursor { backgroun
 #animation { width: 100%; height: 3; text-wrap: nowrap; }
 #amp { height: 11; margin-bottom: 1; text-wrap: nowrap; }
 #amp.compact { height: 8; }
+#amp-mini { height: auto; margin: 1 0; }
 #sound-settings { width: 78; }
 #sound-rows { height: auto; max-height: 20; margin-top: 1; background: #19161c; }
 #sound-rows > .datatable--header { background: #19161c; }

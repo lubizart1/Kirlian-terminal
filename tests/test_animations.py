@@ -265,8 +265,14 @@ async def test_x_dissolves_and_names_the_new_pattern_then_settles(
         await pilot.pause(visuals.NAME_GONE + 0.2)  # Let the song's own reveal finish.
         assert animation.outgoing is None
         await pilot.press("x")
-        await pilot.pause(visuals.NAME_IN + 0.1)
-        assert animation.clock.variation.label in animation.render().plain
+        # The name shows briefly; look for it rather than guess when it is on screen.
+        shown = False
+        for _ in range(40):
+            shown = animation.clock.variation.label in animation.render().plain
+            if shown:
+                break
+            await pilot.pause(0.01)
+        assert shown
         await pilot.pause(visuals.NAME_GONE + 0.1)
         assert animation.outgoing is None
         assert animation.clock.variation.label not in animation.render().plain

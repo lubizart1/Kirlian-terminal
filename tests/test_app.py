@@ -233,7 +233,8 @@ async def test_the_system_picker_opens_the_chosen_folder_or_leaves_typing(
         answers.append("broken")
         browse.press()
         await wait_for(pilot, lambda: not isinstance(app.screen, FolderDialog))
-        assert library.setting("music_folder") == str(music.resolve())
+        # The scan records the folder in the background.
+        await wait_for(pilot, lambda: library.setting("music_folder") == str(music.resolve()))
 
         await wait_for(pilot, lambda: not app.scanning)
         app.action_folder()  # Without a desktop picker, typing is the way, and failures say so.
@@ -389,7 +390,9 @@ async def test_facts_follow_the_playing_song_and_discard_late_answers(
     release_first = threading.Event()
     asked = []
 
-    def fetch(provider, track, key, model):
+    def fetch(provider, track, key, model, about="song"):
+        if about == "album":
+            return []  # Album notes have their own test.
         asked.append(track.title)
         if track.title == "Song 2":
             release_first.wait(timeout=10)
@@ -514,7 +517,9 @@ async def test_facts_fall_back_on_errors_and_a_fallback_answer_is_not_paid_for_t
     calls = []
     failing = {"anthropic"}
 
-    def fetch(provider, track, key, model):
+    def fetch(provider, track, key, model, about="song"):
+        if about == "album":
+            return []  # Album notes have their own test.
         calls.append((provider.id, model))
         if provider.id in failing:
             raise FactsError(f"{provider.name} rate limit or credits reached.")
@@ -569,7 +574,9 @@ async def test_a_dropped_connection_is_retried_next_play_and_unused_keys_are_sug
         credentials.save(PROVIDERS[provider], "key", remember=True)
     calls = []
 
-    def fetch(provider, track, key, model):
+    def fetch(provider, track, key, model, about="song"):
+        if about == "album":
+            return []  # Album notes have their own test.
         calls.append(provider.id)
         if len(calls) == 1:
             raise FactsError("Could not reach Perplexity (connection dropped).", transient=True)
@@ -785,3 +792,89 @@ async def test_playbar_buttons_and_clicking_the_progress_line(tmp_path, audio_fa
             await pilot.click("#transport", offset=(x, 0))
             await pilot.pause()
             assert player.calls[-1] == call
+
+
+async def test_b_opens_a_store_search_for_the_album_and_never_for_folder_names(
+    tmp_path, audio_factory, monkeypatch
+):
+    import webbrowser
+
+    opened = []
+    monkeypatch.setattr(webbrowser, "open", lambda url: opened.append(url) or True)
+    library, _ = populated(tmp_path, audio_factory)
+    root = tmp_path / "Music"
+    audio_factory(root / "Loose folder" / "1.wav", title="Untagged album")  # No album tag.
+    library.scan(root, lambda _: None, threading.Event())
+    app = KirlianApp(library, player=FakePlayer())
+    async with app.run_test(size=(140, 40)) as pilot:
+        await pilot.pause()
+        album_row = next(i for i, r in enumerate(app.rows) if r.title == "Album")
+        app.query_one(DataTable).move_cursor(row=album_row)
+        await pilot.pause()
+        assert "Spotify" in app.query_one("#record-stores").content.plain
+        await pilot.press("b", "down", "enter")  # The second store: Apple Music.
+        await wait_for(pilot, lambda: opened)
+        assert opened == ["https://music.apple.com/search?term=Artist+Album"]
+        links = app.query_one("#record-stores")
+        await pilot.click("#record-stores", offset=(links.content.plain.index("Spotify") + 1, 0))
+        await wait_for(pilot, lambda: len(opened) == 2)
+        assert opened[-1] == "https://open.spotify.com/search/Artist%20Album"
+
+        loose = next(i for i, r in enumerate(app.rows) if r.title == "Loose folder")
+        app.query_one(DataTable).move_cursor(row=loose)
+        await pilot.pause()
+        assert not app.query_one("#record-stores").display
+        await pilot.press("b")
+        assert "no title and artist tags" in app.query_one("#status").content.plain
+        assert len(opened) == 2
+
+
+async def test_album_notes_follow_the_songs_and_each_album_is_asked_once(
+    tmp_path, audio_factory, monkeypatch
+):
+    from kirlian_terminal.facts import PROVIDERS, Credentials, Fact
+
+    monkeypatch.delenv("EXA_API_KEY", raising=False)
+    monkeypatch.setattr(KirlianApp, "FACT_DELAY", 0)
+    library, paths = populated(tmp_path, audio_factory)  # Two songs, one album.
+    library.set_setting("facts", "on")
+    FactsConfig(["exa"]).save(library)
+    credentials = Credentials()
+    credentials.save(PROVIDERS["exa"], "key", remember=True)
+    asked = []
+
+    def fetch(provider, track, key, model, about="song"):
+        asked.append((about, track.title))
+        headline = "The record" if about == "album" else f"On {track.title}"
+        return [Fact(headline, "Body.", "Src", "https://e.org", provider=provider.name)]
+
+    app = KirlianApp(library, player=FakePlayer(), credentials=credentials, fetch_facts=fetch)
+
+    def play(path, serial):
+        state = PlaybackState(path=path, paused=False, idle=False, started_serial=serial)
+        app.on_player_update(PlayerUpdate(state))
+
+    def card():
+        return str(app.query_one("#fact-text").content)
+
+    async with app.run_test(size=(140, 50)) as pilot:
+        await pilot.press("enter")
+        play(paths[0], 1)
+        await wait_for(pilot, lambda: len(app.facts) == 2)
+        assert [f.about for f in app.facts] == ["song", "album"]  # The song's notes first.
+        assert "On Song 2" in card()
+        await pilot.press("right_square_bracket")
+        assert "About the album" in card() and "The record" in card()
+
+        play(paths[1], 2)  # Another song from the same album: only the song is new.
+        await wait_for(pilot, lambda: len(app.facts) == 2 and "Song 10" in app.facts[0].headline)
+        assert asked == [("song", "Song 2"), ("album", "Song 2"), ("song", "Song 10")]
+
+        app.facts_config.albums = False  # Switched off: no album notes, none requested.
+        with library.connect() as db:  # Forget the saved answers, so the song is asked again.
+            db.execute("DELETE FROM facts")
+        app.facts_settings_closed()  # As when the setting is changed with i.
+        play(paths[0], 3)
+        await wait_for(pilot, lambda: len(asked) == 4)
+        await pilot.pause(0.2)
+        assert asked[-1] == ("song", "Song 2") and [f.about for f in app.facts] == ["song"]

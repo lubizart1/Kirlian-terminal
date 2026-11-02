@@ -40,6 +40,7 @@ EIGHTHS = " ▁▂▃▄▅▆▇█"
 BAR_FLOOR, BAR_CEILING = -60.0, -10.0
 # From this width the level meters stand beside the spectrum instead of below it.
 WIDE, METER_WIDTH = 70, 20
+MINI_HEIGHT = 4  # Spectrum rows in the amp under the cover.
 
 
 def frequency_label(frequency: int) -> str:
@@ -90,8 +91,10 @@ def equalizer_text(settings: AmpSettings) -> str:
 class AmpPanel(Static):
     """Frequency bars, left/right meters, and the file's format. Display only."""
 
-    def __init__(self, **kwargs) -> None:
+    def __init__(self, mini: bool = False, **kwargs) -> None:
         super().__init__(**kwargs)
+        # Mini: the small amp under the cover; settings, spectrum, and levels only.
+        self.mini = mini
         self.settings = AmpSettings()
         self.tempo = Tempo()
         self.state = PlaybackState()
@@ -143,6 +146,8 @@ class AmpPanel(Static):
         self.refresh()
 
     def render(self) -> Text:
+        if self.mini:
+            return self.render_mini(max(20, self.size.width))
         width = max(40, self.size.width)
         height = 3 if self.compact else 6
         text = Text()
@@ -164,6 +169,11 @@ class AmpPanel(Static):
             text.append("\n")
         text.append_text(self.hint_line(width))
         return text
+
+    def render_mini(self, width: int) -> Text:
+        rows = [self.status_text(), *self.spectrum(width, MINI_HEIGHT)]
+        rows += [self.meter(_("L"), 0, width), self.meter(_("R"), 1, width)]
+        return Text("\n").join(rows)
 
     def tall_meters(self, height: int) -> list[Text]:
         """Left and right levels as vertical bars with a dB scale, readouts underneath."""
@@ -217,6 +227,18 @@ class AmpPanel(Static):
                 else _("{n} channels", n=state.channels)
             )
         info = Text(" · ".join(parts) or _("Nothing playing"), QUIET)
+        status = self.status_text()
+        if info.cell_len + status.cell_len + 3 > width:
+            # Too long for one line: the settings get their own, right-aligned.
+            if status.cell_len <= width:
+                status.align("right", width)  # Longer than the panel: let it wrap instead.
+            info.append("\n")
+        else:
+            info.pad_right(width - info.cell_len - status.cell_len)
+        info.append_text(status)
+        return info
+
+    def status_text(self) -> Text:
         settings = self.settings
         status = Text.assemble(
             (_("Equalizer") + " ", QUIET),
@@ -234,15 +256,7 @@ class AmpPanel(Static):
             status.append(balance_text(settings.balance), f"bold {self.accent}")
         if not self.tempo.normal:
             status.append("   " + tempo_text(self.tempo), f"bold {self.accent}")
-        if info.cell_len + status.cell_len + 3 > width:
-            # Too long for one line: the settings get their own, right-aligned.
-            if status.cell_len <= width:
-                status.align("right", width)  # Longer than the panel: let it wrap instead.
-            info.append("\n")
-        else:
-            info.pad_right(width - info.cell_len - status.cell_len)
-        info.append_text(status)
-        return info
+        return status
 
     def spectrum(self, width: int, height: int) -> list[Text]:
         count = len(SPECTRUM)

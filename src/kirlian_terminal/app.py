@@ -24,6 +24,7 @@ from textual import events, work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
+from textual.content import Content
 from textual.message import Message
 from textual.screen import ModalScreen
 from textual.widgets import Button, DataTable, Input, Label, OptionList, Select, Static
@@ -46,6 +47,7 @@ from .dialogs import (
     ModelDialog,
     NameDialog,
     PlaylistPicker,
+    StorePicker,
 )
 from .facts import (
     PROVIDERS,
@@ -55,6 +57,7 @@ from .facts import (
     FactsConfig,
     FactsError,
     Provider,
+    album_key,
     fact_key,
     request_facts,
 )
@@ -67,6 +70,7 @@ from .palette import extract_palette
 from .playback import PlaybackError, PlaybackState, Player
 from .playlists import Entry, Playlist, Playlists
 from .resume import Place
+from .stores import STORES, searchable, store_url
 from .visuals import Animation, Progress, TitleRhythm, Transport
 
 
@@ -184,6 +188,7 @@ class KirlianApp(App):
         Binding("left_square_bracket", "fact(-1)", "Previous fact"),
         Binding("right_square_bracket", "fact(1)", "Next fact"),
         Binding("o", "fact_source", "Open fact source"),
+        Binding("b", "buy", "Stream or buy"),
         Binding("n", "next", "Next"),
         Binding("N", "previous", "Previous"),
         Binding("H", "seek(-5)", "Seek back"),
@@ -213,7 +218,7 @@ class KirlianApp(App):
         artwork: str | None = None,
         characters: str | None = None,
         credentials: Credentials | None = None,
-        fetch_facts: Callable[[Provider, Track, str, str], list[Fact]] = request_facts,
+        fetch_facts: Callable[..., list[Fact]] = request_facts,
     ):
         super().__init__()
         self.library = library
@@ -277,6 +282,7 @@ class KirlianApp(App):
         self.stop_scan = threading.Event()
         self.scanning = False
         self.ready = False
+        self.context_album: Album | None = None  # The album the record pane shows.
         self.marquee = Marquee()
         # The listening place last written; None until playback or a resume sets it.
         self.saved_place: Place | None = None
@@ -327,7 +333,9 @@ class KirlianApp(App):
             with RecordPane(id="context"):
                 yield CoverImage(self.artwork_mode, no_color=self.no_color, id="cover")
                 yield Static("", id="cover-placeholder")
+                yield AmpPanel(mini=True, id="amp-mini")
                 yield Static(_("LOCAL MUSIC"), id="record-details")
+                yield Static("", id="record-stores")
                 yield Static("", id="record-note")
                 with Vertical(id="fact-card"):
                     with Horizontal(id="fact-heading"):
@@ -345,6 +353,7 @@ class KirlianApp(App):
                     ("motion", _("Motion")),
                     ("characters", _("Characters")),
                     ("language", _("Language")),
+                    ("amp", _("Amp")),
                 ):
                     with Horizontal(classes="preference-row"):
                         yield Label(label)
@@ -532,10 +541,13 @@ class KirlianApp(App):
             size = event.size if event else self.size
             width = size.width
             self.query_one("#body").screen.set_class(size.height < 30, "compact")
-            amp = self.query_one(AmpPanel)
+            amp = self.query_one("#amp", AmpPanel)
             amp.compact = size.height < 36
             amp.set_class(amp.compact, "compact")
-            self.query_one("#context").display = width >= 110
+            context = self.query_one("#context")
+            if context.display != (width >= 110):
+                context.display = width >= 110
+                self.place_amp()  # The amp under the cover needs the record pane.
             if self.personalizing:
                 self.update_appearance_feedback()
             self.call_after_refresh(self.size_columns)
@@ -757,6 +769,8 @@ class KirlianApp(App):
             details.append(n_("{n} album", "{n} albums", len(self.albums)) + "\n")
             details.append(n_("{n} song", "{n} songs", len(self.tracks)))
         self.query_one("#record-details", Static).update(details)
+        self.context_album = album
+        self.show_store_links(album)
         record_note = self.query_one("#record-note", Static)
         record_note.update(note)
         card = self.update_fact_card(album)
@@ -782,6 +796,28 @@ class KirlianApp(App):
                 self.fetch_cover(key, tuple(t.path for t in album.tracks), revision)
         else:
             self.show_cover(None, "")
+
+    def show_store_links(self, album: Album | None) -> None:
+        links = self.query_one("#record-stores", Static)
+        shown = album is not None and searchable(album)
+        if links.display != shown:
+            links.display = shown
+            self.call_after_refresh(self.query_one(RecordPane).on_resize)
+        if not shown:
+            return
+        accent = self.appearance.accent
+        parts = [Content.styled(_("Stream or buy") + "  ", QUIET), Content.styled("b ", accent)]
+        for index, (store_id, name, _url) in enumerate(STORES):
+            if index:
+                parts.append(Content.styled(" · ", QUIET))
+            parts.append(
+                Content.from_markup(
+                    f"[{INK} @click=\"app.open_store('{store_id}')\"]$name[/]", name=name
+                )
+            )
+        content = Content.assemble(*parts)
+        if links.content != content:
+            links.update(content)
 
     def show_cover(self, image: PILImage.Image | None, placeholder: str | None = None) -> None:
         if self.rebuilding:
@@ -1216,7 +1252,8 @@ class KirlianApp(App):
         animation = self.query_one(Animation)
         previous_serial = animation.clock.serial
         animation.observe(state)
-        self.query_one(AmpPanel).observe(state)
+        for panel in self.query(AmpPanel):
+            panel.observe(state)
         if state.loading and self.amp.enabled and self.amp.filters() != self.amp_installed:
             # Live tuning changes running filters only; mpv rebuilds from the installed list
             # when audio reinitializes, so refresh it while the next song loads.
@@ -1351,47 +1388,10 @@ class KirlianApp(App):
             # Never send a filename or folder name in place of a missing tag.
             self.status(_("Song notes need title and album tags; this file has none."))
             return
-        song = fact_key(track)
         # The listener may switch language mid-request; keep the answer under the
         # language it was asked in.
         code = active_language()
-        errors: list[str] = []
-        order = self.facts_config.order
-        # Any answer already paid for, from any provider, is reused; nothing is sent.
-        facts = await asyncio.to_thread(self.fact_cache.saved, song, code, order)
-        for provider in self.facts_config.providers if facts is None else ():
-            if revision != self.fact_revision:
-                break
-            asked = (provider.id, code, song)
-            if asked in self.facts_asked:
-                continue
-            api_key = await asyncio.to_thread(self.credentials.key, provider)
-            if not api_key:
-                continue
-            self.facts_asked.add(asked)
-            self.fact_loading_provider = provider
-            self.fact_loading = True
-            self.update_context()
-            try:
-                facts = await asyncio.to_thread(
-                    self.fetch_facts_for,
-                    provider,
-                    track,
-                    api_key,
-                    self.facts_config.model(provider),
-                )
-            except FactsError as error:
-                errors.append(str(error))
-                if error.transient:
-                    # Ask again the next time this song starts, not on every update.
-                    self.facts_asked.discard(asked)
-                continue
-            finally:
-                if self.is_running and revision == self.fact_revision:
-                    self.fact_loading = False
-                    self.update_context()
-            await asyncio.to_thread(self.fact_cache.put, provider.id, song, facts, code)
-            break
+        facts, errors = await self.ask_providers(track, fact_key(track), code, "song", revision)
         if not self.is_running or revision != self.fact_revision:
             return
         if facts is None:
@@ -1425,6 +1425,60 @@ class KirlianApp(App):
         self.facts = facts
         self.fact_index = 0
         self.update_context()
+        if not self.facts_config.albums:
+            return
+        # Then the record itself, asked once per album; its notes follow the song's.
+        album, _errors = await self.ask_providers(track, album_key(track), code, "album", revision)
+        if album and self.is_running and revision == self.fact_revision:
+            self.facts = [*facts, *album]
+            self.update_context()
+
+    async def ask_providers(
+        self, track: Track, key: str, code: str, about: str, revision: int
+    ) -> tuple[list[Fact] | None, list[str]]:
+        """A saved answer, or the first provider in order that answers; None if none did.
+
+        An answer is cached even when it arrives for a song no longer playing.
+        """
+        errors: list[str] = []
+        # Any answer already paid for, from any provider, is reused; nothing is sent.
+        facts = await asyncio.to_thread(self.fact_cache.saved, key, code, self.facts_config.order)
+        for provider in self.facts_config.providers if facts is None else ():
+            if revision != self.fact_revision:
+                break
+            asked = (provider.id, code, key)
+            if asked in self.facts_asked:
+                continue
+            api_key = await asyncio.to_thread(self.credentials.key, provider)
+            if not api_key:
+                continue
+            self.facts_asked.add(asked)
+            self.fact_loading_provider = provider
+            self.fact_loading = about == "song"  # Album notes arrive quietly after.
+            self.update_context()
+            try:
+                facts = await asyncio.to_thread(
+                    self.fetch_facts_for,
+                    provider,
+                    track,
+                    api_key,
+                    self.facts_config.model(provider),
+                    about=about,
+                )
+            except FactsError as error:
+                errors.append(str(error))
+                if error.transient:
+                    # Ask again the next time this song starts, not on every update.
+                    self.facts_asked.discard(asked)
+                continue
+            finally:
+                if self.is_running and revision == self.fact_revision:
+                    self.fact_loading = False
+                    self.update_context()
+            facts = [replace(fact, about=about) for fact in facts]
+            await asyncio.to_thread(self.fact_cache.put, provider.id, key, facts, code)
+            break
+        return facts, errors
 
     def update_fact_card(self, album: Album | None) -> bool:
         """Show the playing song's fact, or its title rhythm while asking for one."""
@@ -1454,8 +1508,11 @@ class KirlianApp(App):
         self.query_one("#fact-source").display = show and not loading
         if show and not loading:
             fact = self.facts[self.fact_index % len(self.facts)]
+            about = _("About the album") + "\n" if fact.about == "album" else ""
             self.query_one("#fact-text", Static).update(
-                Text.assemble((fact.headline, f"bold {INK}"), "\n\n", (fact.body, INK))
+                Text.assemble(
+                    (about, QUIET), (fact.headline, f"bold {INK}"), "\n\n", (fact.body, INK)
+                )
             )
             reading = fact.kind == "reading"
             template = _("A reading, drawing on {source}") if reading else _("Source: {source}")
@@ -1493,17 +1550,32 @@ class KirlianApp(App):
 
     def action_fact_source(self) -> None:
         if self.facts and self.query_one("#fact-card").display:
-            self.open_url(self.facts[self.fact_index].source_url)
+            self.open_url(
+                self.facts[self.fact_index].source_url, _("Opened the source in your browser.")
+            )
 
     @work(thread=True, group="browser")
-    def open_url(self, url: str) -> None:
+    def open_url(self, url: str, opened_message: str) -> None:
         opened = webbrowser.open(url)
-        self.call_from_thread(
-            self.status,
-            _("Opened the source in your browser.")
-            if opened
-            else _("Source: {source}", source=url),
-        )
+        self.call_from_thread(self.status, opened_message if opened else url)
+
+    def action_buy(self) -> None:
+        album = self.context_album
+        if album is None:
+            self.status(_("Choose an album first."))
+        elif not searchable(album):
+            self.status(_("This album has no title and artist tags to search the stores with."))
+        else:
+            self.push_screen(StorePicker(album.title), self.action_open_store)
+
+    def action_open_store(self, store_id: str | None) -> None:
+        album = self.context_album
+        if store_id and album and searchable(album):
+            name = next(name for sid, name, _url in STORES if sid == store_id)
+            self.open_url(
+                store_url(store_id, album),
+                _("Opened {store} in your browser.", store=name),
+            )
 
     def action_facts_setup(self) -> None:
         self.push_screen(FactsSettings(), self.facts_settings_closed)
@@ -1635,6 +1707,15 @@ class KirlianApp(App):
             note = _("{provider} key removed.", provider=provider.name)
         self.refresh_facts_settings(screen, note)
 
+    def toggle_album_notes(self, screen: FactsSettings) -> None:
+        self.facts_config.albums = not self.facts_config.albums
+        self.persist_facts(
+            screen,
+            _("Album notes on: asked once per album.")
+            if self.facts_config.albums
+            else _("Album notes off."),
+        )
+
     def toggle_facts(self, screen: FactsSettings) -> None:
         self.facts_on = not self.facts_on
         if not self.facts_on:
@@ -1660,7 +1741,9 @@ class KirlianApp(App):
             if levels is not None and self.is_running and not self.rebuilding:
                 self.query_one(Animation).react(levels)
                 if self.amp.visible:
-                    self.query_one(AmpPanel).measure(levels)
+                    for panel in self.query(AmpPanel):
+                        if panel.display:
+                            panel.measure(levels)
             await asyncio.sleep(0.05)
 
     def action_amp(self) -> None:
@@ -1676,7 +1759,8 @@ class KirlianApp(App):
 
     def change_amp(self, amp: AmpSettings, message: str = "") -> None:
         before, self.amp = self.amp, amp
-        self.query_one(AmpPanel).show(amp)
+        for panel in self.query(AmpPanel):
+            panel.show(amp)
         self.send_amp(before, amp)
         self.save_amp()
         if message:
@@ -1760,14 +1844,16 @@ class KirlianApp(App):
         else:
             tempo = replace(tempo, tape=not tempo.tape)
         self.tempo = tempo
-        self.query_one(AmpPanel).tempo = tempo
-        self.query_one(AmpPanel).refresh()
+        for panel in self.query(AmpPanel):
+            panel.tempo = tempo
+            panel.refresh()
         self.send_tempo(tempo)
 
     def reset_sound(self) -> None:
         """Everything back to untouched: no equalizer, preamp, balance, ReplayGain, or tempo."""
         self.tempo = Tempo()
-        self.query_one(AmpPanel).tempo = self.tempo
+        for panel in self.query(AmpPanel):
+            panel.tempo = self.tempo
         self.send_tempo(self.tempo)
         neutral = AmpSettings(visible=self.amp.visible)
         self.change_amp(neutral, _("Sound reset: the music plays exactly as recorded."))
@@ -1796,13 +1882,23 @@ class KirlianApp(App):
         ascii = self.appearance.characters == "ascii"
         self.query_one(Brand).configure(ascii)
         self.query_one("#fact-spark", Static).update(ASCII_SPARK if ascii else SPARK)
-        amp = self.query_one(AmpPanel)
-        amp.accent, amp.ascii = self.appearance.accent, ascii
-        amp.show(self.amp)
-        amp.display = self.amp.visible
-        self.screen.set_class(self.amp.visible, "amp-open")
+        for panel in self.query(AmpPanel):
+            panel.accent, panel.ascii = self.appearance.accent, ascii
+            panel.show(self.amp)
+        self.place_amp()
         if self.is_running:
             self.on_player_update(PlayerUpdate(getattr(self, "display_state", self.player.state)))
+
+    def place_amp(self) -> None:
+        """Show the open amp where the listener chose: in the playbar, or under the cover.
+
+        The record pane hides in narrow windows; the playbar amp stands in then.
+        """
+        under_cover = self.appearance.amp == "record" and self.query_one("#context").display
+        self.query_one("#amp").display = self.amp.visible and not under_cover
+        self.query_one("#amp-mini").display = self.amp.visible and under_cover
+        self.screen.set_class(self.amp.visible and not under_cover, "amp-open")
+        self.call_after_refresh(self.query_one(RecordPane).on_resize)
 
     def action_personalize(self) -> None:
         self.personalizing = True

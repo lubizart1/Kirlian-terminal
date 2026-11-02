@@ -387,5 +387,19 @@
   "Sound reset: the music plays exactly as recorded.": "声音已重置：音乐按录制原样播放。",
   "song notes & keys": "歌曲笔记与密钥",
   "sound": "声音",
-  "Could not save to the library database ({error}). Is the disk full?": "无法保存到资料库数据库（{error}）。磁盘是否已满？"
+  "Could not save to the library database ({error}). Is the disk full?": "无法保存到资料库数据库（{error}）。磁盘是否已满？",
+  "Choose an album first.": "请先选择一张专辑。",
+  "Opened {store} in your browser.": "已在浏览器中打开 {store}。",
+  "Album notes on: asked once per album.": "专辑笔记已开启：每张专辑只请求一次。",
+  "Album notes off.": "专辑笔记已关闭。",
+  "Stream or buy": "收听或购买",
+  "About the album": "关于这张专辑",
+  "This album has no title and artist tags to search the stores with.": "这张专辑没有可用于商店搜索的标题和艺人标签。",
+  "Amp": "功放",
+  "In the playbar": "在播放栏中",
+  "Under the cover": "在封面下方",
+  "Stream or buy {album}": "收听或购买 {album}",
+  "Opens the store's search in your browser. Enter chooses · Esc cancels": "在浏览器中打开商店搜索。Enter 选择 · Esc 取消",
+  "Album notes too": "也包括专辑笔记",
+  "No album notes": "不含专辑笔记"
 }

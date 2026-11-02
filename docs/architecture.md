@@ -29,6 +29,7 @@ other Kirlian application.
 | `library.py` | Read-only tag parsing, album identity, folder scan, tracks and settings |
 | `playlists.py` | Saved playlists with ordered, duplicate-preserving entries |
 | `picker.py` | The system folder picker (Finder, zenity, kdialog), offered only where one can open |
+| `stores.py` | Stream-or-buy search links, built locally from album tags |
 | `resume.py` | The saved listening place: queue, current song, position |
 | `marquee.py` | Scrolling a clipped title in the highlighted row |
 | `artwork.py` | Embedded and folder cover lookup with bounded decoding |
@@ -275,6 +276,30 @@ suspended while a resume assembles the queue, so a half-built queue is never sto
 `marquee.Marquee` scrolls the highlighted row's main cell when its text is wider
 than the column (0.2 s per character after a short hold) and restores the original
 `Text` when the cursor moves or the table rebuilds. It only runs with gentle motion.
+
+## Playbar, stores, album notes, amp placement
+
+- **Playbar.** `visuals.Transport` renders clickable controls with Textual `@click`
+  actions bound to the same app actions as the keys, so clicks and keys can never
+  disagree. `Progress` seeks on release with `seek <percent> absolute-percent+exact`;
+  while dragging, player updates do not move the knob.
+- **Stores.** `stores.py` builds each store's public search URL from the album's
+  artist and title; no API, nothing sent until the listener picks a store, and only
+  for fully tagged albums.
+- **Album notes.** The same providers, source check, and cache as song notes, with
+  a second question (`album_question`) under a key no song key can collide with
+  (`album_key`). Each album is asked once, after the song; failures stay quiet
+  because the song's status already reports the provider's state. The song question
+  is unchanged, so earlier saved answers stay valid. `FactsConfig.albums` turns
+  them off.
+- **Amp placement.** Two `AmpPanel` instances, the playbar one and a `mini` one in
+  the record pane, receive the same settings; only displayed panels read levels.
+  `place_amp` chooses by `Appearance.amp` and falls back to the playbar when the
+  record pane is hidden. `RecordPane.on_resize` sizes the cover from the measured
+  heights and margins of everything else it shows.
+- **Saving never ends the session.** Workers that write to SQLite run with
+  `exit_on_error=False`; `on_worker_state_changed` reports database and disk errors
+  in the status line. The few synchronous writes catch `sqlite3.Error` themselves.
 
 ## Distribution
 

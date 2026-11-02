@@ -387,5 +387,19 @@
   "Sound reset: the music plays exactly as recorded.": "Klang zurückgesetzt: Die Musik klingt genau wie aufgenommen.",
   "song notes & keys": "Song-Notizen & Schlüssel",
   "sound": "Klang",
-  "Could not save to the library database ({error}). Is the disk full?": "Speichern in der Bibliotheksdatenbank fehlgeschlagen ({error}). Ist die Festplatte voll?"
+  "Could not save to the library database ({error}). Is the disk full?": "Speichern in der Bibliotheksdatenbank fehlgeschlagen ({error}). Ist die Festplatte voll?",
+  "Choose an album first.": "Wähle zuerst ein Album.",
+  "Opened {store} in your browser.": "{store} im Browser geöffnet.",
+  "Album notes on: asked once per album.": "Album-Notizen an: einmal pro Album angefragt.",
+  "Album notes off.": "Album-Notizen aus.",
+  "Stream or buy": "Streamen oder kaufen",
+  "About the album": "Über das Album",
+  "This album has no title and artist tags to search the stores with.": "Dieses Album hat keine Titel- und Künstler-Tags für die Suche in Shops.",
+  "Amp": "Verstärker",
+  "In the playbar": "In der Wiedergabeleiste",
+  "Under the cover": "Unter dem Cover",
+  "Stream or buy {album}": "{album} streamen oder kaufen",
+  "Opens the store's search in your browser. Enter chooses · Esc cancels": "Öffnet die Suche des Shops im Browser. Enter wählt · Esc bricht ab",
+  "Album notes too": "Auch Album-Notizen",
+  "No album notes": "Keine Album-Notizen"
 }

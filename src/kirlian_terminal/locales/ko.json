@@ -387,5 +387,19 @@
   "Sound reset: the music plays exactly as recorded.": "소리를 초기화했어요. 녹음된 그대로 재생해요.",
   "song notes & keys": "노래 메모와 키",
   "sound": "사운드",
-  "Could not save to the library database ({error}). Is the disk full?": "라이브러리 데이터베이스에 저장할 수 없어요({error}). 디스크가 가득 찼나요?"
+  "Could not save to the library database ({error}). Is the disk full?": "라이브러리 데이터베이스에 저장할 수 없어요({error}). 디스크가 가득 찼나요?",
+  "Choose an album first.": "먼저 앨범을 선택하세요.",
+  "Opened {store} in your browser.": "브라우저에서 {store}을(를) 열었어요.",
+  "Album notes on: asked once per album.": "앨범 메모 켜짐: 앨범마다 한 번만 요청해요.",
+  "Album notes off.": "앨범 메모 꺼짐.",
+  "Stream or buy": "듣기 또는 구매",
+  "About the album": "앨범에 대해",
+  "This album has no title and artist tags to search the stores with.": "이 앨범에는 스토어에서 검색할 제목과 아티스트 태그가 없어요.",
+  "Amp": "앰프",
+  "In the playbar": "재생 막대에",
+  "Under the cover": "커버 아래에",
+  "Stream or buy {album}": "{album} 듣기 또는 구매",
+  "Opens the store's search in your browser. Enter chooses · Esc cancels": "브라우저에서 스토어 검색을 열어요. Enter 선택 · Esc 취소",
+  "Album notes too": "앨범 메모도",
+  "No album notes": "앨범 메모 없음"
 }

@@ -96,6 +96,7 @@ class Fact:
     published: str = ""
     kind: str = "story"
     provider: str = ""
+    about: str = "song"  # Or "album": notes on the record as a whole.
 
     @property
     def source_label(self) -> str:
@@ -122,13 +123,51 @@ def fact_key(track: Track) -> str:
     return "\x1f".join(value.casefold() for value in (track.artist, track.album, track.title))
 
 
-def question(track: Track) -> str:
-    write_in = (
-        ""
-        if language() == "en"
-        else f"Write the headlines and bodies in {english_name()}; keep song titles, names, "
+def album_key(track: Track) -> str:
+    """Album notes are cached apart from any song's: no song key starts with "album"."""
+    return "\x1f".join(("album", track.album_artist.casefold(), track.album.casefold()))
+
+
+def write_in() -> str:
+    if language() == "en":
+        return ""
+    return (
+        f"Write the headlines and bodies in {english_name()}; keep song titles, names, "
         "and quoted lyrics in their original language. "
     )
+
+
+RULES = (
+    'Each annotation has a kind. "story": something a source states directly. '
+    '"reading": an interpretation you draw by connecting what sources say, for '
+    "example linking a lyric to an event an interview describes. Phrase a reading as "
+    "a reading, not as fact. Every annotation, including readings, needs the exact "
+    "URL of a page you retrieved that supports it. Headline under 9 words; body under "
+    "55 words, plain and vivid. Return fewer, or none, rather than guessing.\n\n"
+)
+REPLY = (
+    'Reply with only JSON: {"facts": [{"kind": "story", "headline": "...", '
+    '"body": "...", "source_url": "https://..."}]}'
+)
+
+
+def album_question(track: Track) -> str:
+    year = f", {track.year}" if track.year else ""
+    return (
+        f'Write up to three annotations for a listener about the album "{track.album}" by '
+        f"{track.album_artist}{year}, in the spirit of the best liner notes. Search the "
+        "web: interviews, reviews, encyclopedias, books.\n\n"
+        "Look for what makes this record itself interesting: what it is about, the "
+        "circumstances it was made in, where it sits in the artist's life and work, what "
+        "it borrows or answers, how it was received or rediscovered, and sounds a "
+        "listener can hear across it. Prefer the surprising and specific. Skip track "
+        "lists, credits, release dates, and chart positions unless there is a story in "
+        "them, and nothing about a different album.\n\n"
+        f"{RULES}{write_in()}{REPLY}"
+    )
+
+
+def question(track: Track) -> str:
     year = f", {track.year}" if track.year else ""
     return (
         f'Write up to three annotations for a listener about the song "{track.title}" by '
@@ -142,15 +181,7 @@ def question(track: Track) -> str:
         "Skip lists of credits, studios, engineers, release dates, chart positions, and "
         "generic praise unless there is a story in them. Do not describe the album in "
         "general, and nothing about a different song.\n\n"
-        'Each annotation has a kind. "story": something a source states directly. '
-        '"reading": an interpretation you draw by connecting what sources say, for '
-        "example linking a lyric to an event an interview describes. Phrase a reading as "
-        "a reading, not as fact. Every annotation, including readings, needs the exact "
-        "URL of a page you retrieved that supports it. Headline under 9 words; body under "
-        "55 words, plain and vivid. Return fewer, or none, rather than guessing.\n\n"
-        f"{write_in}"
-        'Reply with only JSON: {"facts": [{"kind": "story", "headline": "...", '
-        '"body": "...", "source_url": "https://..."}]}'
+        f"{RULES}{write_in()}{REPLY}"
     )
 
 
@@ -413,6 +444,7 @@ class FactsConfig:
 
     order: list[str] = field(default_factory=list)
     models: dict[str, str] = field(default_factory=dict)
+    albums: bool = True  # Also notes on the record as a whole, asked once per album.
 
     @classmethod
     def load(cls, library: Library) -> FactsConfig:
@@ -428,11 +460,13 @@ class FactsConfig:
         models = {
             p: str(m) for p, m in models.items() if p in PROVIDERS and PROVIDERS[p].models and m
         }
-        return cls(list(dict.fromkeys(order)), models)
+        albums = stored.get("albums", True) is not False
+        return cls(list(dict.fromkeys(order)), models, albums)
 
     def save(self, library: Library) -> None:
         library.set_setting(
-            "facts_config", json.dumps({"order": self.order, "models": self.models})
+            "facts_config",
+            json.dumps({"order": self.order, "models": self.models, "albums": self.albums}),
         )
 
     def model(self, provider: Provider) -> str:
@@ -445,12 +479,18 @@ class FactsConfig:
 
 
 def fetch_payload(
-    provider: Provider, track: Track, key: str, model: str = "", timeout: float = TIMEOUT
+    provider: Provider,
+    track: Track,
+    key: str,
+    model: str = "",
+    timeout: float = TIMEOUT,
+    about: str = "song",
 ) -> dict:
     """Blocking provider call. Raises FactsError with a listener-readable message."""
+    ask = album_question(track) if about == "album" else question(track)
     request = urllib.request.Request(
         provider.endpoint,
-        data=json.dumps(provider.body(question(track), model or provider.model)).encode(),
+        data=json.dumps(provider.body(ask, model or provider.model)).encode(),
         headers=provider.headers(key),
         method="POST",
     )
@@ -500,10 +540,15 @@ def post(request: urllib.request.Request, timeout: float) -> object:
 
 
 def request_facts(
-    provider: Provider, track: Track, key: str, model: str = "", timeout: float = TIMEOUT
+    provider: Provider,
+    track: Track,
+    key: str,
+    model: str = "",
+    timeout: float = TIMEOUT,
+    about: str = "song",
 ) -> list[Fact]:
-    """Blocking; run off the UI loop."""
-    payload = fetch_payload(provider, track, key, model, timeout)
+    """Blocking; run off the UI loop. `about` is "song" or "album"."""
+    payload = fetch_payload(provider, track, key, model, timeout, about)
     try:
         facts = verified_facts(*provider.read(payload))
     except Exception:

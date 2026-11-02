@@ -24,6 +24,7 @@ OPTIONS = {
     "palette": [(N_("Aubergine"), "aubergine"), (N_("Sage"), "sage"), (N_("Amber"), "amber")],
     "motion": [(N_("Gentle"), "gentle"), (N_("Still"), "still"), (N_("Off"), "off")],
     "characters": [(N_("Fine dots"), "dots"), (N_("Plain ASCII"), "ascii")],
+    "amp": [(N_("In the playbar"), "playback"), (N_("Under the cover"), "record")],
     "language": [
         (N_("System language"), "auto"),
         *((name, code) for code, (name, _) in LANGUAGES.items()),
@@ -37,6 +38,7 @@ class Appearance:
     motion: str = "gentle"
     characters: str = "dots"
     language: str = "auto"
+    amp: str = "playback"  # Where the amp shows when open (w).
 
     @property
     def accent(self) -> str:

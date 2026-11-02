@@ -84,16 +84,27 @@ testing, add `--data-dir .local/tryout`. Run `kirlian --help` for options.
 | `-` / `=` | Lower / raise volume |
 | `v` | Turn animation off / on; remembered between launches |
 | `x` | Choose a new animation without changing the song |
-| `w` | Open or close the amp: level meters, equalizer, balance, ReplayGain |
+| `w` | Open or close the amp (in the playbar, or under the cover; choose with `p`) |
 | `s` / `S` | Save the current animation / cycle through saved animations |
 | `c` | Switch cover display between terminal graphics and compatible blocks; remembered |
 | `f` / `r` | Choose folder / rescan |
 | `p` | Preview and save appearance preferences |
 | `?` | Show or hide the keyboard guide |
-| `i` | Song-notes settings: keys, provider order and fallbacks, models, on/off |
-| `[` / `]` | Previous / next note for the playing song |
+| `i` | Song-notes settings: keys, provider order and fallbacks, models, song and album notes on/off |
+| `b` | Stream or buy the shown album: opens Spotify, Apple Music, Qobuz, or Bandcamp search |
+| `[` / `]` | Previous / next note for the playing song and its album |
 | `o` | Open the shown note's source in your browser |
 | `q` | Quit and stop this player's audio |
+
+The playbar has clickable controls too: `|◀` previous, `◀◀` back five seconds, play /
+pause, `▶▶` forward five seconds, `▶|` next (plain `|<  <<  >  >>  >|` with ASCII
+characters). Click anywhere on the progress line to jump there, or drag along it and
+let go. Each control does exactly what its key does.
+
+The record pane offers **Stream or buy** for the album it shows: press `b`, or click
+a store. The browser opens that store's search for the album's artist and title.
+Nothing is sent anywhere until you choose; albums without title and artist tags get
+no links, since their names would be folder names.
 
 The bottom row shows the current Enter and Space actions, pattern, help, quit,
 and volume. Search and personalization stay in the header; Help lists the other
@@ -157,8 +168,13 @@ Each note is one of two kinds, shown on the card:
 
 Either way, a note is shown only if its source is a page the provider's search
 actually retrieved. The card names the source site, its year when stated, and
-which provider answered. `[` / `]` step through up to three notes; `o` opens the
-source.
+which provider answered. `[` / `]` step through the notes; `o` opens the source.
+
+**Album notes** come after the song's, marked *About the album*: what the record is
+about, how it was made, where it sits in the artist's work. Each album is asked
+about once, the first time one of its songs plays, and saved like song notes, so it
+costs one request per album ever. Press `a` in the song-notes settings (`i`) to turn
+album notes off or on.
 
 Notes are off by default and use your own API keys:
 
@@ -236,13 +252,20 @@ billed request.
 
 ## The amp and sound settings
 
-Press `w` to show the amp above the ribbon, and `w` again to hide it. It only
-displays, so every library key keeps working while it is open:
+Press `w` to show the amp, and `w` again to hide it. It only displays, so every
+library key keeps working while it is open. Choose where it lives with `p` → **Amp**:
 
-- Frequency bars: twenty bands from 40 Hz to 16 kHz, measured from the audio as
-  it plays, with caps that hang briefly at each peak.
-- Left and right level meters with a one-second peak mark. `CLIP` appears only
-  when the equalizer is on and a peak reaches full scale.
+- **In the playbar** (default): above the ribbon, using the full width. Twenty
+  frequency bars from 40 Hz to 16 kHz with caps that hang briefly at each peak, and
+  tall left and right level meters beside them with a dB scale and a one-second
+  peak mark. Narrow windows put the level meters under the bars instead.
+- **Under the cover**: a small amp in the record pane, with the current settings,
+  the bars, and the level meters. The cover shrinks to make room. When the window
+  is too narrow for the record pane (under 110 columns), the playbar amp shows
+  instead.
+
+`CLIP` appears only when the equalizer is on and a peak reaches full scale. The amp
+also shows:
 - The file's format, bitrate, sample rate, and channels, and the current
   equalizer and ReplayGain, plus preamp, balance, speed, and pitch whenever they
   differ from normal, so a changed sound is always visible.
@@ -393,7 +416,8 @@ native speakers. Corrections are welcome; see [Contributing](CONTRIBUTING.md).
 ## Make it yours
 
 Press `p` to preview aubergine, sage, or amber for the interface; gentle, still, or no motion; fine
-dots or plain ASCII for the ribbon and header; and the interface language. `↑`/`↓`
+dots or plain ASCII for the ribbon and header; the interface language; and where the
+amp sits (in the playbar or under the cover). `↑`/`↓`
 move between settings, `←`/`→` step through the choices with a live preview, and
 Enter opens the full list. The current
 song and queue keep playing. **Save changes** or `Ctrl+S` saves locally; **Cancel**
@@ -427,6 +451,17 @@ database. Song-notes API keys are kept in the system credential store, never the
 time. Playback uses a private local socket and one owned mpv child process. There
 are no accounts, analytics, or network services. The only network request is the
 optional song-notes call to the providers you chose, described above.
+
+## Tested and working
+
+Checked by hand on macOS. Reports from other setups are welcome; see
+[Testing](docs/testing.md#not-yet-verified).
+
+| Terminal | Result |
+| --- | --- |
+| Kitty | Works well: sharp covers, ribbon, amp, playback. Kitty's default font is small; enlarge it with `Cmd` `+` for the session, or set `font_size 14` (any size) in `~/.config/kitty/kitty.conf`. |
+| Warp | Works. Warp runs inside a terminal multiplexer, so covers use the compatible blocks and look pixelated by design. |
+| Herdr (any terminal) | Works. Also a multiplexer: blocky covers, unless graphics are enabled in Herdr's settings (see [terminals](docs/terminals.md)). |
 
 ## Current limits
 

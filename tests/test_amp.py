@@ -247,3 +247,31 @@ async def test_changed_sound_is_always_shown_and_one_key_resets_it(tmp_path, aud
         assert player.calls[-1] == ("apply", METER, "no")  # The chain is gone entirely.
         line = panel.info_line(140).plain
         assert "Preamp" not in line and "Balance" not in line and "semitone" not in line
+
+
+async def test_the_amp_can_live_under_the_cover_and_returns_to_the_playbar_when_narrow(
+    tmp_path, audio_factory
+):
+    from kirlian_terminal.appearance import Appearance
+
+    library, _ = populated(tmp_path, audio_factory)
+    Appearance(amp="record").save(library)
+    player = AmpPlayer()
+    app = KirlianApp(library, player=player)
+    async with app.run_test(size=(140, 48)) as pilot:
+        await pilot.pause()
+        await pilot.press("w")
+        await pilot.pause()
+        mini, bar = app.query_one("#amp-mini"), app.query_one("#amp")
+        assert mini.display and not bar.display
+        state = PlaybackState(path="x", idle=False, paused=False, started_serial=1)
+        app.on_player_update(PlayerUpdate(state))
+        await pilot.pause(0.3)
+        assert "L" in mini.render().plain and "Equalizer" in mini.render().plain
+        assert mini.levels.rms != Levels().rms  # The visible amp is the one measuring.
+        await pilot.resize_terminal(90, 40)  # No room for the record pane.
+        await pilot.pause()
+        assert bar.display and not mini.display
+        await pilot.resize_terminal(140, 48)
+        await pilot.pause()
+        assert mini.display and not bar.display

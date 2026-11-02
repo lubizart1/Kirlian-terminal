@@ -103,12 +103,20 @@ class CoverImage(Vertical):
 class RecordPane(Vertical):
     """Size covers after this pane receives its actual layout dimensions."""
 
+    # Lines each part needs before it has been laid out once.
+    FALLBACK = {"record-details": 7, "record-stores": 3, "amp-mini": 10, "fact-card": 12}
+
     def on_resize(self) -> None:
-        # Keep room for the complete caption, plus the fact card when it is shown.
-        reserve = 7
-        for card in self.query("#fact-card"):
-            if card.display:
-                reserve += max(12, card.outer_size.height)
+        """The cover gets what is left after everything else the pane shows."""
+        reserve = 0
+        for child in self.children:
+            if isinstance(child, CoverImage) or child.id == "cover-placeholder":
+                continue
+            if child.display:
+                height = child.outer_size.height or self.FALLBACK.get(child.id or "", 0)
+                height += child.styles.margin.height
+                # The fact card grows when its next note is longer; keep room for that.
+                reserve += max(12, height) if child.id == "fact-card" else height
         for cover in self.query(CoverImage):
             # App resize events arrive before pane geometry updates, so measuring
             # there can be stale.

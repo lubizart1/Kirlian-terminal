@@ -387,5 +387,19 @@
   "Sound reset: the music plays exactly as recorded.": "音をリセットしました。録音そのままの音で再生します。",
   "song notes & keys": "曲のメモとキー",
   "sound": "サウンド",
-  "Could not save to the library database ({error}). Is the disk full?": "ライブラリのデータベースに保存できませんでした（{error}）。ディスクがいっぱいではありませんか？"
+  "Could not save to the library database ({error}). Is the disk full?": "ライブラリのデータベースに保存できませんでした（{error}）。ディスクがいっぱいではありませんか？",
+  "Choose an album first.": "先にアルバムを選んでください。",
+  "Opened {store} in your browser.": "{store} をブラウザで開きました。",
+  "Album notes on: asked once per album.": "アルバムのメモ：オン（アルバムごとに1回だけ問い合わせ）。",
+  "Album notes off.": "アルバムのメモ：オフ。",
+  "Stream or buy": "聴く・買う",
+  "About the album": "アルバムについて",
+  "This album has no title and artist tags to search the stores with.": "このアルバムにはストア検索に使えるタイトルとアーティストのタグがありません。",
+  "Amp": "アンプ",
+  "In the playbar": "再生バーに表示",
+  "Under the cover": "ジャケットの下",
+  "Stream or buy {album}": "{album} を聴く・買う",
+  "Opens the store's search in your browser. Enter chooses · Esc cancels": "ストアの検索をブラウザで開きます。Enter で選択 · Esc で取消",
+  "Album notes too": "アルバムのメモも",
+  "No album notes": "アルバムのメモなし"
 }
