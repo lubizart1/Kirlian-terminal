@@ -94,7 +94,12 @@ def read_track(path: Path) -> Track:
     artist = tag("artist", "TPE1", "Unknown artist")
     compilation = tag("compilation", "TCMP") in {"1", "True", "true"}
     album_artist = tag("albumartist", "TPE2", "Various Artists" if compilation else artist)
-    identity = json.dumps([str(release), album_artist.casefold(), album.casefold()])
+    identity_parts = [str(release), album_artist.casefold(), album.casefold()]
+    # Taggers such as MusicBrainz Picard give each edition its own release id, which
+    # separates editions with identical tags in one folder. Without it, ids stay as before.
+    if release_id := tag("musicbrainz_albumid", "TXXX:MusicBrainz Album Id").casefold():
+        identity_parts.append(release_id)
+    identity = json.dumps(identity_parts)
     album_id = hashlib.sha256(identity.encode()).hexdigest()[:24]
     inferred_disc = number(re.search(r"\d+", path.parent.name)[0]) if disc_match else 1
     return Track(

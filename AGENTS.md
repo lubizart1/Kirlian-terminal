@@ -7,8 +7,8 @@ Work in this repository independently of the other Kirlian application.
 - Current authorized scope: local playback, the supplied visual mock, local artwork,
   the accepted filament ribbon, branding, local personalization, saved playlists,
   and opt-in song facts through a provider the listener chooses (Exa, OpenAI,
-  Anthropic, Perplexity, Parallel). Listening-position restoration is still
-  deferred. Maintain deliberate graphics and text fallbacks; terminal protocol
+  Anthropic, Perplexity, Parallel), plus restoring the queue and listening
+  position on relaunch. Maintain deliberate graphics and text fallbacks; terminal protocol
   checks are not real-terminal visual certification.
 - Keep local playback offline. The only permitted network call is the opt-in facts
   request to the chosen provider, which sends title, artist, album, year, and language only,

@@ -241,6 +241,38 @@ class Player:
             for path in paths:
                 await self.command("loadfile", path, "append")
 
+    async def resume(self, paths: Sequence[str], index: int, position: float) -> None:
+        """Load a saved queue paused at a song and position, without playing a sound.
+
+        The saved song is loaded alone first, so the seek cannot land on another one
+        still loading; the rest of the queue is then placed around it.
+        """
+        if not paths or not 0 <= index < len(paths):
+            return
+        async with self.lock:
+            await self.command("set_property", "pause", True)
+            serial = self.state.started_serial
+            await self.command("loadfile", paths[index], "replace")
+            if position >= 1 and await self.loaded_after(serial):
+                duration = self.state.duration
+                if not duration or position < duration - 1:
+                    await self.command("seek", position, "absolute")
+            before, after = paths[:index], paths[index + 1 :]
+            for path in (*after, *before):
+                await self.command("loadfile", path, "append")
+            # Move the earlier songs from the end to the front, in order.
+            for offset in range(len(before)):
+                await self.command("playlist-move", len(paths) - len(before) + offset, offset)
+
+    async def loaded_after(self, serial: int, timeout: float = 5) -> bool:
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + timeout
+        while loop.time() < deadline:
+            if self.state.started_serial > serial and not self.state.loading:
+                return True
+            await asyncio.sleep(0.02)
+        return False  # Too slow to load: the song starts from its beginning instead.
+
     async def jump(self, index: int) -> None:
         async with self.lock:
             await self.command("playlist-play-index", index)

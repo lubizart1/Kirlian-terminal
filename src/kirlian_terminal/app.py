@@ -50,9 +50,11 @@ from .graphics import NATIVE_SUPPORTED
 from .i18n import _, n_, resolve, set_language
 from .i18n import language as active_language
 from .library import Album, Library, ScanProgress, Track, albums_from, display_text
+from .marquee import Marquee
 from .palette import extract_palette
 from .playback import PlaybackError, PlaybackState, Player
 from .playlists import Entry, Playlist, Playlists
+from .resume import Place
 from .visuals import Animation, Progress, TitleRhythm
 
 
@@ -97,6 +99,9 @@ def scan_message(progress: ScanProgress) -> str:
             progress.blocked,
         )
     return _("No music files found in this folder. Press f to choose another folder.")
+
+
+MARQUEE_STEP = 0.2  # Seconds per character when a long title scrolls.
 
 
 @dataclass(frozen=True)
@@ -687,6 +692,10 @@ class KirlianApp(App):
         self.stop_scan = threading.Event()
         self.scanning = False
         self.ready = False
+        self.marquee = Marquee()
+        # The listening place last written; None until playback or a resume sets it.
+        self.saved_place: Place | None = None
+        self.resuming = False
         # True while the screen is rebuilt in another language: widgets come and go, so
         # player events, levels, and messages only update app state until it is done.
         self.rebuilding = False
@@ -791,7 +800,19 @@ class KirlianApp(App):
 
     def on_mount(self) -> None:
         self.prepare_screen()
+        self.set_interval(MARQUEE_STEP, self.scroll_title)
         self.boot()
+
+    def scroll_title(self) -> None:
+        """Scroll the highlighted title if it is clipped (still motion keeps it clipped)."""
+        if self.rebuilding or isinstance(self.screen, ModalScreen) or not self.query("#tracks"):
+            return
+        in_album = self.view == "album" and not self.searching
+        self.marquee.tick(
+            self.query_one(DataTable),
+            "detail" if in_album else "title",
+            self.appearance.motion == "gentle",
+        )
 
     def prepare_screen(self) -> None:
         """Initial widget state; also used after rebuilding the screen in a new language."""
@@ -853,6 +874,7 @@ class KirlianApp(App):
                 await self.player.apply_amp(self.amp)
                 self.amp_installed = self.amp.filters()
             self.watch_levels()
+            await self.resume_place()
         except PlaybackError as error:
             self.status(str(error))
         folder = self.library.setting("music_folder")
@@ -1132,6 +1154,7 @@ class KirlianApp(App):
                     )
                 )
         self.rows = rows
+        self.marquee.forget()
         table.clear()
         for index, row in enumerate(rows):
             if self.view == "album" and not self.searching and row.kind == "track":
@@ -1727,6 +1750,7 @@ class KirlianApp(App):
         if animation.clock.serial != previous_serial and not self.scanning:
             self.status("")
         self.observe_fact_song(state)
+        self.remember_place(state)
         key = (
             state.path,
             state.index,
@@ -1743,6 +1767,39 @@ class KirlianApp(App):
         if self.personalizing:
             self.update_appearance_feedback()
         self.update_footer()
+
+    async def resume_place(self) -> None:
+        """Bring back the last queue, paused where listening stopped."""
+        place = await asyncio.to_thread(Place.load, self.library)
+        if place is None:
+            return
+        self.saved_place, self.resuming = place, True
+        try:
+            await self.player.resume(place.paths, place.index, place.position)
+        finally:
+            self.resuming = False
+
+    def remember_place(self, state: PlaybackState, exact: bool = False) -> None:
+        """Save the queue and position every few seconds of listening, and exactly on quit.
+
+        A single small settings write, like other preferences; skipped while a resume
+        is still assembling the queue.
+        """
+        if not self.ready or self.resuming:
+            return
+        place = Place.of(state)
+        if place == self.saved_place or not (
+            exact or place is None or place.moved_from(self.saved_place)
+        ):
+            return
+        self.saved_place = place
+        try:
+            if place is None:
+                Place.forget(self.library)
+            else:
+                place.save(self.library)
+        except sqlite3.Error:
+            pass  # Losing the place is better than interrupting playback.
 
     def update_ribbon_palette(self, state: PlaybackState) -> None:
         if self.rebuilding:
@@ -2501,9 +2558,11 @@ class KirlianApp(App):
 
     async def action_quit(self) -> None:
         self.stop_scan.set()
+        self.remember_place(self.player.state, exact=True)
         await self.player.close()
         self.exit()
 
     async def on_unmount(self) -> None:
         self.stop_scan.set()
+        self.remember_place(self.player.state, exact=True)
         await self.player.close()

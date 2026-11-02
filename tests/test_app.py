@@ -1,10 +1,12 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
+import json
 import threading
+from dataclasses import replace
 from pathlib import Path
 
 from textual.widgets import DataTable, Input
 
-from kirlian_terminal.app import FolderDialog, KirlianApp
+from kirlian_terminal.app import FolderDialog, KirlianApp, PlayerUpdate
 from kirlian_terminal.facts import FactsConfig
 from kirlian_terminal.library import Library
 from kirlian_terminal.playback import PlaybackState
@@ -39,6 +41,9 @@ class FakePlayer:
 
     async def jump(self, index):
         self.calls.append(("jump", index))
+
+    async def resume(self, paths, index, position):
+        self.calls.append(("resume", list(paths), index, position))
 
 
 def populated(tmp_path, audio_factory):
@@ -598,3 +603,63 @@ async def test_an_upgraded_library_is_rescanned_once_so_song_notes_keep_working(
     async with app.run_test() as pilot:
         await wait_for(pilot, lambda: app.tracks and all(t.tagged for t in app.tracks))
     assert upgraded.setting("rescan") is None
+
+
+async def test_relaunching_brings_back_the_queue_paused_where_listening_stopped(
+    tmp_path, audio_factory
+):
+    library, paths = populated(tmp_path, audio_factory)
+    queue = [{"filename": path} for path in paths]
+    app = KirlianApp(library, player=FakePlayer())
+    async with app.run_test() as pilot:
+        await wait_for(pilot, lambda: app.ready)
+        for position in (1.0, 2.0, 7.4, 8.0):  # Saved every few seconds, not every update.
+            state = PlaybackState(
+                path=paths[1], index=1, idle=False, paused=False, position=position, playlist=queue
+            )
+            app.on_player_update(PlayerUpdate(state))
+        assert json.loads(library.setting("resume"))["position"] == 7.4
+        app.player.state = state
+        await pilot.press("q")  # Quitting saves the exact place.
+
+    Path(paths[0]).unlink()  # A song removed since: the rest of the queue comes back.
+    player = FakePlayer()
+    app = KirlianApp(library, player=player)
+    async with app.run_test() as pilot:
+        await wait_for(pilot, lambda: any(call[0] == "resume" for call in player.calls))
+    assert ("resume", [paths[1]], 0, 8.0) in player.calls
+    assert not any(call[0] in {"play", "pause", "jump"} for call in player.calls)
+
+
+async def test_a_clipped_title_scrolls_while_highlighted_and_returns_whole_after(
+    tmp_path, audio_factory, monkeypatch
+):
+    from kirlian_terminal import app as app_module
+    from kirlian_terminal import marquee
+
+    monkeypatch.setattr(app_module, "MARQUEE_STEP", 0.01)
+    monkeypatch.setattr(marquee, "HOLD", 2)
+    long_title = "A Very Long Album Title That Cannot Possibly Fit In Eighty Columns At All"
+    library, _ = populated(tmp_path, audio_factory)
+    root = tmp_path / "Music"
+    audio_factory(root / "Long" / "1.wav", title="Song", album=long_title, artist="Artist")
+    library.scan(root, lambda _: None, threading.Event())
+    app = KirlianApp(library, player=FakePlayer())
+    async with app.run_test(size=(80, 24)) as pilot:
+        table = app.query_one(DataTable)
+        await wait_for(pilot, lambda: table.row_count == 2)
+        row = next(i for i, r in enumerate(app.rows) if r.title == long_title)
+        table.move_cursor(row=row)
+
+        def shown():
+            return table.get_cell_at((row, 0)).plain
+
+        await wait_for(pilot, lambda: not shown().startswith("A Very"))
+        assert shown() in long_title + marquee.GAP + long_title
+        table.move_cursor(row=1 - row)
+        await wait_for(pilot, lambda: shown() == long_title)
+
+        app.appearance = replace(app.appearance, motion="still")
+        table.move_cursor(row=row)
+        await pilot.pause(0.2)
+        assert shown() == long_title

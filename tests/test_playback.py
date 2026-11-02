@@ -150,3 +150,26 @@ async def test_unexpected_process_exit_is_visible(tmp_path, audio_factory):
             await player.command("get_property", "pause")
     finally:
         await player.close()
+
+
+@pytest.mark.integration
+@pytest.mark.skipif(not shutil.which("mpv"), reason="mpv not installed")
+async def test_real_mpv_resumes_a_saved_queue_paused_at_the_saved_place(tmp_path, audio_factory):
+    paths = [str(audio_factory(tmp_path / f"{n}.wav", seconds=6)) for n in range(4)]
+    player = Player(extra_args=("--ao=null",))
+    await player.start()
+    try:
+        await player.resume(paths, 2, 3.0)
+
+        def order():
+            return [item["filename"] for item in player.state.playlist]
+
+        # The original order; mpv reports each move separately, so wait for the last.
+        await wait_until(lambda: order() == paths and player.state.position >= 2.9)
+        state = player.state
+        assert state.index == 2 and state.path == paths[2]
+        assert state.paused and not state.idle  # Ready, but silent until the listener plays.
+        await asyncio.sleep(0.3)
+        assert 2.9 <= player.state.position < 3.2
+    finally:
+        await player.close()

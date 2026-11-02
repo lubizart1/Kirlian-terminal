@@ -26,6 +26,8 @@ other Kirlian application.
 | `playback.py` | Owned mpv process, IPC replies, observed `PlaybackState`, queue commands |
 | `library.py` | Read-only tag parsing, album identity, folder scan, tracks and settings |
 | `playlists.py` | Saved playlists with ordered, duplicate-preserving entries |
+| `resume.py` | The saved listening place: queue, current song, position |
+| `marquee.py` | Scrolling a clipped title in the highlighted row |
 | `artwork.py` | Embedded and folder cover lookup with bounded decoding |
 | `cover.py` | Cover widget: native, blocks, or off, with aspect-fit sizing |
 | `graphics.py` | Renderer selection; Kitty adapter (pixel transport, targeted cleanup) |
@@ -80,9 +82,10 @@ reporting about every 0.15 s so albums appear during indexing. Unreadable files 
 skipped and counted; missing files are marked unavailable, not deleted.
 
 Album identity hashes the release folder, casefolded album artist, and casefolded
-album title. Disc folders (`CD 1`, `Disc 2`) count as their parent release and supply
-a missing disc number. Editions in separate folders stay apart even with identical
-tags; identical tags in one flat folder cannot be separated. Compilations default the
+album title, plus the MusicBrainz release id when the tags carry one (without it,
+ids are unchanged). Disc folders (`CD 1`, `Disc 2`) count as their parent release and
+supply a missing disc number. Editions in separate folders stay apart even with
+identical tags; in one flat folder only the release id can separate them. Compilations default the
 album artist to "Various Artists". Tracks sort by disc, numeric track, then path.
 Title and album fall back to the filename and folder; `tracks.tagged` records whether
 both came from tags. Adding that column sets `rescan`, which a complete scan clears,
@@ -247,10 +250,22 @@ and model names are never translated; the CLI, `--check-facts`, and key names st
   deadline and byte cap. mpv runs without config, scripts, references, or ytdl.
 - Diagnostic reports omit music, local paths, keys, and multiplexer socket or pane ids.
 
-## Deferred
+## Picking up where you left off
 
-- Listening-position restoration, including persistent queue-entry identity.
-  Relaunching keeps the library but starts with an empty, stopped queue.
+`resume.Place` is the queue's paths, the current index, and the position, stored as
+the `resume` setting. `remember_place` writes it from mpv's reported state when the
+queue or song changes or the position moves 5 s, and exactly on quit: one small
+settings write, like other preferences. On launch, after mpv starts, files that have
+gone are dropped and `Player.resume` loads the saved song alone, paused, waits for
+`file-loaded`, seeks, then appends the rest of the queue and moves the earlier songs
+in front, so the seek can never land on another song still loading. Saving is
+suspended while a resume assembles the queue, so a half-built queue is never stored.
+
+## Long titles
+
+`marquee.Marquee` scrolls the highlighted row's main cell when its text is wider
+than the column (0.2 s per character after a short hold) and restores the original
+`Text` when the cursor moves or the table rebuilds. It only runs with gentle motion.
 
 ## Distribution
 

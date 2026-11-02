@@ -7,7 +7,7 @@ import keyring
 import pytest
 from keyring.backend import KeyringBackend
 from keyring.errors import PasswordDeleteError
-from mutagen.id3 import TALB, TCMP, TCOM, TIT2, TPE1, TPE2, TPOS, TRCK
+from mutagen.id3 import TALB, TCMP, TCOM, TIT2, TPE1, TPE2, TPOS, TRCK, TXXX
 from mutagen.wave import WAVE
 
 
@@ -32,7 +32,10 @@ def make_audio(path: Path, seconds: float = 2, **tags: str) -> Path:
             "composer": TCOM,
         }
         for key, value in tags.items():
-            audio.tags.add(frames[key](encoding=3, text=[value]))
+            if key == "release_id":
+                audio.tags.add(TXXX(encoding=3, desc="MusicBrainz Album Id", text=[value]))
+            else:
+                audio.tags.add(frames[key](encoding=3, text=[value]))
         audio.save()
     return path
 

@@ -104,6 +104,13 @@ priority over these shortcuts.
 Search does not stop playback; Escape restores the previous view and selection.
 Playing a search result starts its album queue at that song. Enter on a Queue
 item jumps to it. `>` marks the current track; the highlighted row is your selection.
+A title too long for its column scrolls while it is highlighted (unless motion is
+set to still).
+
+**Picking up where you left off.** Quitting keeps your queue and your place in the
+current song. The next launch brings them back paused, so nothing plays until you
+press Space. Songs whose files have gone are left out. The place is also saved every
+few seconds while you listen, so it survives a crash.
 
 The player reads MP3, FLAC, M4A/AAC, Ogg Vorbis/Opus, and WAV candidates. Playback
 depends on your installed mpv decoders and the file itself. Unreadable files are
@@ -417,15 +424,12 @@ optional song-notes call to the providers you chose, described above.
 
 ## Current limits
 
-- Listening-position restoration is not implemented.
-- Relaunching retains the library, but clears the active queue and starts stopped.
 - Album identity uses tags and release folders. Discs in `CD 1` / `Disc 2` style
-  subfolders share the parent folder. Distinct editions with identical tags in one
-  flat folder cannot reliably be separated. Unknown artists in untagged mixed
-  folders also need better source organization for accurate grouping.
-- Long titles are clipped in the table; the context pane provides more space on
-  wider terminals. It hides below 110 columns, taking the fact card with it. The
-  minimum target is 80 × 24.
+  subfolders share the parent folder. Editions with identical tags in one flat
+  folder are told apart only when they carry a MusicBrainz release id (MusicBrainz
+  Picard and most taggers write it). Untagged files in a mixed folder group by folder.
+- The record pane (cover, details, song notes) hides below 110 columns. The minimum
+  target is 80 × 24.
 - Notes were checked live with Anthropic only (one song). The other providers are tested against hand-written responses in their
   documented formats. Default models will age; change them with `m` in settings.
 - Google Gemini is not offered: its grounding returns redirect links rather than

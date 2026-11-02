@@ -40,6 +40,20 @@ def test_album_identity_numeric_order_compilation_and_multiple_discs(tmp_path, a
     assert [(t.disc, t.track) for t in album.tracks] == [(1, 2), (1, 10), (2, 1)]
 
 
+def test_editions_with_identical_tags_in_one_folder_are_told_apart_by_release_id(
+    tmp_path, audio_factory
+):
+    root = tmp_path / "Flat"
+    tags = {"album": "Same", "artist": "Band"}
+    for name, release in [("a1", "edition-a"), ("a2", "edition-a"), ("b1", "EDITION-B")]:
+        audio_factory(root / f"{name}.wav", title=name, release_id=release, **tags)
+    audio_factory(root / "plain.wav", title="plain", **tags)
+    library = Library(tmp_path / "library.db")
+    scan(library, root)
+    sizes = sorted(len(album.tracks) for album in albums_from(library.tracks()))
+    assert sizes == [1, 1, 2]  # Edition A, edition B, and the untagged-edition file.
+
+
 def test_tags_fallbacks_persistence_missing_files_and_no_music_writes(tmp_path, audio_factory):
     root = tmp_path / "Untagged album"
     song = audio_factory(root / "02 A song.wav")

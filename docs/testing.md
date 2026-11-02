@@ -61,7 +61,8 @@ Use music you have the right to play. Do not commit it or its artwork.
    playback, search, and keyboard controls should remain usable. Try a wider size.
 9. Quit with `q`. Verify this app's playback stops and any independent mpv process
    remains running. Relaunch using the same data directory: the library should
-   load without a new scan. Playback-position restoration is a later milestone.
+   load without a new scan, and the queue should come back paused at the same
+   song and position.
 10. With disposable copies or generated fixtures, try a missing file, unreadable
     file, broken audio file, and a rescan with `r`. Check that failures are visible.
 
