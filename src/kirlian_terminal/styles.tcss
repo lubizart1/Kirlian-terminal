@@ -46,8 +46,8 @@ DataTable > .datatable--cursor, DataTable:focus > .datatable--cursor { backgroun
 #amp.compact { height: 8; }
 #amp-mini { height: auto; margin: 1 0; }
 #sound-settings { width: 78; }
-#sound-rows { height: auto; max-height: 20; margin-top: 1; background: #19161c; }
-#sound-rows > .datatable--header { background: #19161c; }
+#sound-rows { height: auto; max-height: 20; margin-top: 1; background: $k-dialog; }
+#sound-rows > .datatable--header { background: $k-dialog; }
 #sound-detail { height: auto; min-height: 2; margin-top: 1; }
 #sound-keys { height: auto; margin-top: 1; }
 Screen.amp-open #playback { height: auto; }
@@ -55,29 +55,29 @@ Screen.amp-open #playback { height: auto; }
 #footer { height: 2; padding: 0 2; color: $k-quiet; }
 #volume { width: 12; height: 1; text-align: right; }
 #shortcuts { width: 1fr; height: 1; color: $k-quiet; text-wrap: nowrap; }
-Input { background: #1c1920; border: tall $k-selected; color: $k-ink; }
+Input { background: $k-field; border: tall $k-selected; color: $k-ink; }
 Input:focus { border: tall $k-accent; }
 FolderDialog { align: center middle; background: $k-surface 80%; }
-#folder-dialog { width: 68; max-width: 95%; height: auto; padding: 1 2; border: round $k-accent; background: #19161c; }
+#folder-dialog { width: 68; max-width: 95%; height: auto; padding: 1 2; border: round $k-accent; background: $k-dialog; }
 #folder-dialog Label { text-style: bold; margin-bottom: 1; }
 #folder-actions { height: auto; }
 #folder-actions Button { margin-right: 2; }
-#folder-error, #facts-error { height: 2; color: #e2a895; }
+#folder-error, #facts-error { height: 2; color: $k-warning; }
 NameDialog, PlaylistPicker, ConfirmDialog, FactsSettings, KeyDialog, ModelDialog, SoundSettings { align: center middle; background: $k-surface 80%; }
 #facts-settings { width: 92; }
-#facts-providers { height: auto; max-height: 9; margin-top: 1; background: #19161c; }
-#facts-providers > .datatable--header { background: #19161c; }
+#facts-providers { height: auto; max-height: 9; margin-top: 1; background: $k-dialog; }
+#facts-providers > .datatable--header { background: $k-dialog; }
 #facts-state { height: auto; }
 #facts-detail { height: auto; min-height: 2; margin-top: 1; }
 #facts-actions { height: auto; margin-top: 1; }
 #facts-note { height: auto; min-height: 1; margin-top: 1; }
-#model-choices { height: auto; max-height: 14; margin-top: 1; border: none; background: #19161c; }
+#model-choices { height: auto; max-height: 14; margin-top: 1; border: none; background: $k-dialog; }
 #model-choices > .option-list--option-highlighted, #playlist-choices > .option-list--option-highlighted { background: $k-selected; color: $k-ink; text-style: none; }
 #facts-model { margin-top: 1; }
-.dialog { width: 68; max-width: 95%; height: auto; max-height: 90%; padding: 1 2; border: round $k-accent; background: #19161c; }
+.dialog { width: 68; max-width: 95%; height: auto; max-height: 90%; padding: 1 2; border: round $k-accent; background: $k-dialog; }
 .dialog Label { text-style: bold; margin-bottom: 1; }
 .dialog-hint { height: auto; margin-top: 1; color: $k-quiet; }
-#playlist-choices { height: auto; max-height: 12; border: none; background: #19161c; }
+#playlist-choices { height: auto; max-height: 12; border: none; background: $k-dialog; }
 .dialog-buttons { height: 3; margin-top: 1; }
 .dialog-buttons Button { margin-right: 1; min-width: 10; }
 Button { background: $k-selected; color: $k-ink; border: tall $k-edge; }
@@ -91,7 +91,7 @@ Button:focus { border: tall $k-accent; text-style: bold; }
 .preference-row { height: 3; }
 .preference-row Label { width: 18; padding-top: 1; color: $k-quiet; }
 .preference-row Select { width: 1fr; }
-Select > SelectCurrent { background: #1c1920; border: tall $k-edge; }
+Select > SelectCurrent { background: $k-field; border: tall $k-edge; }
 Select:focus > SelectCurrent { border: tall $k-accent; }
 #appearance-buttons { height: 3; }
 #appearance-buttons Button { margin-right: 1; min-width: 12; }
@@ -101,3 +101,11 @@ Screen.compact #breadcrumb { margin-bottom: 0; }
 Screen.compact #collection-header, Screen.compact #footer { height: 1; }
 Screen.compact #playback { height: 7; padding-top: 0; }
 Screen.compact #appearance-heading { height: 2; padding-top: 0; }
+
+/* Block-character borders show gaps in macOS Terminal and older terminals. */
+.plain-borders Input { border: round $k-selected; }
+.plain-borders Input:focus { border: round $k-accent; }
+.plain-borders Button { border: round $k-edge; }
+.plain-borders Button:focus { border: round $k-accent; }
+.plain-borders Select > SelectCurrent { border: round $k-edge; }
+.plain-borders Select:focus > SelectCurrent { border: round $k-accent; }

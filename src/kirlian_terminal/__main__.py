@@ -3,6 +3,7 @@
 
 import argparse
 import logging
+import re
 import shutil
 import sqlite3
 import sys
@@ -30,6 +31,11 @@ def main() -> None:
         help="Cover display: auto, terminal graphics, or compatible colored blocks, or off",
     )
     parser.add_argument("--characters", choices=("dots", "ascii"), help="Ribbon character override")
+    parser.add_argument(
+        "--new-theme",
+        metavar="NAME",
+        help="Create a theme file to edit; it then appears under Interface palette in p",
+    )
     parser.add_argument(
         "--check-artwork",
         action="store_true",
@@ -71,6 +77,8 @@ def main() -> None:
         run_artwork_check(args.artwork_report)
         return
     data = args.data_dir or user_data_path("kirlian-terminal", appauthor=False)
+    if args.new_theme is not None:
+        raise SystemExit(new_theme(args.new_theme, data.expanduser() / "themes"))
     if args.check_facts is not None:
         from .facts import FactsConfig
         from .facts_check import run_facts_check
@@ -111,6 +119,29 @@ def main() -> None:
     from .app import KirlianApp
 
     KirlianApp(library, folder=args.music, artwork=args.artwork, characters=args.characters).run()
+
+
+def new_theme(name: str, folder: Path) -> int:
+    from .appearance import PALETTES, display_name, theme_template
+
+    label = display_name(name)
+    stem = re.sub(r"[^a-z0-9]+", "-", label.casefold()).strip("-") or "theme"
+    path = folder / f"{stem}.toml"
+    if path.exists():
+        print(f"{path} already exists; edit it, or choose another name.", file=sys.stderr)
+        return 1
+    try:
+        folder.mkdir(parents=True, exist_ok=True)
+        path.write_text(theme_template(label, PALETTES["aubergine"]), encoding="utf-8")
+    except OSError as error:
+        print(f"Could not write {path}: {error}", file=sys.stderr)
+        return 1
+    print(
+        f"Created {path}\n"
+        "Edit the colors, then open Kirlian and press p: it is listed under Interface "
+        'palette as "' + label + '". Reopening p rereads the file, so you can keep editing.'
+    )
+    return 0
 
 
 if __name__ == "__main__":

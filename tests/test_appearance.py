@@ -231,3 +231,40 @@ async def test_arrows_move_between_settings_and_step_through_choices(tmp_path, a
         await pilot.press("enter")  # The full list still opens.
         await pilot.pause()
         assert app.query_one("#pref-palette", Select).expanded
+
+
+async def test_theme_files_appear_in_p_recolor_everything_and_reload_when_edited(
+    tmp_path, audio_factory
+):
+    from kirlian_terminal.appearance import COLORS
+
+    library, _ = populated(tmp_path, audio_factory)
+    themes = library.database.parent / "themes"
+    themes.mkdir()
+    neon = themes / "neon.toml"
+    neon.write_text('name = "Neon"\naccent = "#00ff88"\ntext = "#fafafa"\n')
+    (themes / "broken.toml").write_text('accent = "green"\n')
+    app = KirlianApp(library, player=FakePlayer())
+    async with app.run_test(size=(120, 40)) as pilot:
+        await pilot.press("p")
+        await pilot.pause()
+        palette = app.query_one("#pref-palette", Select)
+        assert ("Neon", "custom-neon") in [(str(p), v) for p, v in palette._options]
+        assert "broken.toml" in str(app.query_one("#appearance-context").content)
+        palette.value = "custom-neon"
+        await pilot.press("ctrl+s")
+        await pilot.pause()
+        assert COLORS.accent == "#00ff88" and COLORS.text == "#fafafa"
+        assert app.get_css_variables()["k-accent"] == "#00ff88"
+        assert COLORS.selection == "#493247"  # Lines left out keep the default.
+
+        neon.write_text('name = "Neon"\naccent = "#ff0088"\n')  # Edited while open.
+        await pilot.press("p")
+        await pilot.pause()
+        assert COLORS.accent == "#ff0088" and app.get_css_variables()["k-accent"] == "#ff0088"
+        await pilot.press("escape")
+
+        neon.unlink()  # The theme in use is gone: the default palette takes over.
+        await pilot.press("p")
+        await pilot.pause()
+        assert app.appearance.palette == "aubergine" and COLORS.accent == "#c69bb9"

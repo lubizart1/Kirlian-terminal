@@ -437,6 +437,38 @@ Saved preferences apply to later launches using the same data directory. An expl
 The folder prompt remains a single step: select a local folder and listen with
 defaults, then personalize whenever you wish. No account or setup wizard is needed.
 
+### Your own themes
+
+Design your own colors. Create a theme file, then pick it in `p`:
+
+```sh
+kirlian --new-theme "Deep sea"
+```
+
+This writes `themes/deep-sea.toml` in the application data folder (below) with
+every color the player uses, commented:
+
+```toml
+name = "Deep sea"
+accent = "#ff6ac1"      # keys, highlights, the playhead
+selection = "#16406b"   # the highlighted row
+text = "#d8f3ff"        # titles and body text
+muted = "#7fa7c4"       # labels and hints
+faint = "#24496b"       # empty meter cells, the unplayed progress line
+edge = "#1d3d5c"        # borders and dividers
+background = "#071726"  # the window
+panel = "#0d2238"       # text fields and dropdowns
+dialog = "#0a1c30"      # dialogs
+warning = "#ffb347"     # CLIP, errors, loud meter cells
+```
+
+Colors are `#rrggbb`; leave a line out to keep the default. To share a theme, send
+the file; to use someone else's, drop it into that `themes` folder. Every `.toml` there
+is listed under **Interface palette** in `p` with a live preview, and the list
+rereads the folder each time `p` opens, so you can edit and look again without
+restarting. `p` also shows the folder's location and names any file it could not
+load and why. The ribbon keeps taking its colors from the playing album's cover.
+
 ## Local data and privacy
 
 Music, tags, and artwork are never written to. The application stores metadata,
@@ -461,6 +493,7 @@ Checked by hand on macOS. Reports from other setups are welcome; see
 | --- | --- |
 | Kitty | Works well: sharp covers, ribbon, amp, playback. Kitty's default font is small; enlarge it with `Cmd` `+` for the session, or set `font_size 14` (any size) in `~/.config/kitty/kitty.conf`. |
 | Warp | Works. Warp runs inside a terminal multiplexer, so covers use the compatible blocks and look pixelated by design. |
+| macOS Terminal | Works. It has 256 colors and draws block borders with gaps, so there the player uses simple box borders for fields and buttons and dithers covers into its 256 colors. Rechecking after these fixes. |
 | Herdr (any terminal) | Works. Also a multiplexer: blocky covers, unless graphics are enabled in Herdr's settings (see [terminals](docs/terminals.md)). |
 
 ## Current limits

@@ -18,7 +18,7 @@ from textual.timer import Timer
 from textual.widgets import Static
 
 from .animations import AnimationClock, Variation
-from .appearance import INK, SURFACE, Appearance
+from .appearance import COLORS, Appearance
 from .audio import Levels, Reaction
 from .palette import mix, ribbon_color
 from .patterns import Frame
@@ -198,7 +198,7 @@ class Animation(Static):
             self.column_colors = []
             for column in range(width):
                 color = ribbon_color(colors, column / max(1, width - 1))
-                highlight = mix(color, "#ffffff", 0.3) if self.album_colors else INK
+                highlight = mix(color, "#ffffff", 0.3) if self.album_colors else COLORS.text
                 self.column_colors.append((color, highlight))
         reaction = self.reaction
         glow = reaction.brightness * 0.22
@@ -215,7 +215,12 @@ class Animation(Static):
                 color, highlight = mix(color, "#ffffff", lift), mix(highlight, "#ffffff", lift)
             # Fine strands sit back: closer to the surface, so the main thread reads first.
             styles.append(
-                (color, mix(color, SURFACE, 0.45), highlight, mix(highlight, SURFACE, 0.4))
+                (
+                    color,
+                    mix(color, COLORS.background, 0.45),
+                    highlight,
+                    mix(highlight, COLORS.background, 0.4),
+                )
             )
         return styles
 
@@ -231,7 +236,7 @@ class Animation(Static):
             run, run_style = [], None
             for column, character in enumerate(line[:width]):
                 if index == 1 and column in name:
-                    character, style = name[column], f"bold {INK}"
+                    character, style = name[column], f"bold {COLORS.text}"
                 else:
                     main, fine, played_main, played_fine = styles[column]
                     back = depth[index][column] < 1 if column < len(depth[index]) else False
@@ -318,9 +323,9 @@ class Progress(Static):
         width = max(1, self.size.width)
         filled = min(width - 1, int(self.fraction * width))
         return Text.assemble(
-            (("-" if self.ascii else "─") * filled, INK),
+            (("-" if self.ascii else "─") * filled, COLORS.text),
             ("o" if self.ascii else "●", self.accent),
-            (("-" if self.ascii else "─") * (width - filled - 1), "#49424c"),
+            (("-" if self.ascii else "─") * (width - filled - 1), COLORS.faint),
         )
 
 
@@ -335,7 +340,7 @@ class Transport(Static):
         actions = ("previous", "seek(-5)", "pause", "seek(5)", "next")
         content = Content("   ").join(
             Content.from_markup(
-                f'[{accent if action == "pause" else INK} @click="app.{action}"]$glyph[/]',
+                f'[{accent if action == "pause" else COLORS.text} @click="app.{action}"]$glyph[/]',
                 glyph=glyph,  # A variable, so a glyph like "[" can never read as markup.
             )
             for glyph, action in zip(glyphs, actions, strict=True)
@@ -382,7 +387,7 @@ class TitleRhythm(Static):
         self.steps: list[int] = []
         self.position = 0
         self.timer: Timer | None = None
-        self.accent = INK
+        self.accent = COLORS.text
         self.ascii = False
         self.key: tuple = ()
 
@@ -424,9 +429,9 @@ class TitleRhythm(Static):
             if moving and index == self.position:
                 style = f"bold {self.accent}"
             elif moving and index == (self.position - 1) % len(self.steps) and step:
-                style = INK  # The last hit lingers for one step.
+                style = COLORS.text  # The last hit lingers for one step.
             else:
-                style = "#6f6772" if step == REST else "#a29a9f"
+                style = COLORS.faint if step == REST else COLORS.muted
             text.append(marks[step], style)
         self.update(text, layout=False)
 

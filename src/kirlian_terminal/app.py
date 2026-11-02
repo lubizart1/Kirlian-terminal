@@ -33,7 +33,15 @@ from textual.worker import Worker, WorkerState
 from . import i18n
 from .amp import COLUMNS, AmpPanel, SoundSettings
 from .animations import Variation
-from .appearance import INK, OPTIONS, PALETTES, QUIET, Appearance, themes
+from .appearance import (
+    COLORS,
+    OPTIONS,
+    PALETTES,
+    Appearance,
+    load_themes,
+    themes,
+    use_palette,
+)
 from .artwork import load_artwork
 from .audio import PREAMP_RANGE, PRESETS, REPLAYGAIN, AmpSettings, Tempo, clamp
 from .brand import ASCII_SPARK, SPARK, Brand
@@ -110,6 +118,14 @@ def scan_message(progress: ScanProgress) -> str:
             progress.blocked,
         )
     return _("No music files found in this folder. Press f to choose another folder.")
+
+
+def plain_borders() -> bool:
+    """macOS Terminal and terminals without full color leave gaps in block-character
+    borders, so fields and buttons use ordinary box lines there."""
+    if os.environ.get("TERM_PROGRAM") == "Apple_Terminal":
+        return True
+    return os.environ.get("COLORTERM", "").casefold() not in {"truecolor", "24bit"}
 
 
 MARQUEE_STEP = 0.2  # Seconds per character when a long title scrolls.
@@ -243,6 +259,9 @@ class KirlianApp(App):
             or library.setting("artwork_mode")
             or ("blocks" if os.environ.get("TERM") == "linux" else "auto")
         )
+        # Theme files first, so a saved custom palette is recognized.
+        self.themes_folder = library.database.parent / "themes"
+        self.theme_problems = load_themes(self.themes_folder)
         self.appearance = Appearance.load(library)
         if characters:
             self.appearance = replace(self.appearance, characters=characters)
@@ -253,6 +272,7 @@ class KirlianApp(App):
         self.preferences_before = self.appearance
         for theme in themes():
             self.register_theme(theme)
+        use_palette(self.appearance.palette)
         self.theme = f"kirlian-{self.appearance.palette}"
         if NATIVE_SUPPORTED or self.artwork_mode == "native":
             # Kitty placeholder colors encode image IDs. Quantization breaks them.
@@ -394,6 +414,9 @@ class KirlianApp(App):
             yield Static(_("vol {percent}%", percent=50), id="volume")
 
     def on_mount(self) -> None:
+        self.set_class(plain_borders(), "plain-borders")
+        # 256-color terminals (macOS Terminal) get covers dithered into their colors.
+        self.query_one(CoverImage).dither = self.console.color_system in {"256", "standard"}
         self.prepare_screen()
         self.set_interval(MARQUEE_STEP, self.scroll_title)
         self.boot()
@@ -609,7 +632,7 @@ class KirlianApp(App):
             if index:
                 text.append("   ")
             text.append(key, self.appearance.accent)
-            text.append(f" {label}", QUIET)
+            text.append(f" {label}", COLORS.muted)
         return text
 
     def update_footer(self) -> None:
@@ -751,7 +774,7 @@ class KirlianApp(App):
         details = Text()
         note = Text()
         if album:
-            details.append(album.title + "\n", style="bold #e5ddcd")
+            details.append(album.title + "\n", style=f"bold {COLORS.text}")
             details.append(album.artist + "\n\n")
             year = album.tracks[0].year
             formats = " / ".join(sorted({t.format for t in album.tracks}))
@@ -761,8 +784,8 @@ class KirlianApp(App):
                 + f" · {clock(sum(t.duration for t in album.tracks))}"
             )
             if track:
-                note.append(_("ON THIS RECORD") + "\n\n", style="#958c98")
-                note.append(track.title + "\n", style="#e5ddcd")
+                note.append(_("ON THIS RECORD") + "\n\n", style=COLORS.muted)
+                note.append(track.title + "\n", style=COLORS.text)
                 note.append(f"{track.disc}.{track.track:02d} · {clock(track.duration)}")
         else:
             details.append(_("LOCAL MUSIC") + "\n\n")
@@ -806,13 +829,16 @@ class KirlianApp(App):
         if not shown:
             return
         accent = self.appearance.accent
-        parts = [Content.styled(_("Stream or buy") + "  ", QUIET), Content.styled("b ", accent)]
+        parts = [
+            Content.styled(_("Stream or buy") + "  ", COLORS.muted),
+            Content.styled("b ", accent),
+        ]
         for index, (store_id, name, _url) in enumerate(STORES):
             if index:
-                parts.append(Content.styled(" · ", QUIET))
+                parts.append(Content.styled(" · ", COLORS.muted))
             parts.append(
                 Content.from_markup(
-                    f"[{INK} @click=\"app.open_store('{store_id}')\"]$name[/]", name=name
+                    f"[{COLORS.text} @click=\"app.open_store('{store_id}')\"]$name[/]", name=name
                 )
             )
         content = Content.assemble(*parts)
@@ -1224,12 +1250,12 @@ class KirlianApp(App):
         self.update_text(
             "#playing-label",
             Text.assemble(
-                (title or _("Nothing playing"), INK),
+                (title or _("Nothing playing"), COLORS.text),
                 (
                     f"\n{artist} · {mode}"
                     if title
                     else "\n" + _("Choose a song from your library."),
-                    QUIET,
+                    COLORS.muted,
                 ),
             ),
         )
@@ -1237,7 +1263,7 @@ class KirlianApp(App):
             "#playing-time",
             Text.assemble(
                 (clock(state.position), self.appearance.accent),
-                (f" / {clock(state.duration)}", QUIET),
+                (f" / {clock(state.duration)}", COLORS.muted),
             )
             if title or state.duration
             else Text(""),
@@ -1494,7 +1520,9 @@ class KirlianApp(App):
                 "{provider}"
             )
             self.query_one("#fact-text", Static).update(
-                Text.assemble((before, QUIET), (provider, INK), (after, QUIET))
+                Text.assemble(
+                    (before, COLORS.muted), (provider, COLORS.text), (after, COLORS.muted)
+                )
             )
             pulse.play(
                 playing.title,
@@ -1511,19 +1539,22 @@ class KirlianApp(App):
             about = _("About the album") + "\n" if fact.about == "album" else ""
             self.query_one("#fact-text", Static).update(
                 Text.assemble(
-                    (about, QUIET), (fact.headline, f"bold {INK}"), "\n\n", (fact.body, INK)
+                    (about, COLORS.muted),
+                    (fact.headline, f"bold {COLORS.text}"),
+                    "\n\n",
+                    (fact.body, COLORS.text),
                 )
             )
             reading = fact.kind == "reading"
             template = _("A reading, drawing on {source}") if reading else _("Source: {source}")
             before, _slot, after = template.partition("{source}")
             source = Text.assemble(
-                (before, QUIET),
-                (fact.source_label, INK),
-                (after, QUIET),
+                (before, COLORS.muted),
+                (fact.source_label, COLORS.text),
+                (after, COLORS.muted),
                 (
                     " · " + _("via {provider}", provider=fact.provider) if fact.provider else "",
-                    QUIET,
+                    COLORS.muted,
                 ),
                 "\n\n",
             )
@@ -1534,9 +1565,9 @@ class KirlianApp(App):
                     index=self.fact_index + 1,
                     total=len(self.facts),
                 )
-                source.append(f" {more}   ", QUIET)
+                source.append(f" {more}   ", COLORS.muted)
             source.append("o", self.appearance.accent)
-            source.append(" " + _("source"), QUIET)
+            source.append(" " + _("source"), COLORS.muted)
             self.query_one("#fact-source", Static).update(source)
         if card.display != show:
             card.display = show
@@ -1873,6 +1904,9 @@ class KirlianApp(App):
         self.change_amp(replace(self.amp, replaygain=mode), _("ReplayGain: {mode}", mode=label))
 
     def apply_appearance(self) -> None:
+        use_palette(self.appearance.palette)
+        if self.theme == f"kirlian-{self.appearance.palette}":
+            self.refresh_css()  # The same theme with edited colors.
         self.theme = f"kirlian-{self.appearance.palette}"
         self.query_one(Animation).configure(self.appearance)
         progress = self.query_one(Progress)
@@ -1900,9 +1934,22 @@ class KirlianApp(App):
         self.screen.set_class(self.amp.visible and not under_cover, "amp-open")
         self.call_after_refresh(self.query_one(RecordPane).on_resize)
 
+    def reload_themes(self) -> None:
+        """Reread theme files, so edits and new files show without a restart."""
+        self.theme_problems = load_themes(self.themes_folder)
+        for theme in themes():
+            self.register_theme(theme)
+        if self.appearance.palette not in PALETTES:  # Its file was removed.
+            self.appearance = replace(self.appearance, palette="aubergine")
+        select = self.query_one("#pref-palette", Select)
+        with select.prevent(Select.Changed):
+            select.set_options((i18n._(label), value) for label, value in OPTIONS["palette"])
+        self.apply_appearance()
+
     def action_personalize(self) -> None:
         self.personalizing = True
         self.appearance_error = ""
+        self.reload_themes()
         self.preferences_before = self.appearance
         for name in OPTIONS:
             select = self.query_one(f"#pref-{name}", Select)
@@ -1920,7 +1967,10 @@ class KirlianApp(App):
         )
 
     def update_appearance_feedback(self) -> None:
-        accent, selected = PALETTES[self.appearance.palette]
+        accent, selected = (
+            PALETTES[self.appearance.palette].accent,
+            PALETTES[self.appearance.palette].selection,
+        )
         palette = next(
             (
                 i18n._(label)
@@ -1930,12 +1980,20 @@ class KirlianApp(App):
             self.appearance.palette.title(),
         )
         preview = Text.assemble(
-            (f" {palette} ", f"{INK} on {selected}"),
-            ("  " + _("Selected row") + "   ", QUIET),
+            (f" {palette} ", f"{COLORS.text} on {selected}"),
+            ("  " + _("Selected row") + "   ", COLORS.muted),
             (f"/ {_('search')}   p {_('personalize')}", accent),
         )
         self.update_text("#appearance-preview", preview)
-        notes = []
+        notes = [
+            _(
+                "Your own themes: {folder} · create one with kirlian --new-theme NAME",
+                folder=self.themes_folder,
+            )
+        ]
+        notes += [
+            _("Theme not loaded: {problem}", problem=problem) for problem in self.theme_problems
+        ]
         if self.no_color:
             notes.append(_("Color is disabled by NO_COLOR; the palette will display in grayscale."))
         state = getattr(self, "display_state", self.player.state)

@@ -401,5 +401,7 @@
   "Stream or buy {album}": "{album} 듣기 또는 구매",
   "Opens the store's search in your browser. Enter chooses · Esc cancels": "브라우저에서 스토어 검색을 열어요. Enter 선택 · Esc 취소",
   "Album notes too": "앨범 메모도",
-  "No album notes": "앨범 메모 없음"
+  "No album notes": "앨범 메모 없음",
+  "Your own themes: {folder} · create one with kirlian --new-theme NAME": "나만의 테마: {folder} · kirlian --new-theme 이름 으로 만들기",
+  "Theme not loaded: {problem}": "불러오지 못한 테마: {problem}"
 }

@@ -18,7 +18,7 @@ from textual.screen import ModalScreen
 from textual.widgets import DataTable, Label, Static
 
 from . import i18n
-from .appearance import INK, QUIET
+from .appearance import COLORS
 from .audio import (
     BANDS,
     GAIN_LIMIT,
@@ -33,8 +33,6 @@ from .i18n import N_, _, n_
 from .playback import PlaybackState
 
 COLUMNS = len(BANDS) + 2  # Preamp, ten bands, balance: the app's adjustment targets.
-WARM = "#e2a895"
-DIM = "#4f4752"
 EIGHTHS = " ▁▂▃▄▅▆▇█"
 # Band levels map to bar height between these; music bands mostly sit inside.
 BAR_FLOOR, BAR_CEILING = -60.0, -10.0
@@ -99,7 +97,7 @@ class AmpPanel(Static):
         self.tempo = Tempo()
         self.state = PlaybackState()
         self.levels = Levels()
-        self.accent = INK
+        self.accent = COLORS.text
         self.ascii = False
         self.compact = False
         self.bars = [0.0] * len(SPECTRUM)
@@ -189,22 +187,24 @@ class AmpPanel(Static):
                 loud = top > height * 0.8
                 if fill:
                     cells = " .:-=+*#%" if self.ascii else EIGHTHS
-                    line.append(cells[fill] * 4, WARM if loud else self.accent)
+                    line.append(cells[fill] * 4, COLORS.warning if loud else self.accent)
                 elif self.hold[channel] > SILENCE and top - 1 <= held < top:
-                    line.append(("-" if self.ascii else "▔") * 4, WARM if loud else INK)
+                    line.append(
+                        ("-" if self.ascii else "▔") * 4, COLORS.warning if loud else COLORS.text
+                    )
                 else:
-                    line.append(("." if self.ascii else "·").center(4), DIM)
+                    line.append(("." if self.ascii else "·").center(4), COLORS.faint)
                 line.append(" ")
             scale = {0: "0", height // 2: f"{SILENCE / 2:.0f}", height - 1: f"{SILENCE:.0f}"}
-            line.append(f" {scale.get(row, '')}", QUIET)
+            line.append(f" {scale.get(row, '')}", COLORS.muted)
             rows.append(line)
         readouts = Text("  ")
         for channel, label in ((0, _("L")), (1, _("R"))):
             level = self.levels.rms[channel] if channel < len(self.levels.rms) else SILENCE
             clipping = self.hold[channel] >= -0.1 and self.settings.enabled
             reading = _("CLIP") if clipping else f"{level:.0f}" if level > SILENCE else "–"
-            readouts.append(f"{label} ", QUIET)
-            readouts.append(f"{reading:<5}"[:5], WARM if clipping else INK)
+            readouts.append(f"{label} ", COLORS.muted)
+            readouts.append(f"{reading:<5}"[:5], COLORS.warning if clipping else COLORS.text)
             readouts.append(" ")
         rows.append(readouts)
         return rows
@@ -226,7 +226,7 @@ class AmpPanel(Static):
                 if state.channels == 2
                 else _("{n} channels", n=state.channels)
             )
-        info = Text(" · ".join(parts) or _("Nothing playing"), QUIET)
+        info = Text(" · ".join(parts) or _("Nothing playing"), COLORS.muted)
         status = self.status_text()
         if info.cell_len + status.cell_len + 3 > width:
             # Too long for one line: the settings get their own, right-aligned.
@@ -241,18 +241,18 @@ class AmpPanel(Static):
     def status_text(self) -> Text:
         settings = self.settings
         status = Text.assemble(
-            (_("Equalizer") + " ", QUIET),
-            (equalizer_text(settings), f"bold {self.accent}" if settings.enabled else INK),
-            ("   " + _("ReplayGain") + " ", QUIET),
-            (replaygain_text(settings.replaygain), INK),
+            (_("Equalizer") + " ", COLORS.muted),
+            (equalizer_text(settings), f"bold {self.accent}" if settings.enabled else COLORS.text),
+            ("   " + _("ReplayGain") + " ", COLORS.muted),
+            (replaygain_text(settings.replaygain), COLORS.text),
         )
         # Preamp and balance only act while the equalizer is on; show them whenever they
         # do, so a changed sound is never invisible.
         if settings.enabled and settings.preamp:
-            status.append("   " + _("Preamp") + " ", QUIET)
+            status.append("   " + _("Preamp") + " ", COLORS.muted)
             status.append(f"{settings.preamp:+g} dB", f"bold {self.accent}")
         if settings.enabled and abs(settings.balance) >= 0.05:
-            status.append("   " + _("Balance") + " ", QUIET)
+            status.append("   " + _("Balance") + " ", COLORS.muted)
             status.append(balance_text(settings.balance), f"bold {self.accent}")
         if not self.tempo.normal:
             status.append("   " + tempo_text(self.tempo), f"bold {self.accent}")
@@ -272,12 +272,12 @@ class AmpPanel(Static):
                 # The falling cap sits in the first empty cell above the bar.
                 cap_row = min(height, int(self.caps[index] * height) + 1)
                 if fill > 0:
-                    style = WARM if top == height and fill >= 6 else self.accent
+                    style = COLORS.warning if top == height and fill >= 6 else self.accent
                     mark = cells[fill]
                 elif self.caps[index] > self.bars[index] + 0.04 and top == cap_row:
-                    mark, style = ("-" if self.ascii else "─"), INK
+                    mark, style = ("-" if self.ascii else "─"), COLORS.text
                 else:
-                    mark, style = " ", DIM
+                    mark, style = " ", COLORS.faint
                 line.append(mark * bar, style)
                 line.append(" ")
             rows.append(line)
@@ -290,7 +290,7 @@ class AmpPanel(Static):
                 c == " " for c in slots[start : start + len(label) + 1]
             ):
                 slots[start : start + len(label)] = label
-        rows.append(Text("".join(slots).rstrip(), QUIET))
+        rows.append(Text("".join(slots).rstrip(), COLORS.muted))
         return rows
 
     def meter(self, label: str, channel: int, width: int) -> Text:
@@ -300,17 +300,17 @@ class AmpPanel(Static):
         hold = round((self.hold[channel] - SILENCE) / -SILENCE * (size - 1))
         # Mastered music often peaks at full scale; only warn when our boosts could clip.
         clipping = self.hold[channel] >= -0.1 and self.settings.enabled
-        line = Text(f"{label} ", QUIET)
+        line = Text(f"{label} ", COLORS.muted)
         for cell in range(size):
             loud = cell >= size * 0.85
             if cell == hold and self.hold[channel] > SILENCE:
-                line.append("|" if self.ascii else "▌", WARM if loud else INK)
+                line.append("|" if self.ascii else "▌", COLORS.warning if loud else COLORS.text)
             elif cell < fill:
-                line.append("=" if self.ascii else "━", WARM if loud else self.accent)
+                line.append("=" if self.ascii else "━", COLORS.warning if loud else self.accent)
             else:
-                line.append("-" if self.ascii else "─", DIM)
+                line.append("-" if self.ascii else "─", COLORS.faint)
         reading = _("CLIP") if clipping else f"{level:.0f} dB" if level > SILENCE else "–"
-        line.append(f" {reading}", WARM if clipping else QUIET)
+        line.append(f" {reading}", COLORS.warning if clipping else COLORS.muted)
         return line
 
     def hint_line(self, width: int) -> Text:
@@ -321,9 +321,9 @@ class AmpPanel(Static):
         )
         return Text.assemble(
             ("E", self.accent),
-            (" " + sound + "   ", QUIET),
+            (" " + sound + "   ", COLORS.muted),
             ("w", self.accent),
-            (" " + _("hide"), QUIET),
+            (" " + _("hide"), COLORS.muted),
         )
 
 
@@ -407,12 +407,12 @@ class SoundSettings(ModalScreen[None]):
         ascii = self.app.appearance.characters == "ascii"
         for row_id, label in SETTINGS_ROWS:
             table.add_row(
-                Text(i18n._(label), QUIET), self.value(row_id, settings, accent), key=row_id
+                Text(i18n._(label), COLORS.muted), self.value(row_id, settings, accent), key=row_id
             )
         for index, frequency in enumerate(BANDS):
             gain = settings.gains[index]
             table.add_row(
-                Text(_("{hz} Hz", hz=frequency_label(frequency)), QUIET),
+                Text(_("{hz} Hz", hz=frequency_label(frequency)), COLORS.muted),
                 self.slider(gain, GAIN_LIMIT, settings.enabled, accent, ascii),
                 key=f"band{index}",
             )
@@ -422,34 +422,38 @@ class SoundSettings(ModalScreen[None]):
     def value(self, row_id: str, settings: AmpSettings, accent: str) -> Text:
         if row_id == "enabled":
             on = settings.enabled
-            return Text(_("on") if on else _("off"), f"bold {accent}" if on else INK)
+            return Text(_("on") if on else _("off"), f"bold {accent}" if on else COLORS.text)
         if row_id == "preset":
             return Text.assemble(
-                ("‹ ", QUIET),
+                ("‹ ", COLORS.muted),
                 (
                     equalizer_text(settings)
                     if settings.enabled
                     else i18n._(settings.preset)
                     if settings.preset
                     else _("Custom"),
-                    INK,
+                    COLORS.text,
                 ),
-                (" ›", QUIET),
+                (" ›", COLORS.muted),
             )
         if row_id == "preamp":
-            return Text(f"{settings.preamp:+.0f} dB", INK)
+            return Text(f"{settings.preamp:+.0f} dB", COLORS.text)
         if row_id == "balance":
-            return Text(balance_text(settings.balance), INK)
+            return Text(balance_text(settings.balance), COLORS.text)
         tempo = self.app.tempo
         if row_id == "speed":
-            return Text(speed_text(tempo.speed), f"bold {accent}" if tempo.speed != 1 else INK)
+            return Text(
+                speed_text(tempo.speed), f"bold {accent}" if tempo.speed != 1 else COLORS.text
+            )
         if row_id == "pitch":
-            return Text(pitch_text(tempo.semitones), f"bold {accent}" if tempo.semitones else INK)
+            return Text(
+                pitch_text(tempo.semitones), f"bold {accent}" if tempo.semitones else COLORS.text
+            )
         if row_id == "tape":
             return Text(
-                _("on") if tempo.tape else _("off"), f"bold {accent}" if tempo.tape else INK
+                _("on") if tempo.tape else _("off"), f"bold {accent}" if tempo.tape else COLORS.text
             )
-        return Text(replaygain_text(settings.replaygain), INK)
+        return Text(replaygain_text(settings.replaygain), COLORS.text)
 
     def slider(self, gain: float, limit: float, enabled: bool, accent: str, ascii: bool) -> Text:
         """−12 … 0 … +12 dB as a centered bar, so boosts and cuts read at a glance."""
@@ -458,12 +462,12 @@ class SoundSettings(ModalScreen[None]):
         line = Text()
         for cell in range(-half, half + 1):
             if cell == 0:
-                line.append("|" if ascii else "┃", QUIET)
+                line.append("|" if ascii else "┃", COLORS.muted)
             elif (gain > 0 and 0 < cell <= steps) or (gain < 0 and -steps <= cell < 0):
-                line.append("#" if ascii else "█", accent if enabled else QUIET)
+                line.append("#" if ascii else "█", accent if enabled else COLORS.muted)
             else:
-                line.append("." if ascii else "·", DIM)
-        line.append(f"  {gain:+.0f} dB", INK if enabled else QUIET)
+                line.append("." if ascii else "·", COLORS.faint)
+        line.append(f"  {gain:+.0f} dB", COLORS.text if enabled else COLORS.muted)
         return line
 
     def describe(self, settings: AmpSettings) -> None:
@@ -514,12 +518,12 @@ class SoundSettings(ModalScreen[None]):
             )
             keys = [("← →", _("cut or boost 1 dB")), ("0", _("flat"))]
         keys += [("↑ ↓", _("choose a row")), ("R", _("reset all sound")), ("esc", _("close"))]
-        self.query_one("#sound-detail", Static).update(Text(detail, INK))
+        self.query_one("#sound-detail", Static).update(Text(detail, COLORS.text))
         hints = Text()
         for index, (key, label) in enumerate(keys):
             hints.append("   " if index else "")
             hints.append(key, f"bold {accent}")
-            hints.append(f" {label}", QUIET)
+            hints.append(f" {label}", COLORS.muted)
         self.query_one("#sound-keys", Static).update(hints)
 
     def on_data_table_row_highlighted(self, event: DataTable.RowHighlighted) -> None:

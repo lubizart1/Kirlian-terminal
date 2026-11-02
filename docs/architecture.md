@@ -301,6 +301,26 @@ than the column (0.2 s per character after a short hold) and restores the origin
   `exit_on_error=False`; `on_worker_state_changed` reports database and disk errors
   in the status line. The few synchronous writes catch `sqlite3.Error` themselves.
 
+## Colors, themes, and limited terminals
+
+- **One color object.** `appearance.Colors` names every color the interface draws
+  with; `COLORS` is the one in use and widgets read it while drawing, so switching
+  palettes recolors Python-drawn text and the stylesheet (`$k-*` variables from
+  `themes()`) together. Built-in palettes are `Colors` with their accent and
+  selection; nothing else hard-codes a color.
+- **Theme files.** `load_themes` reads `<data>/themes/*.toml` with `tomllib`, accepts
+  only known keys with `#rrggbb` values, and registers each as `custom-<file stem>`.
+  It runs at launch (before the saved appearance is validated) and again whenever
+  `p` opens; a removed theme in use falls back to aubergine. Rejected files are
+  listed in `p` with the reason. `--new-theme` writes a commented template.
+- **macOS Terminal and other 256-color terminals.** `tall` borders are drawn with
+  partial blocks that macOS Terminal renders with gaps; the `plain-borders` class
+  (Apple Terminal, or no `COLORTERM=truecolor`) switches fields, dropdowns, and
+  buttons to `round`. Block covers there are resized to one pixel per half cell and
+  Floyd–Steinberg dithered into the xterm cube and gray ramp (never the first 16,
+  which themes redefine), so the terminal shows exactly those colors instead of
+  snapping each pixel; on one cover the perceived error fell from 11.4 to 1.9.
+
 ## Distribution
 
 Listeners install with `curl -fsSL …/releases/latest/download/install.sh | sh`. The

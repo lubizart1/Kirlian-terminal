@@ -401,5 +401,7 @@
   "Stream or buy {album}": "Ascolta o acquista {album}",
   "Opens the store's search in your browser. Enter chooses · Esc cancels": "Apre la ricerca del negozio nel browser. Invio sceglie · Esc annulla",
   "Album notes too": "Anche note sull'album",
-  "No album notes": "Nessuna nota sull'album"
+  "No album notes": "Nessuna nota sull'album",
+  "Your own themes: {folder} · create one with kirlian --new-theme NAME": "I tuoi temi: {folder} · creane uno con kirlian --new-theme NOME",
+  "Theme not loaded: {problem}": "Tema non caricato: {problem}"
 }

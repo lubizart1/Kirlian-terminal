@@ -16,7 +16,7 @@ from textual.screen import ModalScreen
 from textual.widgets import Button, DataTable, Input, Label, OptionList, Static
 
 from . import i18n, picker
-from .appearance import INK, QUIET
+from .appearance import COLORS
 from .facts import (
     PROVIDERS,
     FactsConfig,
@@ -291,8 +291,8 @@ class ModelDialog(ModalScreen[str | None]):
             options = [
                 Text.assemble(
                     ("● " if model == self.current else "  ", self.app.appearance.accent),
-                    (model, f"bold {INK}"),
-                    ("  " + _("default") if model == p.model else "", QUIET),
+                    (model, f"bold {COLORS.text}"),
+                    ("  " + _("default") if model == p.model else "", COLORS.muted),
                     "\n    " + i18n._(about),
                 )
                 for model, about in p.models
@@ -415,10 +415,13 @@ class FactsSettings(ModalScreen[None]):
             p = PROVIDERS[provider_id]
             used = provider_id in config.order
             table.add_row(
-                Text(self.role(provider_id), f"bold {accent}" if used else QUIET),
-                Text(p.name, INK if used else QUIET),
-                Text(self.key_label(p), INK if sources.get(p.id) else QUIET),
-                Text(config.model(p) or _("its own model"), INK if config.model(p) else QUIET),
+                Text(self.role(provider_id), f"bold {accent}" if used else COLORS.muted),
+                Text(p.name, COLORS.text if used else COLORS.muted),
+                Text(self.key_label(p), COLORS.text if sources.get(p.id) else COLORS.muted),
+                Text(
+                    config.model(p) or _("its own model"),
+                    COLORS.text if config.model(p) else COLORS.muted,
+                ),
                 key=provider_id,
             )
         table.move_cursor(row=self.row_ids.index(self.selected_id))
@@ -428,17 +431,17 @@ class FactsSettings(ModalScreen[None]):
                     _("Notes are on") if on else _("Notes are off"),
                     f"bold {accent}" if on else "bold",
                 ),
-                ("  ·  ", QUIET),
+                ("  ·  ", COLORS.muted),
                 ("t", "bold"),
-                (" " + (_("to turn off") if on else _("to turn on")), QUIET),
+                (" " + (_("to turn off") if on else _("to turn on")), COLORS.muted),
                 ("     ", ""),
                 (
                     _("Album notes too") if config.albums else _("No album notes"),
                     f"bold {accent}" if on and config.albums else "bold",
                 ),
-                ("  ·  ", QUIET),
+                ("  ·  ", COLORS.muted),
                 ("a", "bold"),
-                (" " + (_("to turn off") if config.albums else _("to turn on")), QUIET),
+                (" " + (_("to turn off") if config.albums else _("to turn on")), COLORS.muted),
             )
         )
         self.query_one("#facts-note", Static).update(Text(note, accent))
@@ -462,7 +465,7 @@ class FactsSettings(ModalScreen[None]):
             else _("{provider} picks the model that writes the notes.", provider=p.name)
         )
         self.query_one("#facts-detail", Static).update(
-            Text.assemble((p.name, f"bold {INK}"), "  ", (f"{role} {writer}", QUIET))
+            Text.assemble((p.name, f"bold {COLORS.text}"), "  ", (f"{role} {writer}", COLORS.muted))
         )
         actions = [("enter", _("replace key") if self.sources.get(p.id) else _("add key"))]
         if p.id in order:
@@ -481,7 +484,7 @@ class FactsSettings(ModalScreen[None]):
         for index, (key, label) in enumerate(actions):
             hints.append("   " if index else "")
             hints.append(key, f"bold {self.app.appearance.accent}")
-            hints.append(f" {label}", QUIET)
+            hints.append(f" {label}", COLORS.muted)
         self.query_one("#facts-actions", Static).update(hints)
 
     def action_cursor(self, step: int) -> None:

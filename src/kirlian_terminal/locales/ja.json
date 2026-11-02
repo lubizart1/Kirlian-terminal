@@ -401,5 +401,7 @@
   "Stream or buy {album}": "{album} を聴く・買う",
   "Opens the store's search in your browser. Enter chooses · Esc cancels": "ストアの検索をブラウザで開きます。Enter で選択 · Esc で取消",
   "Album notes too": "アルバムのメモも",
-  "No album notes": "アルバムのメモなし"
+  "No album notes": "アルバムのメモなし",
+  "Your own themes: {folder} · create one with kirlian --new-theme NAME": "自作テーマ：{folder} · 作成は kirlian --new-theme 名前",
+  "Theme not loaded: {problem}": "読み込めなかったテーマ：{problem}"
 }

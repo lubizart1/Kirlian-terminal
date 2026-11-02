@@ -11,6 +11,33 @@ from textual_image.widget import HalfcellImage
 
 from .graphics import NATIVE_SUPPORTED, image_widget
 
+# The xterm 256-color palette without its first 16 entries, which each terminal
+# theme redefines: a 6x6x6 color cube and a 24-step gray ramp.
+CUBE = (0, 95, 135, 175, 215, 255)
+XTERM_COLORS = [(r, g, b) for r in CUBE for g in CUBE for b in CUBE] + [
+    (8 + 10 * step,) * 3 for step in range(24)
+]
+
+
+def palette_image() -> Image.Image:
+    image = Image.new("P", (1, 1))
+    flat = [channel for color in XTERM_COLORS for channel in color]
+    image.putpalette(flat + flat[: 768 - len(flat)])  # Pad with repeats, never new colors.
+    return image
+
+
+XTERM_PALETTE = palette_image()
+
+
+def dithered(image: Image.Image, columns: int, rows: int) -> Image.Image:
+    """The cover at exactly one pixel per half cell, dithered into the 256 colors.
+
+    A 256-color terminal otherwise snaps each pixel to its nearest color, which
+    turns gradients into bands; spreading the error keeps them smooth.
+    """
+    sized = image.convert("RGB").resize((columns, rows * 2), Image.Resampling.LANCZOS)
+    return sized.quantize(palette=XTERM_PALETTE, dither=Image.Dither.FLOYDSTEINBERG).convert("RGB")
+
 
 class CoverImage(Vertical):
     """Keep the decoded cover while switching how the terminal draws it."""
@@ -36,6 +63,9 @@ class CoverImage(Vertical):
         self._display_image: Image.Image | None = None
         self._grayscale: OrderedDict[int, tuple[Image.Image, Image.Image]] = OrderedDict()
         self._available = (34, 17)
+        # Set by the app when the terminal has 256 colors rather than full color.
+        self.dither = False
+        self._dithered: tuple[tuple[int, int, int], Image.Image] | None = None
         self.native.display = self.mode == "native"
         self.blocks.display = self.mode == "blocks"
 
@@ -84,6 +114,12 @@ class CoverImage(Vertical):
         )
         self.styles.width = max(1, round(width * scale / cell.width))
         self.styles.height = max(1, round(height * scale / cell.height))
+        if self.dither and self.mode == "blocks" and self._display_image is not None:
+            size = (int(self.styles.width.value), int(self.styles.height.value))
+            key = (id(self._display_image), *size)
+            if self._dithered is None or self._dithered[0] != key:
+                self._dithered = (key, dithered(self._display_image, *size))
+            self.blocks.image = self._dithered[1]
 
     def toggle(self) -> bool:
         self.renderer.image = None  # Release any native image before hiding it.
@@ -91,6 +127,7 @@ class CoverImage(Vertical):
         self.mode = "native" if self.mode in {"blocks", "off"} else "blocks"
         self.renderer.image = self._display_image
         self.renderer.display = True
+        self.fit(*self._available)  # Blocks on a 256-color terminal are dithered here.
         self.refresh(layout=True)
         return True
 

@@ -8,7 +8,7 @@ presentation, unlike U+2733, so terminals do not swap in a color emoji.
 from rich.text import Text
 from textual.widgets import Static
 
-from .appearance import INK
+from .appearance import COLORS
 
 SPARK = "✺"
 ASCII_SPARK = "*"
@@ -16,7 +16,9 @@ NAME = "kirlian"
 
 
 def mark(ascii: bool = False) -> Text:
-    return Text.assemble((ASCII_SPARK if ascii else SPARK, INK), "  ", (NAME, f"bold {INK}"))
+    return Text.assemble(
+        (ASCII_SPARK if ascii else SPARK, COLORS.text), "  ", (NAME, f"bold {COLORS.text}")
+    )
 
 
 class Brand(Static):

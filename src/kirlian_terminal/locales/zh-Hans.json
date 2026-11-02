@@ -401,5 +401,7 @@
   "Stream or buy {album}": "收听或购买 {album}",
   "Opens the store's search in your browser. Enter chooses · Esc cancels": "在浏览器中打开商店搜索。Enter 选择 · Esc 取消",
   "Album notes too": "也包括专辑笔记",
-  "No album notes": "不含专辑笔记"
+  "No album notes": "不含专辑笔记",
+  "Your own themes: {folder} · create one with kirlian --new-theme NAME": "自定义主题：{folder} · 用 kirlian --new-theme 名称 创建",
+  "Theme not loaded: {problem}": "未加载的主题：{problem}"
 }
