@@ -193,6 +193,12 @@ while the next song loads if live tuning changed it (mpv rebuilds from the insta
 list). ReplayGain is mpv's `replaygain`. Amp settings persist 0.3 s after a change.
 Speed (0.5×–2×, key kept), pitch (±12 semitones), and Tape (pitch follows speed) use
 mpv's `speed`, `pitch`, and `audio-pitch-correction` and are session-only.
+Returning pitch to 0 removes mpv's tempo filter; a null test against untouched
+playback is bit-exact afterwards. Rubber Band (`af=rubberband`) was measured as an
+alternative and left out: on a steady tone at +3 semitones it added sidebands at
+−28 dB against −62 dB for mpv's built-in shift. Preamp and balance are saved, so the
+amp line names them whenever they are not neutral, and `R` on the Sound screen resets
+every setting at once.
 
 ## Song notes
 
