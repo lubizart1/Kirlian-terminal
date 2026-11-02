@@ -52,7 +52,8 @@ uv run kirlian
 
 From a checkout, put `uv run` before the `kirlian` commands below.
 
-Enter your music folder when prompted, open an album with Enter, and press Enter
+Choose your music folder when prompted: type its path, or press **Choose in Finder…**
+(**Browse…** on a Linux desktop with zenity or kdialog) to pick it in the system dialog. Then open an album with Enter, and press Enter
 on a track to play. Albums appear as indexing progresses. Later launches use the
 saved library; press `r` when you want to rescan.
 

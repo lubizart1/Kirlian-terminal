@@ -378,5 +378,9 @@
   "w amp: frequency bars and level meters": "w アンプ：周波数バーとレベルメーター",
   "E sound: equalizer, balance, ReplayGain, speed, pitch": "E サウンド：イコライザー、バランス、ReplayGain、速度、ピッチ",
   "Providers are asked from the top. The primary answers every new song; a fallback is asked only if the ones above it fail. Sent: title, artist, album, year, language. Never: audio, artwork, or file paths.": "プロバイダには上から順に問い合わせます。メインは新しい曲すべてに答え、予備はその上のプロバイダが失敗したときだけ使われます。送信するもの：タイトル、アーティスト、アルバム、年、言語。送信しないもの：音声、ジャケット画像、ファイルパス。",
-  "Song notes need title and album tags; this file has none.": "曲のメモにはタイトルとアルバムのタグが必要です。このファイルにはありません。"
+  "Song notes need title and album tags; this file has none.": "曲のメモにはタイトルとアルバムのタグが必要です。このファイルにはありません。",
+  "Choose in Finder…": "Finderで選択…",
+  "Browse…": "参照…",
+  "Choose your music folder": "音楽フォルダを選択",
+  "Could not open the folder picker. Type the path instead.": "フォルダ選択を開けませんでした。代わりにパスを入力してください。"
 }

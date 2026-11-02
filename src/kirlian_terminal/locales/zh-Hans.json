@@ -378,5 +378,9 @@
   "w amp: frequency bars and level meters": "w 功放：频谱条和电平表",
   "E sound: equalizer, balance, ReplayGain, speed, pitch": "E 声音：均衡器、声道平衡、ReplayGain、速度、音高",
   "Providers are asked from the top. The primary answers every new song; a fallback is asked only if the ones above it fail. Sent: title, artist, album, year, language. Never: audio, artwork, or file paths.": "服务商按从上到下的顺序询问。首选服务商回答每首新歌；只有上方的服务商都失败时，才会询问备用服务商。会发送：标题、艺人、专辑、年份、语言。绝不发送：音频、封面图或文件路径。",
-  "Song notes need title and album tags; this file has none.": "歌曲笔记需要标题和专辑标签；此文件没有。"
+  "Song notes need title and album tags; this file has none.": "歌曲笔记需要标题和专辑标签；此文件没有。",
+  "Choose in Finder…": "在访达中选择…",
+  "Browse…": "浏览…",
+  "Choose your music folder": "选择你的音乐文件夹",
+  "Could not open the folder picker. Type the path instead.": "无法打开文件夹选择器。请直接输入路径。"
 }

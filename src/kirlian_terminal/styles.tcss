@@ -57,6 +57,8 @@ Input:focus { border: tall $k-accent; }
 FolderDialog { align: center middle; background: $k-surface 80%; }
 #folder-dialog { width: 68; max-width: 95%; height: auto; padding: 1 2; border: round $k-accent; background: #19161c; }
 #folder-dialog Label { text-style: bold; margin-bottom: 1; }
+#folder-actions { height: auto; }
+#folder-actions Button { margin-right: 2; }
 #folder-error, #facts-error { height: 2; color: #e2a895; }
 NameDialog, PlaylistPicker, ConfirmDialog, FactsSettings, KeyDialog, ModelDialog, SoundSettings { align: center middle; background: $k-surface 80%; }
 #facts-settings { width: 92; }

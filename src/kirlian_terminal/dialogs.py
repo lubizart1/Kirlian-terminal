@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import asyncio
+import sys
 from pathlib import Path
 
 from rich.text import Text
@@ -14,7 +15,7 @@ from textual.containers import Horizontal, Vertical
 from textual.screen import ModalScreen
 from textual.widgets import Button, DataTable, Input, Label, OptionList, Static
 
-from . import i18n
+from . import i18n, picker
 from .appearance import INK, QUIET
 from .facts import (
     PROVIDERS,
@@ -38,7 +39,11 @@ class FolderDialog(ModalScreen[str | None]):
             )
             yield Input(placeholder="~/Music", id="folder-path")
             yield Static("", id="folder-error")
-            yield Button(_("Open folder"), variant="primary")
+            with Horizontal(id="folder-actions"):
+                yield Button(_("Open folder"), variant="primary", id="folder-open")
+                if picker.command(""):
+                    label = _("Choose in Finder…") if sys.platform == "darwin" else _("Browse…")
+                    yield Button(label, id="folder-browse")
 
     def on_mount(self) -> None:
         self.query_one(Input).focus()
@@ -46,8 +51,23 @@ class FolderDialog(ModalScreen[str | None]):
     def on_input_submitted(self) -> None:
         self.submit()
 
-    def on_button_pressed(self) -> None:
-        self.submit()
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "folder-browse":
+            self.browse()
+        else:
+            self.submit()
+
+    @work(exclusive=True, group="folder-picker")
+    async def browse(self) -> None:
+        try:
+            chosen = await picker.choose(_("Choose your music folder"))
+        except picker.PickerError:
+            error = _("Could not open the folder picker. Type the path instead.")
+            self.query_one("#folder-error", Static).update(error)
+            return
+        if chosen and self.is_mounted:
+            self.query_one(Input).value = chosen
+            self.submit()
 
     @work(exclusive=True)
     async def submit(self) -> None:

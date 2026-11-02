@@ -28,6 +28,7 @@ other Kirlian application.
 | `playback.py` | Owned mpv process, IPC replies, observed `PlaybackState`, queue commands |
 | `library.py` | Read-only tag parsing, album identity, folder scan, tracks and settings |
 | `playlists.py` | Saved playlists with ordered, duplicate-preserving entries |
+| `picker.py` | The system folder picker (Finder, zenity, kdialog), offered only where one can open |
 | `resume.py` | The saved listening place: queue, current song, position |
 | `marquee.py` | Scrolling a clipped title in the highlighted row |
 | `artwork.py` | Embedded and folder cover lookup with bounded decoding |

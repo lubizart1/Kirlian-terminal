@@ -200,6 +200,56 @@ async def test_folder_typing_and_cancel(tmp_path):
         assert not isinstance(app.screen, FolderDialog)
 
 
+async def test_the_system_picker_opens_the_chosen_folder_or_leaves_typing(
+    tmp_path, audio_factory, monkeypatch
+):
+    from textual.widgets import Button, Static
+
+    from kirlian_terminal import picker
+
+    music = tmp_path / "Picked music"
+    audio_factory(music / "1.wav", title="Song", album="Album", artist="Artist")
+    answers = [None, music]  # Cancelled first, then a folder.
+
+    async def choose(prompt):
+        answer = answers.pop(0)
+        if answer == "broken":
+            raise picker.PickerError
+        return answer and str(answer)
+
+    def ready(app):
+        return isinstance(app.screen, FolderDialog) and app.screen.query("#folder-path")
+
+    monkeypatch.setattr(picker, "command", lambda prompt: ["picker"])
+    monkeypatch.setattr(picker, "choose", choose)
+    library = Library(tmp_path / "library.db")
+    app = KirlianApp(library, player=FakePlayer())
+    async with app.run_test(size=(80, 24)) as pilot:
+        await wait_for(pilot, lambda: ready(app))
+        browse = app.screen.query_one("#folder-browse", Button)
+        browse.press()
+        await pilot.pause()
+        assert isinstance(app.screen, FolderDialog)  # Cancelling the picker changes nothing.
+        answers.append("broken")
+        browse.press()
+        await wait_for(pilot, lambda: not isinstance(app.screen, FolderDialog))
+        assert library.setting("music_folder") == str(music.resolve())
+
+        await wait_for(pilot, lambda: not app.scanning)
+        app.action_folder()  # Without a desktop picker, typing is the way, and failures say so.
+        await wait_for(pilot, lambda: ready(app))
+        browse = app.screen.query_one("#folder-browse", Button)
+        browse.press()
+        await pilot.pause()
+        error = app.screen.query_one("#folder-error", Static).content
+        assert "Type the path" in str(error)
+    monkeypatch.setattr(picker, "command", lambda prompt: None)
+    app = KirlianApp(Library(tmp_path / "other.db"), player=FakePlayer())
+    async with app.run_test(size=(80, 24)) as pilot:
+        await wait_for(pilot, lambda: ready(app))
+        assert not app.screen.query("#folder-browse")
+
+
 async def test_background_scan_arrives_in_ui(tmp_path, audio_factory):
     root = tmp_path / "Music with spaces é"
     for n in range(3):

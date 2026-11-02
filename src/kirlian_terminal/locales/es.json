@@ -378,5 +378,9 @@
   "w amp: frequency bars and level meters": "w amp: barras de frecuencia y medidores de nivel",
   "E sound: equalizer, balance, ReplayGain, speed, pitch": "E sonido: ecualizador, balance, ReplayGain, velocidad, tono",
   "Providers are asked from the top. The primary answers every new song; a fallback is asked only if the ones above it fail. Sent: title, artist, album, year, language. Never: audio, artwork, or file paths.": "Los proveedores se consultan de arriba abajo. El principal responde por cada canción nueva; un respaldo solo se consulta si fallan los de arriba. Se envía: título, artista, álbum, año, idioma. Nunca: audio, portadas ni rutas de archivos.",
-  "Song notes need title and album tags; this file has none.": "Las notas necesitan etiquetas de título y álbum; este archivo no las tiene."
+  "Song notes need title and album tags; this file has none.": "Las notas necesitan etiquetas de título y álbum; este archivo no las tiene.",
+  "Choose in Finder…": "Elegir en Finder…",
+  "Browse…": "Examinar…",
+  "Choose your music folder": "Elige tu carpeta de música",
+  "Could not open the folder picker. Type the path instead.": "No se pudo abrir el selector de carpetas. Escribe la ruta en su lugar."
 }
