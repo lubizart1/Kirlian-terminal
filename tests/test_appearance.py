@@ -5,7 +5,7 @@ import threading
 from dataclasses import replace
 
 import pytest
-from test_app import FakePlayer, populated
+from test_app import FakePlayer, populated, wait_for
 from textual.widgets import Button, DataTable, Select, Static
 
 from kirlian_terminal.app import KirlianApp, PlayerUpdate
@@ -74,6 +74,7 @@ async def test_live_preferences_preserve_track_seed_queue_and_cancel(tmp_path, a
         app.query_one("#pref-motion", Select).value = "off"
         await pilot.pause()
         await pilot.click("#appearance-keep")
+        await wait_for(pilot, lambda: not app.personalizing)  # Saved in the background.
         assert Appearance.load(library) == replace(Appearance(), palette="amber", motion="off")
         assert animation.render().plain == ""
         assert not player.calls
@@ -253,7 +254,7 @@ async def test_theme_files_appear_in_p_recolor_everything_and_reload_when_edited
         assert "broken.toml" in str(app.query_one("#appearance-context").content)
         palette.value = "custom-neon"
         await pilot.press("ctrl+s")
-        await pilot.pause()
+        await wait_for(pilot, lambda: not app.personalizing)  # p is ignored while saving.
         assert COLORS.accent == "#00ff88" and COLORS.text == "#fafafa"
         assert app.get_css_variables()["k-accent"] == "#00ff88"
         assert COLORS.selection == "#493247"  # Lines left out keep the default.

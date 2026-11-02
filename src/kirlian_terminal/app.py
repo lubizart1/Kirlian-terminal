@@ -472,6 +472,8 @@ class KirlianApp(App):
             await self.recompose()
         finally:
             self.rebuilding = False
+        if not self.is_running or not self.query("#search"):
+            return  # The app closed while the screen was being rebuilt.
         self.prepare_screen()
         sections = ("albums", "artists", "songs", "playlists", "queue")
         section = {"album": "albums", "artist": "artists", "playlist": "playlists"}.get(

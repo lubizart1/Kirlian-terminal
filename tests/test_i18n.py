@@ -142,7 +142,7 @@ async def test_language_switch_survives_player_events_during_the_rebuild(tmp_pat
     """Playback keeps reporting while the screen is rebuilt; nothing may draw too early."""
     import json
 
-    from test_app import FakePlayer, populated
+    from test_app import FakePlayer, populated, wait_for
     from textual.widgets import OptionList, Select
 
     from kirlian_terminal.app import KirlianApp, PlayerUpdate
@@ -175,9 +175,6 @@ async def test_language_switch_survives_player_events_during_the_rebuild(tmp_pat
         app.query_one("#pref-language", Select).value = "es"
         await pilot.pause()
         await pilot.press("ctrl+s")
-        for _attempt in range(40):
-            await pilot.pause(0.02)
-            if not app.personalizing:
-                break
+        await wait_for(pilot, lambda: not app.personalizing)
         assert str(app.query_one("#nav", OptionList).get_option_at_index(0).prompt) == "Álbumes"
         assert app.view == "album" and len(app.rows) == 2

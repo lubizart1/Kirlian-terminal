@@ -318,8 +318,9 @@ async def test_record_caption_fits_under_cover_after_resize(tmp_path, audio_fact
             )
 
 
-async def wait_for(pilot, condition, attempts=60):
-    for _ in range(attempts):
+async def wait_for(pilot, condition, seconds=5.0):
+    """Until the condition holds; generous for slow CI machines, instant when it does."""
+    for _ in range(int(seconds / 0.02)):
         if condition():
             return
         await pilot.pause(0.02)

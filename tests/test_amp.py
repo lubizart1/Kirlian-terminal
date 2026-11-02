@@ -2,7 +2,7 @@
 import json
 
 import pytest
-from test_app import FakePlayer, populated
+from test_app import FakePlayer, populated, wait_for
 
 from kirlian_terminal.app import KirlianApp, PlayerUpdate
 from kirlian_terminal.audio import BANDS, METER, PRESETS, AmpSettings, Levels, Reaction
@@ -95,20 +95,18 @@ async def test_amp_only_displays_and_the_sound_screen_changes_mpv(tmp_path, audi
         assert isinstance(app.screen, SoundSettings)
         # Rows: equalizer, preset, preamp, balance, ReplayGain, speed, pitch, tape, bands.
         await pilot.press("j", "right", "right")  # Preset: Flat → Bass → Rock.
-        await pilot.pause(0.1)
+        await wait_for(pilot, lambda: player.calls and player.calls[0][0] == "apply")
         assert app.amp.preset == "Rock" and app.amp.enabled
-        assert player.calls[0][0] == "apply" and "equalizer@b0" in player.calls[0][1]
+        assert "equalizer@b0" in player.calls[0][1]
         await pilot.press(*["j"] * 8, "right")  # 62 Hz +1 from Rock's +3.
-        await pilot.pause(0.1)
+        await wait_for(pilot, lambda: player.calls[-1] == ("tune", "equalizer@b1", "gain", "4"))
         assert app.amp.gains[1] == 4 and app.amp.preset == ""
-        assert player.calls[-1] == ("tune", "equalizer@b1", "gain", "4")
         assert "62 Hz" in str(app.screen.query_one("#sound-detail").content)
         await pilot.press("0")
         await pilot.pause(0.1)
         assert app.amp.gains[1] == 0
         await pilot.press(*["k"] * 7, "left")  # Preamp -1 dB.
-        await pilot.pause(0.1)
-        assert player.calls[-1] == ("tune", "volume@pre", "volume", "-1dB")
+        await wait_for(pilot, lambda: player.calls[-1] == ("tune", "volume@pre", "volume", "-1dB"))
         await pilot.press("0")  # Resetting a named row, not a band, must not crash.
         await pilot.pause(0.1)
         assert app.amp.preamp == 0 and app.is_running
@@ -116,8 +114,7 @@ async def test_amp_only_displays_and_the_sound_screen_changes_mpv(tmp_path, audi
         await pilot.pause(0.1)
         assert app.amp.replaygain == "track"
         await pilot.press("k", "k", "k", "k", "enter")  # Equalizer off removes the chain.
-        await pilot.pause(0.1)
-        assert player.calls[-1] == ("apply", METER, "track")
+        await wait_for(pilot, lambda: player.calls[-1] == ("apply", METER, "track"))
         await pilot.press("escape", "w")
         await pilot.pause(0.5)
         assert not panel.display
