@@ -714,3 +714,20 @@ async def test_a_clipped_title_scrolls_while_highlighted_and_returns_whole_after
         table.move_cursor(row=row)
         await pilot.pause(0.2)
         assert shown() == long_title
+
+
+async def test_arrows_choose_among_search_results_while_typing(tmp_path, audio_factory):
+    library, paths = populated(tmp_path, audio_factory)
+    player = FakePlayer()
+    app = KirlianApp(library, player=player)
+    async with app.run_test(size=(120, 32)) as pilot:
+        await pilot.pause()
+        await pilot.press("slash", *"song")
+        await pilot.pause()
+        assert [row.kind for row in app.rows] == ["track", "track"]
+        await pilot.press("down", "down", "up", "down")  # Stops at the last result.
+        assert app.focused.id == "search"  # Typing can continue.
+        chosen = app.rows[1].value
+        await pilot.press("enter")
+        await pilot.pause()
+        assert player.calls == [("play", paths, paths.index(chosen))]

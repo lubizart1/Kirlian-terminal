@@ -181,9 +181,14 @@ class AmpPanel(Static):
             ("   " + _("ReplayGain") + " ", QUIET),
             (replaygain_text(settings.replaygain), INK),
         )
-        if abs(settings.balance) >= 0.05:
+        # Preamp and balance only act while the equalizer is on; show them whenever they
+        # do, so a changed sound is never invisible.
+        if settings.enabled and settings.preamp:
+            status.append("   " + _("Preamp") + " ", QUIET)
+            status.append(f"{settings.preamp:+g} dB", f"bold {self.accent}")
+        if settings.enabled and abs(settings.balance) >= 0.05:
             status.append("   " + _("Balance") + " ", QUIET)
-            status.append(balance_text(settings.balance), INK)
+            status.append(balance_text(settings.balance), f"bold {self.accent}")
         if not self.tempo.normal:
             status.append("   " + tempo_text(self.tempo), f"bold {self.accent}")
         info.pad_right(max(1, width - info.cell_len - status.cell_len))
@@ -285,6 +290,7 @@ class SoundSettings(ModalScreen[None]):
         Binding("right,l", "change(1)", "More", show=False),
         Binding("enter", "toggle", "On/off", priority=True),
         Binding("0", "reset", "Reset", show=False),
+        Binding("R", "reset_all", "Reset all", show=False),
         Binding("j", "cursor(1)", "Down", show=False),
         Binding("k", "cursor(-1)", "Up", show=False),
     ]
@@ -436,7 +442,7 @@ class SoundSettings(ModalScreen[None]):
                 role=i18n._(BAND_ROLES[index]),
             )
             keys = [("← →", _("cut or boost 1 dB")), ("0", _("flat"))]
-        keys += [("↑ ↓", _("choose a row")), ("esc", _("close"))]
+        keys += [("↑ ↓", _("choose a row")), ("R", _("reset all sound")), ("esc", _("close"))]
         self.query_one("#sound-detail", Static).update(Text(detail, INK))
         hints = Text()
         for index, (key, label) in enumerate(keys):
@@ -485,6 +491,10 @@ class SoundSettings(ModalScreen[None]):
             column = targets[row] if row in targets else int(row.removeprefix("band")) + 1
             self.app.amp_adjust(column, None)
             self.show(self.app.amp)
+
+    def action_reset_all(self) -> None:
+        self.app.reset_sound()
+        self.show(self.app.amp)
 
     def action_toggle(self) -> None:
         if self.row == "tape":

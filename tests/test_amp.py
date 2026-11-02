@@ -221,3 +221,29 @@ async def test_quick_successive_changes_leave_mpv_on_the_latest_settings(tmp_pat
         )
         live = {call[1]: call[3] for call in player.calls if call[0] == "tune"}
         assert live == {"equalizer@b0": "4", "equalizer@b9": "7"}
+
+
+async def test_changed_sound_is_always_shown_and_one_key_resets_it(tmp_path, audio_factory):
+    from kirlian_terminal.amp import AmpPanel, SoundSettings
+    from kirlian_terminal.audio import Tempo
+
+    library, _ = populated(tmp_path, audio_factory)
+    library.set_setting(
+        "amp",
+        json.dumps({"visible": True, "enabled": True, "preamp": 6, "balance": -0.1}),
+    )
+    player = AmpPlayer()
+    app = KirlianApp(library, player=player)
+    async with app.run_test(size=(140, 44)) as pilot:
+        await pilot.pause()
+        app.tempo_change("pitch", 1)
+        panel = app.query_one(AmpPanel)
+        line = panel.info_line(140).plain
+        assert "Preamp +6 dB" in line and "Balance left 10%" in line and "+1 semitone" in line
+        await pilot.press("E", "R")
+        await pilot.pause(0.2)
+        assert isinstance(app.screen, SoundSettings)
+        assert app.amp == AmpSettings(visible=True) and app.tempo == Tempo()
+        assert player.calls[-1] == ("apply", METER, "no")  # The chain is gone entirely.
+        line = panel.info_line(140).plain
+        assert "Preamp" not in line and "Balance" not in line and "semitone" not in line

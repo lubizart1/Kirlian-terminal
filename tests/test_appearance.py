@@ -203,3 +203,31 @@ async def test_color_disabled_and_paused_motion_are_explained(tmp_path, audio_fa
         context = str(app.query_one("#appearance-context", Static).content)
         assert "NO_COLOR" in context
         assert "stays still" in context
+
+
+async def test_arrows_move_between_settings_and_step_through_choices(tmp_path, audio_factory):
+    library, _ = populated(tmp_path, audio_factory)
+    app = KirlianApp(library, player=FakePlayer())
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.press("p")
+        await pilot.pause()
+
+        def value(name):
+            return app.query_one(f"#pref-{name}", Select).value
+
+        palette, motion = value("palette"), value("motion")
+        assert app.focused.id == "pref-palette"
+        await pilot.press("down")
+        assert app.focused.id == "pref-motion" and value("palette") == palette
+        await pilot.press("right")
+        await pilot.pause()
+        assert value("motion") != motion and app.focused.id == "pref-motion"
+        await pilot.press("left")
+        await pilot.pause()
+        assert value("motion") == motion
+        await pilot.press("up", "right")
+        await pilot.pause()
+        assert app.focused.id == "pref-palette" and value("palette") != palette
+        await pilot.press("enter")  # The full list still opens.
+        await pilot.pause()
+        assert app.query_one("#pref-palette", Select).expanded

@@ -121,6 +121,27 @@ class PlayerUpdate(Message):
         self.state = replace(state)
 
 
+class PreferenceSelect(Select):
+    """A settings row: up/down move between rows, left/right step through the choices.
+
+    Textual's Select opens its menu on up/down, which trapped the arrows in one row.
+    Enter or Space still open the full list.
+    """
+
+    BINDINGS = [
+        Binding("enter,space", "show_overlay", "Show choices", show=False),
+        Binding("down", "app.focus_next", "Next setting", show=False),
+        Binding("up", "app.focus_previous", "Previous setting", show=False),
+        Binding("right", "step(1)", "Next choice", show=False),
+        Binding("left", "step(-1)", "Previous choice", show=False),
+    ]
+
+    def action_step(self, step: int) -> None:
+        values = [value for _prompt, value in self._options if value is not self.NULL]
+        if self.value in values:
+            self.value = values[(values.index(self.value) + step) % len(values)]
+
+
 class LibraryTable(DataTable):
     def on_resize(self) -> None:
         self.app.call_after_refresh(self.app.size_columns)
@@ -147,6 +168,9 @@ class KirlianApp(App):
         Binding("right", "open", "Open", priority=True),
         Binding("space", "pause", "Play/pause"),
         Binding("slash", "search", "Search"),
+        # While typing a search, the arrows choose among the results below.
+        Binding("down", "search_move(1)", "Next result", show=False),
+        Binding("up", "search_move(-1)", "Previous result", show=False),
         Binding("escape", "back", "Back"),
         Binding("a", "append", "Append"),
         Binding("plus", "playlist_add", "Add to playlist"),
@@ -322,7 +346,7 @@ class KirlianApp(App):
                 ):
                     with Horizontal(classes="preference-row"):
                         yield Label(label)
-                        yield Select(
+                        yield PreferenceSelect(
                             [(i18n._(option), value) for option, value in OPTIONS[name]],
                             value=getattr(self.appearance, name),
                             allow_blank=False,
@@ -468,6 +492,9 @@ class KirlianApp(App):
             self.render_rows()
 
     def check_action(self, action: str, parameters: tuple[object, ...]) -> bool | None:
+        if action == "search_move":
+            # Only while typing a search; a focused table handles its own arrows.
+            return isinstance(self.focused, Input) and self.focused.id == "search"
         if isinstance(self.focused, Input) and action not in {
             "back",
             "focus_next",
@@ -1019,6 +1046,11 @@ class KirlianApp(App):
         search.focus()
         self.render_rows(0)
         self.update_footer()
+
+    def action_search_move(self, step: int) -> None:
+        table = self.query_one(DataTable)
+        if table.row_count:
+            table.move_cursor(row=min(max(0, table.cursor_row + step), table.row_count - 1))
 
     def action_append(self) -> None:
         row = self.selected()
@@ -1700,6 +1732,14 @@ class KirlianApp(App):
         self.query_one(AmpPanel).tempo = tempo
         self.query_one(AmpPanel).refresh()
         self.send_tempo(tempo)
+
+    def reset_sound(self) -> None:
+        """Everything back to untouched: no equalizer, preamp, balance, ReplayGain, or tempo."""
+        self.tempo = Tempo()
+        self.query_one(AmpPanel).tempo = self.tempo
+        self.send_tempo(self.tempo)
+        neutral = AmpSettings(visible=self.amp.visible)
+        self.change_amp(neutral, _("Sound reset: the music plays exactly as recorded."))
 
     @work(group="tempo", exclusive=True)
     async def send_tempo(self, tempo: Tempo) -> None:

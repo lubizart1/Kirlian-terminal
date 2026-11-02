@@ -102,7 +102,8 @@ only when there is something to report.
 
 Typing in search, the folder field, playlist names, or the API key field takes
 priority over these shortcuts.
-Search does not stop playback; Escape restores the previous view and selection.
+Search does not stop playback; `↑`/`↓` choose a result while you keep typing, Enter
+opens it, and Escape restores the previous view and selection.
 Playing a search result starts its album queue at that song. Enter on a Queue
 item jumps to it. `>` marks the current track; the highlighted row is your selection.
 A title too long for its column scrolls while it is highlighted (unless motion is
@@ -243,11 +244,13 @@ displays, so every library key keeps working while it is open:
 - Left and right level meters with a one-second peak mark. `CLIP` appears only
   when the equalizer is on and a peak reaches full scale.
 - The file's format, bitrate, sample rate, and channels, and the current
-  equalizer, ReplayGain, balance, speed, and pitch.
+  equalizer and ReplayGain, plus preamp, balance, speed, and pitch whenever they
+  differ from normal, so a changed sound is always visible.
 
 Press `E` for **Sound**, one row per setting. `↑`/`↓` choose a row, `←`/`→` change
-it, `0` resets it, `Enter` turns the equalizer (or Tape) on and off, and `Esc`
-closes. The line under the list says what the selected row does.
+it, `0` resets it, `Enter` turns the equalizer (or Tape) on and off, `R` resets
+everything so the music plays exactly as recorded, and `Esc` closes. Equalizer,
+preamp, balance, and ReplayGain are saved; speed and pitch last for the session. The line under the list says what the selected row does.
 
 | Row | What it does |
 | --- | --- |
@@ -390,7 +393,9 @@ native speakers. Corrections are welcome; see [Contributing](CONTRIBUTING.md).
 ## Make it yours
 
 Press `p` to preview aubergine, sage, or amber for the interface; gentle, still, or no motion; fine
-dots or plain ASCII for the ribbon and header; and the interface language. The current
+dots or plain ASCII for the ribbon and header; and the interface language. `↑`/`↓`
+move between settings, `←`/`→` step through the choices with a live preview, and
+Enter opens the full list. The current
 song and queue keep playing. **Save changes** or `Ctrl+S` saves locally; **Cancel**
 or Escape restores the previous appearance. **Reset** previews the defaults without
 saving them. The screen labels unsaved previews and confirms a successful save.

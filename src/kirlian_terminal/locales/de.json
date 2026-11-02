@@ -382,5 +382,7 @@
   "Choose in Finder…": "Im Finder wählen…",
   "Browse…": "Durchsuchen…",
   "Choose your music folder": "Wähle deinen Musikordner",
-  "Could not open the folder picker. Type the path instead.": "Die Ordnerauswahl ließ sich nicht öffnen. Gib den Pfad stattdessen ein."
+  "Could not open the folder picker. Type the path instead.": "Die Ordnerauswahl ließ sich nicht öffnen. Gib den Pfad stattdessen ein.",
+  "reset all sound": "alles zurücksetzen",
+  "Sound reset: the music plays exactly as recorded.": "Klang zurückgesetzt: Die Musik klingt genau wie aufgenommen."
 }
