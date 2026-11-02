@@ -38,7 +38,7 @@ async def test_live_preferences_preserve_track_seed_queue_and_cancel(tmp_path, a
     player = FakePlayer()
     app = KirlianApp(library, player=player)
     async with app.run_test(size=(120, 36)) as pilot:
-        await pilot.pause()
+        await wait_for(pilot, lambda: app.ready)  # Library loaded, player up.
         await pilot.press("enter", "j")
         selection = app.selected()
         player.state = PlaybackState(paused=False, idle=False, started_serial=1, path=paths[0])
@@ -88,13 +88,14 @@ async def test_save_reads_visible_choices_before_change_messages_arrive(tmp_path
     library, _ = populated(tmp_path, audio_factory)
     app = KirlianApp(library, player=FakePlayer())
     async with app.run_test(size=(120, 36)) as pilot:
+        await wait_for(pilot, lambda: app.ready)  # Library loaded, player up.
         await pilot.press("p")
         # Select posts its change message asynchronously. Saving must use the
         # visible value, even if that message has not reached the app yet.
         app.query_one("#pref-palette", Select).value = "sage"
         app.query_one("#pref-motion", Select).value = "still"
         app.finish_personalizing(True)
-        await pilot.pause()
+        await wait_for(pilot, lambda: not app.personalizing)  # Saved in the background.
         assert Appearance.load(library) == Appearance(palette="sage", motion="still")
 
 
@@ -108,6 +109,7 @@ async def test_keyboard_preview_save_reopen_and_reset_cancel(
     app = KirlianApp(library, player=player, artwork="off")
     expected = Appearance(palette="sage", motion="still", characters="ascii")
     async with app.run_test(size=size) as pilot:
+        await wait_for(pilot, lambda: app.ready)  # Library loaded, player up.
         await pilot.press("p", "enter", "down", "enter")
         await pilot.pause()
         assert app.query_one("#appearance-keep").styles.background.hex == "#33493A"
@@ -162,6 +164,7 @@ async def test_slow_failed_save_preserves_preview_and_allows_retry(
 
     monkeypatch.setattr(library, "set_setting", failed_save)
     async with app.run_test(size=(120, 36)) as pilot:
+        await wait_for(pilot, lambda: app.ready)  # Library loaded, player up.
         await pilot.press("p", "enter", "down", "enter", "ctrl+s")
         try:
             async with asyncio.timeout(2):
@@ -198,6 +201,7 @@ async def test_color_disabled_and_paused_motion_are_explained(tmp_path, audio_fa
     library, _ = populated(tmp_path, audio_factory)
     app = KirlianApp(library, player=FakePlayer(), artwork="off")
     async with app.run_test(size=(80, 24)) as pilot:
+        await wait_for(pilot, lambda: app.ready)  # Library loaded, player up.
         await pilot.press("p")
         context = str(app.query_one("#appearance-context", Static).content)
         assert "NO_COLOR" in context
@@ -208,6 +212,7 @@ async def test_arrows_move_between_settings_and_step_through_choices(tmp_path, a
     library, _ = populated(tmp_path, audio_factory)
     app = KirlianApp(library, player=FakePlayer())
     async with app.run_test(size=(120, 36)) as pilot:
+        await wait_for(pilot, lambda: app.ready)  # Library loaded, player up.
         await pilot.press("p")
         await pilot.pause()
 
@@ -245,6 +250,7 @@ async def test_theme_files_appear_in_p_recolor_everything_and_reload_when_edited
     (themes / "broken.toml").write_text('accent = "green"\n')
     app = KirlianApp(library, player=FakePlayer())
     async with app.run_test(size=(120, 40)) as pilot:
+        await wait_for(pilot, lambda: app.ready)  # Library loaded, player up.
         await pilot.press("p")
         await pilot.pause()
         palette = app.query_one("#pref-palette", Select)

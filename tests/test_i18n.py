@@ -85,7 +85,7 @@ async def test_saved_language_switches_the_running_interface_and_keeps_the_view(
 ):
     import json
 
-    from test_app import FakePlayer, populated
+    from test_app import FakePlayer, populated, wait_for
     from textual.widgets import DataTable, OptionList, Select
 
     from kirlian_terminal.app import KirlianApp
@@ -100,7 +100,7 @@ async def test_saved_language_switches_the_running_interface_and_keeps_the_view(
         return str(app.query_one("#nav", OptionList).get_option_at_index(0).prompt)
 
     async with app.run_test(size=(80, 24)) as pilot:
-        await pilot.pause()
+        await wait_for(pilot, lambda: app.ready)  # Library loaded, player up.
         assert first_section() == "Álbumes"
         await pilot.press("enter", "j")  # Open the album, select the second song.
         assert app.view == "album"
@@ -109,11 +109,10 @@ async def test_saved_language_switches_the_running_interface_and_keeps_the_view(
         await pilot.pause()
         assert "保存" not in str(app.query_one("#appearance-context").content)
         await pilot.press("ctrl+s")
-        for _attempt in range(40):
-            await pilot.pause(0.02)
-            if not app.personalizing and first_section() == "アルバム":
-                break
-        assert first_section() == "アルバム"
+        await wait_for(
+            pilot,
+            lambda: not app.rebuilding and app.query("#nav") and first_section() == "アルバム",
+        )
         assert Appearance.load(library).language == "ja"
         assert app.view == "album" and app.query_one(DataTable).cursor_row == 1
         assert str(app.query_one("#status").content) == _(
@@ -164,7 +163,7 @@ async def test_language_switch_survives_player_events_during_the_rebuild(tmp_pat
 
     app.recompose = recompose_while_playing
     async with app.run_test(size=(120, 40)) as pilot:
-        await pilot.pause()
+        await wait_for(pilot, lambda: app.ready)  # Library loaded, player up.
         await pilot.press("enter")
         app.on_player_update(
             PlayerUpdate(PlaybackState(path=paths[0], paused=False, idle=False, started_serial=1))
@@ -175,6 +174,10 @@ async def test_language_switch_survives_player_events_during_the_rebuild(tmp_pat
         app.query_one("#pref-language", Select).value = "es"
         await pilot.pause()
         await pilot.press("ctrl+s")
-        await wait_for(pilot, lambda: not app.personalizing)
+        # The rebuild clears "personalizing" first; wait for the new screen itself.
+        await wait_for(
+            pilot,
+            lambda: not app.personalizing and not app.rebuilding and app.query("#nav"),
+        )
         assert str(app.query_one("#nav", OptionList).get_option_at_index(0).prompt) == "Álbumes"
         assert app.view == "album" and len(app.rows) == 2

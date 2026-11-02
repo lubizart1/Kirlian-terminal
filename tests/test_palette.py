@@ -5,7 +5,7 @@ from dataclasses import replace
 
 import pytest
 from PIL import Image
-from test_app import FakePlayer, populated
+from test_app import FakePlayer, populated, wait_for
 from textual.widgets import DataTable
 
 import kirlian_terminal.app as app_module
@@ -74,7 +74,7 @@ async def test_playing_album_drives_palette_with_hidden_art_and_survives_prefere
     player = FakePlayer()
     app = KirlianApp(library, player=player, artwork="off", characters="ascii")
     async with app.run_test(size=(80, 24)) as pilot:
-        await pilot.pause()
+        await wait_for(pilot, lambda: app.ready)  # Library loaded, player up.
         player.state = PlaybackState(
             path=paths[0], idle=False, paused=True, started_serial=1, position=30, duration=90
         )
@@ -124,7 +124,7 @@ async def test_stale_palette_cannot_recolor_new_track(tmp_path, audio_factory, m
     monkeypatch.setattr(app_module, "load_artwork", slow_artwork)
     app = KirlianApp(library, player=FakePlayer(), artwork="off")
     async with app.run_test(size=(80, 24)) as pilot:
-        await pilot.pause()
+        await wait_for(pilot, lambda: app.ready)  # Library loaded, player up.
         animation = app.query_one(Animation)
         state = PlaybackState(path=paths[0], idle=False, paused=True, started_serial=1)
         app.on_player_update(PlayerUpdate(state))

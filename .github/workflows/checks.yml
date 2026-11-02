@@ -20,8 +20,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10
         with:
           python-version: "3.13"
           enable-cache: true
@@ -41,8 +41,8 @@ jobs:
         os: [ubuntu-latest, macos-latest]
         python: ["3.12", "3.13", "3.14"]
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10
         with:
           python-version: ${{ matrix.python }}
           enable-cache: true
@@ -61,14 +61,14 @@ jobs:
     timeout-minutes: 10
     needs: [lint, test]
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10
         with:
           python-version: "3.13"
           enable-cache: true
       - run: uv build
       - run: packaging/render-install.sh
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: dist
           path: dist/
@@ -85,7 +85,7 @@ jobs:
         os: [ubuntu-latest, macos-latest]
     steps:
       # No checkout and no setup-uv: the installer must bring its own uv and Python.
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: dist
           path: dist

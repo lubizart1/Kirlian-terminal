@@ -3,7 +3,7 @@ import hashlib
 from dataclasses import replace
 
 import pytest
-from test_app import FakePlayer, populated
+from test_app import FakePlayer, populated, wait_for
 
 from kirlian_terminal.animations import (
     CATALOG,
@@ -132,7 +132,7 @@ async def test_motion_controls_pause_seek_disable_save_and_recall(tmp_path, audi
     player = FakePlayer()
     app = KirlianApp(library, player=player)
     async with app.run_test(size=(80, 24)) as pilot:
-        await pilot.pause()
+        await wait_for(pilot, lambda: app.ready)  # Library loaded, player up.
         animation = app.query_one(Animation)
         state = PlaybackState(paused=False, idle=False, started_serial=1, path=paths[0])
         app.on_player_update(PlayerUpdate(state))

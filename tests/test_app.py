@@ -65,7 +65,7 @@ async def test_search_typing_does_not_trigger_controls_and_escape_restores(tmp_p
     player = FakePlayer()
     app = KirlianApp(library, player=player)
     async with app.run_test(size=(80, 24)) as pilot:
-        await pilot.pause()
+        await wait_for(pilot, lambda: app.ready)  # Library loaded, player up.
         assert len(app.rows) == 1
         assert not app.query_one("#context").display
         await pilot.press("enter", "j")
@@ -90,7 +90,7 @@ async def test_resize_keeps_rows_and_selection_without_rebuilding(
     library, _ = populated(tmp_path, audio_factory)
     app = KirlianApp(library, player=FakePlayer())
     async with app.run_test(size=(120, 36)) as pilot:
-        await pilot.pause()
+        await wait_for(pilot, lambda: app.ready)  # Library loaded, player up.
         await pilot.press("enter", "down")
         selection = app.selected()
         table = app.query_one(DataTable)
@@ -121,7 +121,7 @@ async def test_position_updates_do_not_relayout_labels_or_duplicate_motion_frame
     library, paths = populated(tmp_path, audio_factory)
     app = KirlianApp(library, player=FakePlayer())
     async with app.run_test(size=(80, 24)) as pilot:
-        await pilot.pause()
+        await wait_for(pilot, lambda: app.ready)  # Library loaded, player up.
         state = PlaybackState(
             path=paths[0], paused=False, idle=False, duration=200, started_serial=1
         )
@@ -165,7 +165,7 @@ async def test_song_search_starts_album_queue_and_browsing_does_not_replace_it(
     player = FakePlayer()
     app = KirlianApp(library, player=player)
     async with app.run_test(size=(120, 32)) as pilot:
-        await pilot.pause()
+        await wait_for(pilot, lambda: app.ready)  # Library loaded, player up.
         assert app.query_one("#context").display
         await pilot.resize_terminal(80, 24)
         await pilot.pause()
@@ -188,8 +188,7 @@ async def test_folder_typing_and_cancel(tmp_path):
     player = FakePlayer()
     app = KirlianApp(Library(tmp_path / "library.db"), player=player)
     async with app.run_test(size=(80, 24)) as pilot:
-        await pilot.pause()
-        assert isinstance(app.screen, FolderDialog)
+        await wait_for(pilot, lambda: isinstance(app.screen, FolderDialog))  # After loading.
         await pilot.press("q", "space", "a", "n", "slash", "H")
         assert app.screen.query_one(Input).value == "q an/H"
         assert not player.calls
@@ -284,8 +283,7 @@ async def test_search_remains_usable_while_scan_is_running(tmp_path, audio_facto
     app = KirlianApp(Library(tmp_path / "library.db"), folder=root, player=FakePlayer())
     async with app.run_test(size=(80, 24)) as pilot:
         try:
-            await pilot.pause()
-            assert app.scanning
+            await wait_for(pilot, lambda: app.scanning)  # Starts once the library has loaded.
             await pilot.press("slash", "a", "space", "q")
             assert app.query_one("#search", Input).value == "a q"
             assert app.scanning
@@ -332,7 +330,7 @@ async def test_playlist_keeps_saved_order_duplicates_and_missing_files(tmp_path,
     player = FakePlayer()
     app = KirlianApp(library, player=player)
     async with app.run_test(size=(120, 36)) as pilot:
-        await pilot.pause()
+        await wait_for(pilot, lambda: app.ready)  # Library loaded, player up.
         await pilot.press("enter", "plus", "enter")
         await pilot.pause()
         await pilot.press("E", "v", "e", "space", "q", "a", "n")
@@ -414,6 +412,7 @@ async def test_facts_follow_the_playing_song_and_discard_late_answers(
         return card.display and app.query_one("#fact-text").content.plain
 
     async with app.run_test(size=(140, 50)) as pilot:
+        await wait_for(pilot, lambda: app.ready)  # Library loaded, player up.
         try:
             await pilot.press("enter")
             play(paths[0], 1)
@@ -454,8 +453,14 @@ async def test_facts_settings_adds_a_key_orders_providers_and_typing_is_not_a_sh
     player = FakePlayer()
     app = KirlianApp(library, player=player)
     async with app.run_test(size=(120, 40)) as pilot:
+        await wait_for(pilot, lambda: app.ready)  # Library loaded, player up.
         await pilot.press("i")
-        await wait_for(pilot, lambda: isinstance(app.screen, FactsSettings))
+        await wait_for(
+            pilot,  # The provider rows fill in from a background refresh.
+            lambda: (
+                isinstance(app.screen, FactsSettings) and app.screen.query_one(DataTable).row_count
+            ),
+        )
         await pilot.press("j", "enter")  # Rows: Exa, OpenAI, …
         await wait_for(pilot, lambda: isinstance(app.screen, KeyDialog))
         await pilot.press("enter")
@@ -468,21 +473,27 @@ async def test_facts_settings_adds_a_key_orders_providers_and_typing_is_not_a_sh
 
         # Rows follow the order: OpenAI (primary), then unused Exa, Anthropic, …
         screen = app.screen
-        assert screen.row_ids[0] == "openai" and screen.selected_id == "openai"
+
+        async def shown(order):
+            """Saved, and the screen redrawn: its rows follow the order."""
+            await wait_for(
+                pilot,
+                lambda: app.facts_config.order == order and screen.row_ids[: len(order)] == order,
+            )
+
+        await shown(["openai"])
+        assert screen.selected_id == "openai"
         await pilot.press("j", "j", "space")
-        await wait_for(pilot, lambda: app.facts_config.order == ["openai", "anthropic"])
-        await pilot.pause()
+        await shown(["openai", "anthropic"])
         assert screen.selected_id == "anthropic" and screen.row_ids[1] == "anthropic"
         assert "Fallback: asked only if OpenAI fails" in str(
             screen.query_one("#facts-detail").content
         )
         await pilot.press("K")  # The selection moves with its row.
-        await wait_for(pilot, lambda: app.facts_config.order == ["anthropic", "openai"])
-        await pilot.pause()
+        await shown(["anthropic", "openai"])
         assert screen.row_ids[:2] == ["anthropic", "openai"] and screen.selected_id == "anthropic"
         await pilot.press("j", "1")
-        await wait_for(pilot, lambda: app.facts_config.order == ["openai", "anthropic"])
-        await pilot.pause()
+        await shown(["openai", "anthropic"])
         await pilot.press("j", "m")  # Anthropic: pick a listed model.
         await wait_for(pilot, lambda: app.screen.query("#model-choices"))
         await pilot.press("down", "enter")
@@ -492,9 +503,8 @@ async def test_facts_settings_adds_a_key_orders_providers_and_typing_is_not_a_sh
         await pilot.press("up", "enter")  # Back to the default removes the override.
         await wait_for(pilot, lambda: app.facts_config.models == {})
         await pilot.press("t")
-        await wait_for(pilot, lambda: not app.facts_on)
+        await wait_for(pilot, lambda: library.setting("facts") == "off")  # Saved in the background.
         await pilot.press("escape")
-        await pilot.pause()
         stored = FactsConfig.load(library)
         assert stored.order == ["openai", "anthropic"]
         assert library.setting("facts") == "off"
@@ -543,6 +553,7 @@ async def test_facts_fall_back_on_errors_and_a_fallback_answer_is_not_paid_for_t
         return shown and app.query_one("#fact-text").content.plain
 
     async with app.run_test(size=(140, 50)) as pilot:
+        await wait_for(pilot, lambda: app.ready)  # Library loaded, player up.
         await pilot.press("enter")
         state = PlaybackState(path=paths[0], paused=False, idle=False, started_serial=1)
         app.on_player_update(PlayerUpdate(state))
@@ -591,13 +602,14 @@ async def test_a_dropped_connection_is_retried_next_play_and_unused_keys_are_sug
         app.on_player_update(PlayerUpdate(state))
 
     async with app.run_test(size=(140, 50)) as pilot:
+        await wait_for(pilot, lambda: app.ready)  # Library loaded, player up.
         await pilot.press("enter")
         play(paths[0], 1)
         await wait_for(
             pilot, lambda: "Anthropic has a key" in str(app.query_one("#status").content)
         )
         play(paths[1], 2)
-        await pilot.pause(0.1)
+        await wait_for(pilot, lambda: calls.count("perplexity") == 2)  # Song 10 asked.
         play(paths[0], 3)  # The same song again: a dropped connection is retried.
         await wait_for(pilot, lambda: calls.count("perplexity") == 3)
         assert "anthropic" not in calls  # Unused providers are suggested, never billed.
@@ -611,6 +623,7 @@ async def test_question_mark_toggles_one_key_guide(tmp_path, audio_factory):
 
     app = KirlianApp(library, player=FakePlayer())
     async with app.run_test(size=(120, 40)) as pilot:
+        await wait_for(pilot, lambda: app.ready)  # Library loaded, player up.
         await pilot.press("question_mark")
         await wait_for(pilot, lambda: guides() == 1)
         await pilot.press("question_mark")
@@ -628,7 +641,7 @@ async def test_a_slow_load_of_a_playlist_left_behind_never_replaces_the_open_one
     library, paths = populated(tmp_path, audio_factory)
     app = KirlianApp(library, player=FakePlayer())
     async with app.run_test() as pilot:
-        await pilot.pause()
+        await wait_for(pilot, lambda: app.ready)  # Library loaded, player up.
         first, second = app.playlists.create("First"), app.playlists.create("Second")
         app.playlists.add(first, [str(paths[0])])
         app.playlists.add(second, [str(paths[1])])
@@ -730,7 +743,7 @@ async def test_arrows_choose_among_search_results_while_typing(tmp_path, audio_f
     player = FakePlayer()
     app = KirlianApp(library, player=player)
     async with app.run_test(size=(120, 32)) as pilot:
-        await pilot.pause()
+        await wait_for(pilot, lambda: app.ready)  # Library loaded, player up.
         await pilot.press("slash", *"song")
         await pilot.pause()
         assert [row.kind for row in app.rows] == ["track", "track"]
@@ -752,7 +765,7 @@ async def test_a_full_disk_never_closes_the_player(tmp_path, audio_factory, monk
 
     app = KirlianApp(library, player=FakePlayer())
     async with app.run_test(size=(120, 36)) as pilot:
-        await pilot.pause()
+        await wait_for(pilot, lambda: app.ready)  # Library loaded, player up.
 
         def status():
             return app.query_one("#status").content.plain
@@ -779,7 +792,7 @@ async def test_playbar_buttons_and_clicking_the_progress_line(tmp_path, audio_fa
     player = FakePlayer()
     app = KirlianApp(library, player=player, characters="dots")
     async with app.run_test(size=(120, 36)) as pilot:
-        await pilot.pause()
+        await wait_for(pilot, lambda: app.ready)  # Library loaded, player up.
         player.state = PlaybackState(
             path=paths[0], idle=False, paused=False, duration=200, position=10
         )
@@ -820,7 +833,7 @@ async def test_b_opens_a_store_search_for_the_album_and_never_for_folder_names(
     library.scan(root, lambda _: None, threading.Event())
     app = KirlianApp(library, player=FakePlayer())
     async with app.run_test(size=(140, 40)) as pilot:
-        await pilot.pause()
+        await wait_for(pilot, lambda: app.ready)  # Library loaded, player up.
         album_row = next(i for i, r in enumerate(app.rows) if r.title == "Album")
         app.query_one(DataTable).move_cursor(row=album_row)
         await pilot.pause()
@@ -871,6 +884,7 @@ async def test_album_notes_follow_the_songs_and_each_album_is_asked_once(
         return str(app.query_one("#fact-text").content)
 
     async with app.run_test(size=(140, 50)) as pilot:
+        await wait_for(pilot, lambda: app.ready)  # Library loaded, player up.
         await pilot.press("enter")
         play(paths[0], 1)
         await wait_for(pilot, lambda: len(app.facts) == 2)

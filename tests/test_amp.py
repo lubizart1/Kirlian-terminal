@@ -83,7 +83,7 @@ async def test_amp_only_displays_and_the_sound_screen_changes_mpv(tmp_path, audi
     player = AmpPlayer()
     app = KirlianApp(library, player=player)
     async with app.run_test(size=(120, 46)) as pilot:
-        await pilot.pause()
+        await wait_for(pilot, lambda: app.ready)  # Library loaded, player up.
         await pilot.press("w")
         panel = app.query_one("#amp")
         assert panel.display and app.focused is not panel
@@ -136,7 +136,7 @@ async def test_speed_pitch_and_tape_reach_mpv_and_reset_next_launch(tmp_path, au
     player.apply_tempo = apply_tempo
     app = KirlianApp(library, player=player)
     async with app.run_test(size=(120, 46)) as pilot:
-        await pilot.pause()
+        await wait_for(pilot, lambda: app.ready)  # Library loaded, player up.
         await pilot.press("E", *["j"] * 5, "left", "left", "left")  # Speed 0.85×.
         await pilot.press("j", "right", "right")  # Pitch +2 semitones.
         await pilot.press("j", "enter")  # Tape on.
@@ -176,6 +176,7 @@ async def test_amp_fits_small_and_large_windows(tmp_path, audio_factory, size):
     library, _ = populated(tmp_path, audio_factory)
     app = KirlianApp(library, player=AmpPlayer())
     async with app.run_test(size=size) as pilot:
+        await wait_for(pilot, lambda: app.ready)  # Library loaded, player up.
         await pilot.press("w")
         await pilot.pause()
         panel = app.query_one("#amp")
@@ -209,7 +210,7 @@ async def test_quick_successive_changes_leave_mpv_on_the_latest_settings(tmp_pat
     player = SlowPlayer()
     app = KirlianApp(library, player=player)
     async with app.run_test() as pilot:
-        await pilot.pause()
+        await wait_for(pilot, lambda: app.ready)  # Library loaded, player up.
         app.change_amp(app.amp.with_gain(0, 3).with_gain(9, 6))  # Turns it on: one rebuild.
         app.change_amp(app.amp.with_gain(0, 4).with_gain(9, 2))
         app.change_amp(app.amp.with_gain(9, 7))
@@ -232,7 +233,7 @@ async def test_changed_sound_is_always_shown_and_one_key_resets_it(tmp_path, aud
     player = AmpPlayer()
     app = KirlianApp(library, player=player)
     async with app.run_test(size=(140, 44)) as pilot:
-        await pilot.pause()
+        await wait_for(pilot, lambda: app.ready)  # Library loaded, player up.
         app.tempo_change("pitch", 1)
         panel = app.query_one(AmpPanel)
         line = panel.info_line(140).plain
@@ -256,7 +257,7 @@ async def test_the_amp_can_live_under_the_cover_and_returns_to_the_playbar_when_
     player = AmpPlayer()
     app = KirlianApp(library, player=player)
     async with app.run_test(size=(140, 48)) as pilot:
-        await pilot.pause()
+        await wait_for(pilot, lambda: app.ready)  # Library loaded, player up.
         await pilot.press("w")
         await pilot.pause()
         mini, bar = app.query_one("#amp-mini"), app.query_one("#amp")
@@ -278,6 +279,6 @@ async def test_a_change_made_just_before_quitting_is_kept(tmp_path, audio_factor
     library, _ = populated(tmp_path, audio_factory)
     app = KirlianApp(library, player=AmpPlayer())
     async with app.run_test() as pilot:
-        await pilot.pause()
+        await wait_for(pilot, lambda: app.ready)  # Library loaded, player up.
         app.amp_preset(1)  # The delayed save cannot have run before the app closes.
     assert AmpSettings.load(library).preset == app.amp.preset != "Flat"
