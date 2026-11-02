@@ -636,6 +636,8 @@ class KirlianApp(App):
         return text
 
     def update_footer(self) -> None:
+        if not self.is_running or self.rebuilding or not self.query("#tracks"):
+            return  # Queued table events can arrive while the screen is closing.
         self.update_text(
             "#search-hint",
             self.key_hints(
@@ -1213,6 +1215,8 @@ class KirlianApp(App):
         self.palette_revision += 1
         await self.refresh_library()
         self.scanning = not progress.done
+        if not self.is_running or not self.query("#tracks"):
+            return  # The last update of a scan can arrive while the app is closing.
         self.update_ribbon_palette(getattr(self, "display_state", self.player.state))
         self.status(scan_message(progress))
 

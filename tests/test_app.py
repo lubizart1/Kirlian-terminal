@@ -218,7 +218,8 @@ async def test_the_system_picker_opens_the_chosen_folder_or_leaves_typing(
         return answer and str(answer)
 
     def ready(app):
-        return isinstance(app.screen, FolderDialog) and app.screen.query("#folder-path")
+        # The buttons' row can mount a moment after the path field.
+        return isinstance(app.screen, FolderDialog) and app.screen.query("#folder-open")
 
     monkeypatch.setattr(picker, "command", lambda prompt: ["picker"])
     monkeypatch.setattr(picker, "choose", choose)
