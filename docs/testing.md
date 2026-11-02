@@ -92,11 +92,10 @@ the **Report a check** template. Remove an item once it has been checked.
   Korean particles after placeholders (이(가)); mixed gender in pt-BR "Reserva"
   descriptions; German "bewegen" used for both focus and reordering.
 - **macOS Terminal:** recheck the plain borders and dithered covers in the real app.
-- **CI:** the workflows have not yet run on GitHub.
 - **Installer download:** the `releases/latest/download/install.sh` path, the wheel
   download, and its checksum were tested only against a local web server; the real
-  GitHub URLs work once the repository and a release are public. On Linux the
-  installer has only the CI run above.
+  GitHub URLs work once the repository and a release are public. The installer itself
+  passes in CI on clean Ubuntu and macOS runners.
 
 
 ## Artwork and animation review
