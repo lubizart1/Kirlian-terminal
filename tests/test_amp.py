@@ -275,3 +275,12 @@ async def test_the_amp_can_live_under_the_cover_and_returns_to_the_playbar_when_
         await pilot.resize_terminal(140, 48)
         await pilot.pause()
         assert mini.display and not bar.display
+
+
+async def test_a_change_made_just_before_quitting_is_kept(tmp_path, audio_factory):
+    library, _ = populated(tmp_path, audio_factory)
+    app = KirlianApp(library, player=AmpPlayer())
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        app.amp_preset(1)  # The delayed save cannot have run before the app closes.
+    assert AmpSettings.load(library).preset == app.amp.preset != "Flat"

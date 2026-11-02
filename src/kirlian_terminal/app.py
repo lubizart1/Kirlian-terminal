@@ -2208,11 +2208,17 @@ class KirlianApp(App):
 
     async def action_quit(self) -> None:
         self.stop_scan.set()
-        self.remember_place(self.player.state, exact=True)
+        self.save_on_exit()
         await self.player.close()
         self.exit()
 
     async def on_unmount(self) -> None:
         self.stop_scan.set()
-        self.remember_place(self.player.state, exact=True)
+        self.save_on_exit()
         await self.player.close()
+
+    def save_on_exit(self) -> None:
+        """The exact place, and amp settings whose delayed save may not have run yet."""
+        self.remember_place(self.player.state, exact=True)
+        with contextlib.suppress(sqlite3.Error):
+            self.amp.save(self.library)
