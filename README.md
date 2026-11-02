@@ -3,7 +3,7 @@
 A small terminal music player for people who listen to albums.
 
 [Website](https://kirlian.ai/player/terminal) · [Install](#install) ·
-[Keys](#keys) · [Contributing](CONTRIBUTING.md) · [License](#license)
+[Keys](#keys) · [Kirlian](#kirlian) · [Contributing](CONTRIBUTING.md) · [License](#license)
 
 ## About
 
@@ -137,6 +137,12 @@ blank anywhere, press `c` for blocks, or run `kirlian --check-artwork`.
 - Identical editions in one flat folder are told apart only by a MusicBrainz release id.
 - Notes were checked live with Anthropic; the other providers against their documented formats.
 - Translations were written with AI help and await native-speaker review.
+
+## Kirlian
+
+Kirlian Terminal is the small, offline sibling of **[Kirlian](https://kirlian.ai)**,
+an LLM-powered music visualization system. If you enjoy watching the ribbon move with
+your music, go see what Kirlian does with it.
 
 ## Contributing
 
