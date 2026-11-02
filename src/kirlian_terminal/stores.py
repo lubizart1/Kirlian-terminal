@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from urllib.parse import quote, quote_plus
 
-from .library import Album
+from .library import UNKNOWN_ARTIST, Album
 
 # (id, name, search URL with {query}). Search pages need no account or API key.
 STORES = (
@@ -21,8 +21,12 @@ STORES = (
 
 
 def searchable(album: Album) -> bool:
-    """Only albums named by their tags; folder names stand in for the rest."""
-    return all(track.tagged for track in album.tracks)
+    """Only albums whose title and artist come from tags, never from folder names.
+
+    A tagged track carries its album tag, so one is enough for the title; the artist
+    must not be the stand-in for a missing artist tag.
+    """
+    return any(track.tagged for track in album.tracks) and album.artist != UNKNOWN_ARTIST
 
 
 def store_url(store_id: str, album: Album) -> str:

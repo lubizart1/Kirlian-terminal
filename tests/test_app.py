@@ -9,7 +9,7 @@ from textual.widgets import DataTable, Input
 from kirlian_terminal.app import KirlianApp, PlayerUpdate
 from kirlian_terminal.dialogs import FolderDialog
 from kirlian_terminal.facts import FactsConfig
-from kirlian_terminal.library import Library
+from kirlian_terminal.library import Library, albums_from
 from kirlian_terminal.playback import PlaybackState
 
 
@@ -751,14 +751,25 @@ async def test_a_full_disk_never_closes_the_player(tmp_path, audio_factory, monk
     app = KirlianApp(library, player=FakePlayer())
     async with app.run_test(size=(120, 36)) as pilot:
         await pilot.pause()
+
+        def status():
+            return app.query_one("#status").content.plain
+
+        saving = library.set_setting
         monkeypatch.setattr(library, "set_setting", full_disk)
         monkeypatch.setattr(app.playlists, "create", full_disk)
         await pilot.press("E", "j", "right", "escape")  # Change a preset: saved in a worker.
-        await pilot.press("s", "c")  # Save a pattern; switch cover display.
         app.create_playlist("Mix")
         await pilot.pause(0.6)
-        assert app.is_running
-        assert "Is the disk full?" in app.query_one("#status").content.plain
+        assert app.is_running and "Is the disk full?" in status()
+        await pilot.press("c")  # The display switches, but the listener learns it won't last.
+        assert "Is the disk full?" in status()
+        await pilot.press("s")  # A pattern that could not be saved is not counted as saved.
+        assert "Is the disk full?" in status() and not app.saved_animations
+
+        monkeypatch.setattr(library, "set_setting", saving)  # Space again: s now saves.
+        await pilot.press("s")
+        assert len(app.saved_animations) == 1 and library.setting("saved_animations")
 
 
 async def test_playbar_buttons_and_clicking_the_progress_line(tmp_path, audio_factory):
@@ -878,3 +889,28 @@ async def test_album_notes_follow_the_songs_and_each_album_is_asked_once(
         await wait_for(pilot, lambda: len(asked) == 4)
         await pilot.pause(0.2)
         assert asked[-1] == ("song", "Song 2") and [f.about for f in app.facts] == ["song"]
+
+
+def test_a_queue_holding_one_song_twice_resumes_at_the_right_copy(tmp_path, audio_factory):
+    from kirlian_terminal.resume import Place
+
+    a, b, c = (str(audio_factory(tmp_path / f"{n}.wav")) for n in "abc")
+    library = Library(tmp_path / "library.db")
+    Place((a, b, a, c), 2, 30.0).save(library)  # On the second copy of a.
+    assert Place.load(library) == Place((a, b, a, c), 2, 30.0)
+    Path(b).unlink()  # An earlier song gone: still the second copy, now one place up.
+    assert Place.load(library) == Place((a, a, c), 1, 30.0)
+
+
+def test_stores_need_album_and_artist_tags_not_every_title(tmp_path, audio_factory):
+    from kirlian_terminal.stores import searchable
+
+    root = tmp_path / "Music"
+    audio_factory(root / "Tagged" / "1.wav", title="One", album="Record", artist="Band")
+    audio_factory(root / "Tagged" / "2.wav", album="Record", artist="Band")  # No title tag.
+    audio_factory(root / "No artist" / "1.wav", title="One", album="Anonymous")
+    library = Library(tmp_path / "library.db")
+    library.scan(root, lambda _: None, threading.Event())
+    albums = {album.title: album for album in albums_from(library.tracks())}
+    assert searchable(albums["Record"])
+    assert not searchable(albums["Anonymous"])  # Would search for "Unknown artist".

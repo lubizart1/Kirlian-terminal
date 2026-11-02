@@ -33,6 +33,9 @@ def display_text(value: object) -> str:
     return " ".join("".join(c if c.isprintable() else " " for c in str(value)).split())
 
 
+UNKNOWN_ARTIST = "Unknown artist"  # Stored when a file has no artist tag.
+
+
 @dataclass(frozen=True)
 class Track:
     path: str
@@ -91,7 +94,7 @@ def read_track(path: Path) -> Track:
     album_tag = tag("album", "TALB")
     title_tag = tag("title", "TIT2")
     album = album_tag or display_text(release.name)
-    artist = tag("artist", "TPE1", "Unknown artist")
+    artist = tag("artist", "TPE1", UNKNOWN_ARTIST)
     compilation = tag("compilation", "TCMP") in {"1", "True", "true"}
     album_artist = tag("albumartist", "TPE2", "Various Artists" if compilation else artist)
     identity_parts = [str(release), album_artist.casefold(), album.casefold()]

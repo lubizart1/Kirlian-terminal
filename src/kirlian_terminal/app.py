@@ -2123,14 +2123,13 @@ class KirlianApp(App):
     def action_animation_save(self) -> None:
         variation = self.query_one(Animation).clock.variation
         if variation not in self.saved_animations:
-            self.saved_animations.append(variation)
+            saved = [*self.saved_animations, variation]
             try:
-                self.library.set_setting(
-                    "saved_animations", json.dumps([v.code for v in self.saved_animations])
-                )
+                self.library.set_setting("saved_animations", json.dumps([v.code for v in saved]))
             except sqlite3.Error as error:
-                self.report_save_error(error)
+                self.report_save_error(error)  # Not kept, so pressing s again retries.
                 return
+            self.saved_animations = saved
         self.status(_("Saved {pattern} · S recalls saved patterns", pattern=variation.label))
 
     def action_animation_recall(self) -> None:
@@ -2165,7 +2164,8 @@ class KirlianApp(App):
         try:
             self.library.set_setting("artwork_mode", cover.mode)
         except sqlite3.Error as error:
-            self.report_save_error(error)
+            self.report_save_error(error)  # The display changed; say it will not last.
+            return
         self.status(
             _("Cover display: compatible blocks. Press c to try terminal graphics.")
             if cover.mode == "blocks"

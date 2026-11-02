@@ -47,13 +47,15 @@ class Place:
             index, position = int(data["index"]), float(data["position"])
         except (TypeError, KeyError, ValueError):
             return None
-        current = paths[index] if 0 <= index < len(paths) else None
-        kept = tuple(path for path in paths if os.path.isfile(path))
+        # Keep each entry's original position: a queue may hold the same song twice.
+        kept = [(original, path) for original, path in enumerate(paths) if os.path.isfile(path)]
         if not kept:
             return None
-        if current not in kept:
-            return cls(kept)  # The song itself is gone: keep the rest of the queue.
-        return cls(kept, kept.index(current), max(0.0, position))
+        positions = [original for original, _path in kept]
+        songs = tuple(path for _original, path in kept)
+        if index not in positions:
+            return cls(songs)  # The song itself is gone: keep the rest of the queue.
+        return cls(songs, positions.index(index), max(0.0, position))
 
     def save(self, library: Library) -> None:
         library.set_setting(KEY, json.dumps(asdict(self)))
