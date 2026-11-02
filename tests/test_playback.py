@@ -75,7 +75,10 @@ async def test_real_mpv_queue_controls_transitions_and_owned_cleanup(tmp_path, a
         await player.toggle_pause()
         await wait_until(lambda: player.state.paused)
         await player.command("seek", 1, "absolute+exact")
-        await wait_until(lambda: player.state.position >= 0.9)
+        # Ask mpv where it is: a paused player does not always report the new position.
+        async with asyncio.timeout(6):
+            while (await player.command("get_property", "time-pos") or 0) < 0.9:
+                await asyncio.sleep(0.02)
         await player.command("set_property", "volume", 35)
         await wait_until(lambda: player.state.volume == 35)
         await player.append([paths[2], paths[2]])
