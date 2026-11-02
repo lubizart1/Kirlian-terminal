@@ -1630,7 +1630,8 @@ class KirlianApp(App):
         sources = await asyncio.to_thread(
             lambda: {p.id: self.credentials.source(p) for p in PROVIDERS.values()}
         )
-        if screen.is_mounted:
+        # The screen may still be building its table, or already closing.
+        if screen.is_mounted and screen.query(DataTable):
             screen.show(self.facts_config, sources, self.facts_on, note)
 
     @work(group="facts-settings", exit_on_error=False)

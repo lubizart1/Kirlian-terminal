@@ -121,8 +121,7 @@ async def test_keyboard_preview_save_reopen_and_reset_cancel(
         for _ in range(2):
             await pilot.press("tab", "enter", "down", "enter")
         await pilot.press("ctrl+s")
-        await pilot.pause()
-        assert not app.personalizing
+        await wait_for(pilot, lambda: not app.personalizing)
         assert Appearance.load(library) == expected
         assert "saved for next time" in str(app.query_one("#status", Static).content)
         assert not player.calls
@@ -189,8 +188,7 @@ async def test_slow_failed_save_preserves_preview_and_allows_retry(
         assert not app.query_one("#appearance-keep", Button).disabled
         monkeypatch.setattr(library, "set_setting", original)
         await pilot.press("ctrl+s")
-        await pilot.pause()
-        assert not app.personalizing
+        await wait_for(pilot, lambda: not app.personalizing)  # The retry saves in the background.
         assert Appearance.load(library).palette == "sage"
         assert not player.calls
 
