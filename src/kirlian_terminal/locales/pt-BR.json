@@ -384,5 +384,8 @@
   "Choose your music folder": "Escolha sua pasta de música",
   "Could not open the folder picker. Type the path instead.": "Não foi possível abrir o seletor de pastas. Digite o caminho.",
   "reset all sound": "redefinir todo o som",
-  "Sound reset: the music plays exactly as recorded.": "Som redefinido: a música toca exatamente como foi gravada."
+  "Sound reset: the music plays exactly as recorded.": "Som redefinido: a música toca exatamente como foi gravada.",
+  "song notes & keys": "notas e chaves",
+  "sound": "som",
+  "Could not save to the library database ({error}). Is the disk full?": "Não foi possível salvar no banco de dados da biblioteca ({error}). O disco está cheio?"
 }

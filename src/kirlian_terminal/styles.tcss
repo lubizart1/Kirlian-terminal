@@ -38,6 +38,7 @@ DataTable > .datatable--cursor, DataTable:focus > .datatable--cursor { backgroun
 #now-playing { height: 2; }
 #play-state { width: 3; height: 1; color: $k-accent; }
 #playing-label { width: 1fr; height: 2; text-wrap: nowrap; text-overflow: ellipsis; }
+#transport { width: auto; height: 1; margin: 0 3; }
 #playing-time { width: 18; height: 1; text-align: right; color: $k-quiet; }
 #animation { width: 100%; height: 3; text-wrap: nowrap; }
 #amp { height: 11; margin-bottom: 1; text-wrap: nowrap; }

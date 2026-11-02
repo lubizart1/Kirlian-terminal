@@ -731,3 +731,57 @@ async def test_arrows_choose_among_search_results_while_typing(tmp_path, audio_f
         await pilot.press("enter")
         await pilot.pause()
         assert player.calls == [("play", paths, paths.index(chosen))]
+
+
+async def test_a_full_disk_never_closes_the_player(tmp_path, audio_factory, monkeypatch):
+    import sqlite3
+
+    library, _ = populated(tmp_path, audio_factory)
+
+    def full_disk(*args, **kwargs):
+        raise sqlite3.OperationalError("unable to open database file")
+
+    app = KirlianApp(library, player=FakePlayer())
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+        monkeypatch.setattr(library, "set_setting", full_disk)
+        monkeypatch.setattr(app.playlists, "create", full_disk)
+        await pilot.press("E", "j", "right", "escape")  # Change a preset: saved in a worker.
+        await pilot.press("s", "c")  # Save a pattern; switch cover display.
+        app.create_playlist("Mix")
+        await pilot.pause(0.6)
+        assert app.is_running
+        assert "Is the disk full?" in app.query_one("#status").content.plain
+
+
+async def test_playbar_buttons_and_clicking_the_progress_line(tmp_path, audio_factory):
+    library, paths = populated(tmp_path, audio_factory)
+    player = FakePlayer()
+    app = KirlianApp(library, player=player, characters="dots")
+    async with app.run_test(size=(120, 36)) as pilot:
+        await pilot.pause()
+        player.state = PlaybackState(
+            path=paths[0], idle=False, paused=False, duration=200, position=10
+        )
+        app.on_player_update(PlayerUpdate(player.state))
+        await pilot.pause()
+        progress = app.query_one("#progress")
+        await pilot.click("#progress", offset=(progress.size.width // 2, 0))
+        await pilot.pause()
+        seek = player.calls[-1]
+        assert seek[0] == "seek" and seek[2] == "absolute-percent+exact"
+        assert 49 <= seek[1] <= 51  # The middle of the line is the middle of the song.
+
+        transport = app.query_one("#transport")
+        assert transport.content.plain == "|◀   ◀◀   ❚❚   ▶▶   ▶|"
+        expected = [
+            (0, ("playlist-prev", "weak")),
+            (5, ("seek", -5, "relative+exact")),
+            (10, ("pause",)),
+            (15, ("seek", 5, "relative+exact")),
+            (20, ("playlist-next", "weak")),
+        ]
+        for x, call in expected:
+            await pilot.click("#transport", offset=(x, 0))
+            await pilot.pause()
+            assert player.calls[-1] == call

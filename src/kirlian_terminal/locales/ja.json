@@ -384,5 +384,8 @@
   "Choose your music folder": "音楽フォルダを選択",
   "Could not open the folder picker. Type the path instead.": "フォルダ選択を開けませんでした。代わりにパスを入力してください。",
   "reset all sound": "音をすべてリセット",
-  "Sound reset: the music plays exactly as recorded.": "音をリセットしました。録音そのままの音で再生します。"
+  "Sound reset: the music plays exactly as recorded.": "音をリセットしました。録音そのままの音で再生します。",
+  "song notes & keys": "曲のメモとキー",
+  "sound": "サウンド",
+  "Could not save to the library database ({error}). Is the disk full?": "ライブラリのデータベースに保存できませんでした（{error}）。ディスクがいっぱいではありませんか？"
 }

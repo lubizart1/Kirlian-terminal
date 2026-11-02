@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import os
 import sqlite3
@@ -26,6 +27,7 @@ from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.message import Message
 from textual.screen import ModalScreen
 from textual.widgets import Button, DataTable, Input, Label, OptionList, Select, Static
+from textual.worker import Worker, WorkerState
 
 from . import i18n
 from .amp import COLUMNS, AmpPanel, SoundSettings
@@ -65,7 +67,7 @@ from .palette import extract_palette
 from .playback import PlaybackError, PlaybackState, Player
 from .playlists import Entry, Playlist, Playlists
 from .resume import Place
-from .visuals import Animation, Progress, TitleRhythm
+from .visuals import Animation, Progress, TitleRhythm, Transport
 
 
 def scan_message(progress: ScanProgress) -> str:
@@ -373,6 +375,7 @@ class KirlianApp(App):
                     _("Nothing playing") + "\n" + _("Choose a song from your library."),
                     id="playing-label",
                 )
+                yield Transport(id="transport")
                 yield Static("", id="playing-time")
             yield AmpPanel(id="amp")
             yield Animation(id="animation")
@@ -511,6 +514,19 @@ class KirlianApp(App):
             return action in {"back", "focus_next", "focus_previous"}
         return True
 
+    def report_save_error(self, error: BaseException) -> None:
+        self.status(
+            _("Could not save to the library database ({error}). Is the disk full?", error=error)
+        )
+
+    def on_worker_state_changed(self, event: Worker.StateChanged) -> None:
+        """Workers that save run with exit_on_error=False; a failed save is reported, and
+        playback carries on."""
+        worker = event.worker
+        failed = event.state == WorkerState.ERROR and not worker.exit_on_error
+        if failed and isinstance(worker.error, (sqlite3.Error, OSError)):
+            self.report_save_error(worker.error)
+
     def on_resize(self, event: events.Resize | None = None) -> None:
         if self.is_mounted and self.query("#body"):
             size = event.size if event else self.size
@@ -586,7 +602,10 @@ class KirlianApp(App):
 
     def update_footer(self) -> None:
         self.update_text(
-            "#search-hint", self.key_hints([("/", _("search")), ("p", _("personalize"))])
+            "#search-hint",
+            self.key_hints(
+                [("/", _("search")), ("i", _("song notes & keys")), ("p", _("personalize"))]
+            ),
         )
         row = self.selected()
         state = getattr(self, "display_state", self.player.state)
@@ -843,7 +862,7 @@ class KirlianApp(App):
             self.play_playlist(row.value)
         self.query_one(DataTable).focus()
 
-    @work(group="playlists")
+    @work(group="playlists", exit_on_error=False)
     async def open_playlist(self, playlist_id: str) -> None:
         self.view, self.view_value = "playlist", playlist_id
         self.playlist_entries = []
@@ -861,7 +880,7 @@ class KirlianApp(App):
             return
         self.perform(self.player.play([e.path for e in playable], start))
 
-    @work(group="playlists")
+    @work(group="playlists", exit_on_error=False)
     async def create_playlist(self, name: str | None) -> None:
         if not name:
             return
@@ -907,7 +926,7 @@ class KirlianApp(App):
 
         self.push_screen(PlaylistPicker(self.playlist_list, len(paths)), chosen)
 
-    @work(group="playlists")
+    @work(group="playlists", exit_on_error=False)
     async def add_to_playlist(
         self, paths: list[str], playlist_id: int | None, name: str | None
     ) -> None:
@@ -946,7 +965,7 @@ class KirlianApp(App):
                 lambda name: self.rename_playlist(playlist.id, name),
             )
 
-    @work(group="playlists")
+    @work(group="playlists", exit_on_error=False)
     async def rename_playlist(self, playlist_id: int, name: str | None) -> None:
         if name:
             await asyncio.to_thread(self.playlists.rename, playlist_id, name)
@@ -970,12 +989,12 @@ class KirlianApp(App):
                 lambda confirmed: confirmed and self.delete_playlist(playlist.id),
             )
 
-    @work(group="playlists")
+    @work(group="playlists", exit_on_error=False)
     async def remove_entry(self, entry_id: int) -> None:
         await asyncio.to_thread(self.playlists.remove, entry_id)
         await self.refresh_playlists()
 
-    @work(group="playlists")
+    @work(group="playlists", exit_on_error=False)
     async def delete_playlist(self, playlist_id: int) -> None:
         await asyncio.to_thread(self.playlists.delete, playlist_id)
         await self.refresh_playlists()
@@ -986,7 +1005,7 @@ class KirlianApp(App):
         if row and row.kind == "entry" and not self.searching:
             self.move_entry(int(row.value), offset)
 
-    @work(group="playlists", exclusive=True)
+    @work(group="playlists", exclusive=True, exit_on_error=False)
     async def move_entry(self, entry_id: int, offset: int) -> None:
         moved = await asyncio.to_thread(self.playlists.move, int(self.view_value), entry_id, offset)
         if moved:
@@ -1059,7 +1078,7 @@ class KirlianApp(App):
         elif row and row.kind != "queue" and (paths := self.selected_paths()):
             self.append_paths(paths)
 
-    @work(group="playlists")
+    @work(group="playlists", exit_on_error=False)
     async def append_playlist(self, playlist_id: int) -> None:
         entries = await asyncio.to_thread(self.playlists.entries, playlist_id)
         paths = [e.path for e in entries if (t := self.by_path.get(e.path)) and t.available]
@@ -1093,6 +1112,12 @@ class KirlianApp(App):
 
     def action_seek(self, seconds: int) -> None:
         self.perform(self.player.control("seek", seconds, "relative+exact"))
+
+    def on_progress_seek(self, message: Progress.Seek) -> None:
+        state = self.player.state
+        if state.duration and not (state.idle or state.loading):
+            percent = round(message.fraction * 100, 2)
+            self.perform(self.player.control("seek", percent, "absolute-percent+exact"))
 
     def action_volume(self, amount: int) -> None:
         value = min(100, max(0, self.player.state.volume + amount))
@@ -1182,6 +1207,11 @@ class KirlianApp(App):
             else Text(""),
         )
         self.update_text("#volume", _("vol {percent}%", percent=f"{state.volume:.0f}"))
+        self.query_one(Transport).show(
+            not (state.paused or state.idle or state.loading),
+            self.appearance.accent,
+            self.appearance.characters == "ascii",
+        )
         self.query_one(Progress).set_progress(state.position, state.duration)
         animation = self.query_one(Animation)
         previous_serial = animation.clock.serial
@@ -1302,7 +1332,8 @@ class KirlianApp(App):
         if self.facts_on:
             self.load_facts(track, self.fact_revision)
         elif not self.library.setting("facts"):
-            self.library.set_setting("facts", "invited")
+            with contextlib.suppress(sqlite3.Error):  # Only decides whether to invite again.
+                self.library.set_setting("facts", "invited")
             self.status(_("Optional: press i for short notes on how each song was made."))
 
     # A traceback here would print local variables, including the API key.
@@ -1493,7 +1524,7 @@ class KirlianApp(App):
         if screen.is_mounted:
             screen.show(self.facts_config, sources, self.facts_on, note)
 
-    @work(group="facts-settings")
+    @work(group="facts-settings", exit_on_error=False)
     async def persist_facts(self, screen: FactsSettings, note: str = "") -> None:
         await asyncio.to_thread(self.facts_config.save, self.library)
         await asyncio.to_thread(self.library.set_setting, "facts", "on" if self.facts_on else "off")
@@ -1687,7 +1718,7 @@ class KirlianApp(App):
             except (PlaybackError, AttributeError):
                 self.amp_installed = ""
 
-    @work(group="amp-save", exclusive=True)
+    @work(group="amp-save", exclusive=True, exit_on_error=False)
     async def save_amp(self) -> None:
         await asyncio.sleep(0.3)  # Holding an arrow key saves once, not per step.
         await asyncio.to_thread(self.amp.save, self.library)
@@ -1939,9 +1970,13 @@ class KirlianApp(App):
         variation = self.query_one(Animation).clock.variation
         if variation not in self.saved_animations:
             self.saved_animations.append(variation)
-            self.library.set_setting(
-                "saved_animations", json.dumps([v.code for v in self.saved_animations])
-            )
+            try:
+                self.library.set_setting(
+                    "saved_animations", json.dumps([v.code for v in self.saved_animations])
+                )
+            except sqlite3.Error as error:
+                self.report_save_error(error)
+                return
         self.status(_("Saved {pattern} · S recalls saved patterns", pattern=variation.label))
 
     def action_animation_recall(self) -> None:
@@ -1973,7 +2008,10 @@ class KirlianApp(App):
             )
         self.cover_key = None
         self.update_context()
-        self.library.set_setting("artwork_mode", cover.mode)
+        try:
+            self.library.set_setting("artwork_mode", cover.mode)
+        except sqlite3.Error as error:
+            self.report_save_error(error)
         self.status(
             _("Cover display: compatible blocks. Press c to try terminal graphics.")
             if cover.mode == "blocks"

@@ -38,6 +38,8 @@ DIM = "#4f4752"
 EIGHTHS = " ▁▂▃▄▅▆▇█"
 # Band levels map to bar height between these; music bands mostly sit inside.
 BAR_FLOOR, BAR_CEILING = -60.0, -10.0
+# From this width the level meters stand beside the spectrum instead of below it.
+WIDE, METER_WIDTH = 70, 20
 
 
 def frequency_label(frequency: int) -> str:
@@ -142,19 +144,60 @@ class AmpPanel(Static):
 
     def render(self) -> Text:
         width = max(40, self.size.width)
+        height = 3 if self.compact else 6
         text = Text()
         text.append_text(self.info_line(width))
         text.append("\n")
-        height = 3 if self.compact else 6
-        for row in self.spectrum(width, height):
+        if width < WIDE:
+            # Narrow: the spectrum across, the level meters underneath.
+            rows = self.spectrum(width, height)
+            rows += [self.meter(_("L"), 0, width), self.meter(_("R"), 1, width)]
+        else:
+            # Wide: the spectrum fills the width; tall level meters stand beside it.
+            rows = self.spectrum(width - METER_WIDTH, height)
+            meters = self.tall_meters(height)
+            for row, column in zip(rows, meters, strict=True):
+                row.pad_right(width - METER_WIDTH - row.cell_len)
+                row.append_text(column)
+        for row in rows:
             text.append_text(row)
             text.append("\n")
-        text.append_text(self.meter(_("L"), 0, width))
-        text.append("\n")
-        text.append_text(self.meter(_("R"), 1, width))
-        text.append("\n")
-        text.append_text(self.hint_line())
+        text.append_text(self.hint_line(width))
         return text
+
+    def tall_meters(self, height: int) -> list[Text]:
+        """Left and right levels as vertical bars with a dB scale, readouts underneath."""
+        rows = []
+        for row in range(height):
+            top = height - row  # In bar units from the floor.
+            line = Text("  ")
+            for channel in (0, 1):
+                level = self.levels.rms[channel] if channel < len(self.levels.rms) else SILENCE
+                filled = (level - SILENCE) / -SILENCE * height
+                fill = min(8, max(0, round((filled - (top - 1)) * 8)))
+                held = (self.hold[channel] - SILENCE) / -SILENCE * height
+                loud = top > height * 0.8
+                if fill:
+                    cells = " .:-=+*#%" if self.ascii else EIGHTHS
+                    line.append(cells[fill] * 4, WARM if loud else self.accent)
+                elif self.hold[channel] > SILENCE and top - 1 <= held < top:
+                    line.append(("-" if self.ascii else "▔") * 4, WARM if loud else INK)
+                else:
+                    line.append(("." if self.ascii else "·").center(4), DIM)
+                line.append(" ")
+            scale = {0: "0", height // 2: f"{SILENCE / 2:.0f}", height - 1: f"{SILENCE:.0f}"}
+            line.append(f" {scale.get(row, '')}", QUIET)
+            rows.append(line)
+        readouts = Text("  ")
+        for channel, label in ((0, _("L")), (1, _("R"))):
+            level = self.levels.rms[channel] if channel < len(self.levels.rms) else SILENCE
+            clipping = self.hold[channel] >= -0.1 and self.settings.enabled
+            reading = _("CLIP") if clipping else f"{level:.0f}" if level > SILENCE else "–"
+            readouts.append(f"{label} ", QUIET)
+            readouts.append(f"{reading:<5}"[:5], WARM if clipping else INK)
+            readouts.append(" ")
+        rows.append(readouts)
+        return rows
 
     def info_line(self, width: int) -> Text:
         state = self.state
@@ -191,13 +234,19 @@ class AmpPanel(Static):
             status.append(balance_text(settings.balance), f"bold {self.accent}")
         if not self.tempo.normal:
             status.append("   " + tempo_text(self.tempo), f"bold {self.accent}")
-        info.pad_right(max(1, width - info.cell_len - status.cell_len))
+        if info.cell_len + status.cell_len + 3 > width:
+            # Too long for one line: the settings get their own, right-aligned.
+            if status.cell_len <= width:
+                status.align("right", width)  # Longer than the panel: let it wrap instead.
+            info.append("\n")
+        else:
+            info.pad_right(width - info.cell_len - status.cell_len)
         info.append_text(status)
         return info
 
     def spectrum(self, width: int, height: int) -> list[Text]:
         count = len(SPECTRUM)
-        bar = max(1, min(4, (width - count) // count))
+        bar = max(1, min(8, (width - count) // count))
         rows: list[Text] = []
         cells = EIGHTHS if not self.ascii else " .:-=+*#%"
         for row in range(height):
@@ -218,13 +267,16 @@ class AmpPanel(Static):
                 line.append(mark * bar, style)
                 line.append(" ")
             rows.append(line)
-        labels = Text()
-        for index, frequency in enumerate(SPECTRUM):
-            label = frequency_label(frequency) if index % 3 == 0 else ""
-            labels.append(
-                label.ljust(bar + 1)[: bar + 1] if bar >= 3 else label[:1].ljust(2), QUIET
-            )
-        rows.append(labels)
+        # Every third band is labelled where its whole label fits, never cut short.
+        slots = [" "] * (count * (bar + 1))
+        for index in range(0, count, 3):
+            label = frequency_label(SPECTRUM[index])
+            start = index * (bar + 1)
+            if start + len(label) < len(slots) and all(
+                c == " " for c in slots[start : start + len(label) + 1]
+            ):
+                slots[start : start + len(label)] = label
+        rows.append(Text("".join(slots).rstrip(), QUIET))
         return rows
 
     def meter(self, label: str, channel: int, width: int) -> Text:
@@ -247,10 +299,15 @@ class AmpPanel(Static):
         line.append(f" {reading}", WARM if clipping else QUIET)
         return line
 
-    def hint_line(self) -> Text:
+    def hint_line(self, width: int) -> Text:
+        sound = (
+            _("sound: equalizer, balance, ReplayGain, speed, pitch")
+            if width >= WIDE
+            else _("sound")
+        )
         return Text.assemble(
             ("E", self.accent),
-            (" " + _("sound: equalizer, balance, ReplayGain, speed, pitch") + "   ", QUIET),
+            (" " + sound + "   ", QUIET),
             ("w", self.accent),
             (" " + _("hide"), QUIET),
         )

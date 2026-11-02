@@ -384,5 +384,8 @@
   "Choose your music folder": "음악 폴더를 선택하세요",
   "Could not open the folder picker. Type the path instead.": "폴더 선택 창을 열 수 없어요. 대신 경로를 입력하세요.",
   "reset all sound": "소리 모두 초기화",
-  "Sound reset: the music plays exactly as recorded.": "소리를 초기화했어요. 녹음된 그대로 재생해요."
+  "Sound reset: the music plays exactly as recorded.": "소리를 초기화했어요. 녹음된 그대로 재생해요.",
+  "song notes & keys": "노래 메모와 키",
+  "sound": "사운드",
+  "Could not save to the library database ({error}). Is the disk full?": "라이브러리 데이터베이스에 저장할 수 없어요({error}). 디스크가 가득 찼나요?"
 }

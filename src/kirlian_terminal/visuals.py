@@ -11,6 +11,9 @@ from __future__ import annotations
 import time
 
 from rich.text import Text
+from textual import events
+from textual.content import Content
+from textual.message import Message
 from textual.timer import Timer
 from textual.widgets import Static
 
@@ -271,15 +274,45 @@ class Animation(Static):
 
 
 class Progress(Static):
+    """The song's progress. Click to jump there, or drag and let go."""
+
     fraction = 0.0
     ascii = False
     accent = Appearance().accent
+    dragging = False
+
+    class Seek(Message):
+        def __init__(self, fraction: float) -> None:
+            super().__init__()
+            self.fraction = fraction
 
     def set_progress(self, position: float, duration: float) -> None:
+        if self.dragging:
+            return  # The listener's hand wins until they let go.
         before = int(self.fraction * self.size.width)
         self.fraction = min(1, max(0, position / duration)) if duration else 0
         if int(self.fraction * self.size.width) != before:
             self.refresh()
+
+    def point(self, x: int) -> float:
+        return min(1.0, max(0.0, x / max(1, self.size.width - 1)))
+
+    def on_mouse_down(self, event: events.MouseDown) -> None:
+        self.dragging = True
+        self.capture_mouse()
+        self.fraction = self.point(event.x)
+        self.refresh()
+
+    def on_mouse_move(self, event: events.MouseMove) -> None:
+        if self.dragging:
+            self.fraction = self.point(event.x)
+            self.refresh()
+
+    def on_mouse_up(self, event: events.MouseUp) -> None:
+        if self.dragging:
+            self.dragging = False
+            self.release_mouse()
+            self.post_message(self.Seek(self.point(event.x)))
 
     def render(self) -> Text:
         width = max(1, self.size.width)
@@ -289,6 +322,26 @@ class Progress(Static):
             ("o" if self.ascii else "●", self.accent),
             (("-" if self.ascii else "─") * (width - filled - 1), "#49424c"),
         )
+
+
+class Transport(Static):
+    """Clickable playback controls; each does what its key does."""
+
+    def show(self, playing: bool, accent: str, ascii: bool) -> None:
+        if ascii:
+            glyphs = ("|<", "<<", "||" if playing else ">", ">>", ">|")
+        else:
+            glyphs = ("|◀", "◀◀", "❚❚" if playing else "▶", "▶▶", "▶|")
+        actions = ("previous", "seek(-5)", "pause", "seek(5)", "next")
+        content = Content("   ").join(
+            Content.from_markup(
+                f'[{accent if action == "pause" else INK} @click="app.{action}"]$glyph[/]',
+                glyph=glyph,  # A variable, so a glyph like "[" can never read as markup.
+            )
+            for glyph, action in zip(glyphs, actions, strict=True)
+        )
+        if content != self.content:
+            self.update(content)
 
 
 VOWELS = set("aeiouyàáâäãåæèéêëìíîïòóôöõøùúûüýÿœ")

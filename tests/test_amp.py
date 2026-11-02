@@ -171,7 +171,7 @@ async def test_levels_reach_meters_and_ribbon_only_while_playing(tmp_path, audio
         assert panel.levels.rms == (-12.0, -14.0)
         assert panel.hold[0] == -3.0
         assert app.query_one("#animation").reaction.energy > 0
-        assert "-12 dB" in panel.render().plain
+        assert "L -12" in panel.render().plain  # The left level, beside the spectrum.
 
 
 @pytest.mark.parametrize("size", [(80, 24), (120, 44)])

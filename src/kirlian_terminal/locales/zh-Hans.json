@@ -384,5 +384,8 @@
   "Choose your music folder": "选择你的音乐文件夹",
   "Could not open the folder picker. Type the path instead.": "无法打开文件夹选择器。请直接输入路径。",
   "reset all sound": "重置所有声音设置",
-  "Sound reset: the music plays exactly as recorded.": "声音已重置：音乐按录制原样播放。"
+  "Sound reset: the music plays exactly as recorded.": "声音已重置：音乐按录制原样播放。",
+  "song notes & keys": "歌曲笔记与密钥",
+  "sound": "声音",
+  "Could not save to the library database ({error}). Is the disk full?": "无法保存到资料库数据库（{error}）。磁盘是否已满？"
 }
