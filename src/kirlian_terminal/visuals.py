@@ -309,15 +309,37 @@ class Progress(Static):
         self.refresh()
 
     def on_mouse_move(self, event: events.MouseMove) -> None:
-        if self.dragging:
-            self.fraction = self.point(event.x)
-            self.refresh()
+        if not self.dragging:
+            return
+        if not event.button:
+            # The button came up where no release reached us (outside the window, or
+            # a terminal that drops it). Finish here; never keep holding the mouse.
+            self.finish(self.fraction)
+            return
+        self.fraction = self.point(event.x)
+        self.refresh()
 
     def on_mouse_up(self, event: events.MouseUp) -> None:
         if self.dragging:
+            self.finish(self.point(event.x))
+
+    def on_mouse_scroll_down(self, event: events.MouseScrollDown) -> None:
+        self.cancel(event)
+
+    def on_mouse_scroll_up(self, event: events.MouseScrollUp) -> None:
+        self.cancel(event)
+
+    def cancel(self, event: events.MouseEvent) -> None:
+        """Scrolling mid-drag means the drag is over: hand the mouse back unseeked."""
+        if self.dragging:
             self.dragging = False
             self.release_mouse()
-            self.post_message(self.Seek(self.point(event.x)))
+            event.stop()
+
+    def finish(self, fraction: float) -> None:
+        self.dragging = False
+        self.release_mouse()
+        self.post_message(self.Seek(fraction))
 
     def render(self) -> Text:
         width = max(1, self.size.width)

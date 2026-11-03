@@ -930,3 +930,30 @@ def test_stores_need_album_and_artist_tags_not_every_title(tmp_path, audio_facto
     albums = {album.title: album for album in albums_from(library.tracks())}
     assert searchable(albums["Record"])
     assert not searchable(albums["Anonymous"])  # Would search for "Unknown artist".
+
+
+async def test_a_press_on_the_progress_line_never_leaves_scrolling_stuck(tmp_path, audio_factory):
+    from textual import events
+
+    library = Library(tmp_path / "library.db")
+    for n in range(40):
+        audio_factory(tmp_path / "Music" / f"Album {n:02d}" / "1.wav", seconds=0.2, album=f"A{n}")
+    library.scan(tmp_path / "Music", lambda _: None, threading.Event())
+    app = KirlianApp(library, player=FakePlayer())
+    async with app.run_test(size=(120, 30)) as pilot:
+        await wait_for(pilot, lambda: app.ready)
+        table, progress = app.query_one(DataTable), app.query_one("#progress")
+
+        async def wheel(times):
+            # Pilot's mouse routing: events go where the app sends them, capture included.
+            for _ in range(times):
+                await pilot._post_mouse_events([events.MouseScrollDown], widget=table)
+                await pilot.pause()
+
+        await pilot._post_mouse_events([events.MouseDown], widget=progress)  # Pressed...
+        await pilot.pause()
+        assert app.mouse_captured is progress  # ...and released outside the window.
+        await wheel(1)  # The first turn hands the mouse back.
+        assert app.mouse_captured is None
+        await wheel(3)
+        assert table.scroll_y > 0
