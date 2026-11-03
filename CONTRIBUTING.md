@@ -7,6 +7,9 @@ Keep changes small enough to try in a real terminal.
 
 ## Checks and releases
 
+Refresh the README screenshots with `uv run python scripts/screenshots.py`; it renders
+the real app with a generated demo library, never personal music.
+
 Run the commands in [Testing and listening](docs/testing.md) before pushing. GitHub
 runs them again on every push to `main` and every pull request
 (`.github/workflows/checks.yml`); a red check means do not merge.

@@ -79,11 +79,11 @@ the **Report a check** template. Remove an item once it has been checked.
 
 - **Listening:** a full real-album pass for audio quality and gapless transitions;
   equalizer bands and presets, pitch shifting, and tape mode by ear.
+- **Linux:** a fresh install and a full album by ear on a real Linux machine. CI
+  covers the tests and the installer on Ubuntu, not listening.
 - **Terminals:** Linux terminals and the Linux console; native covers while
   switching panes, resizing, and quitting in Herdr;
   CJK text width and font fallback; the 180 patterns in a real terminal.
-- **Song notes:** all five providers were tested live with their default models;
-  those default model names will age.
 - **macOS privacy:** whether granting folder access exposes downloaded
   (non-streaming) Music app files.
 - **Translations:** drafted by AI, not yet reviewed by native speakers. Flagged:

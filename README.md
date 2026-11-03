@@ -5,6 +5,8 @@ A small terminal music player for people who listen to albums.
 [Website](https://kirlian.ai/player/terminal) · [Install](#install) ·
 [Keys](#keys) · [Kirlian](#kirlian) · [Contributing](CONTRIBUTING.md) · [License](#license)
 
+![Kirlian Terminal playing an album, with the amp under the cover](docs/images/player.svg)
+
 ## About
 
 Kirlian Terminal plays your local music from the keyboard, offline, and keeps your
@@ -14,9 +16,15 @@ song and the album; and make it yours with palettes and your own themes. Your mu
 files and tags are never changed, and there is no account.
 
 For a tour of everything it does, see the [website](https://kirlian.ai/player/terminal).
-macOS and Linux are supported.
+
+**Platforms:** macOS, tested by hand. Linux runs the same automated tests and
+installer on every change; listening reports from Linux are welcome. Windows is not
+supported.
 
 ## Install
+
+You need macOS or Linux, a terminal, and an internet connection for the install.
+The installer brings everything else.
 
 ```sh
 curl -fsSL https://github.com/lubizart1/Kirlian-terminal/releases/latest/download/install.sh | sh
@@ -28,7 +36,9 @@ macOS; on Linux it prints the package command, as it never uses sudo) and
 checksum, and installs the `kirlian` command. Run it again to update; uninstall with
 `uv tool uninstall kirlian-terminal`.
 
-From source, with Python 3.12+, uv, and mpv:
+On Linux, install mpv first if you don't have it (`sudo apt-get install mpv`,
+`sudo dnf install mpv`, or `sudo pacman -S mpv`). From source, with Python 3.12+, uv,
+and mpv:
 
 ```sh
 uv sync --locked
@@ -109,6 +119,11 @@ selection, text, background, and so on). Edit it, press `p`, and pick it under
 **Interface palette**; `p` rereads the folder each time, so you can tweak and look
 again. Share a theme by sending the file.
 
+![The same album in a custom "Deep sea" theme, with the amp in the playbar](docs/images/deep-sea-theme.svg)
+
+Screenshots show the real app with a generated demo library; covers appear as
+character blocks here, and as sharp images in terminals with graphics support.
+
 ## Privacy and data
 
 Nothing leaves your computer except the opt-in notes request above, and store pages
@@ -132,6 +147,29 @@ Checked by hand on macOS; reports from other setups are welcome
 
 In tmux 3.3+, `set -g allow-passthrough on` lets covers through. If a cover stays
 blank anywhere, press `c` for blocks, or run `kirlian --check-artwork`.
+
+## Troubleshooting
+
+- **`kirlian: command not found`** after installing: run `uv tool update-shell`,
+  then open a new terminal.
+- **"mpv is missing"**: install mpv (`brew install mpv`, or your package manager),
+  then run `kirlian` again.
+- **No music found in `~/Music` on macOS**: the Music app's folder is protected.
+  Allow your terminal in System Settings › Privacy & Security › Files and Folders,
+  or press `f` and choose another folder.
+- **No sound**: check your system output and the volume (`=` raises it). If
+  `mpv some-song.mp3` is silent too, the problem is outside Kirlian.
+- **Covers blocky or blank**: press `c` to switch between terminal graphics and
+  blocks; each terminal remembers its own choice. In tmux or Herdr, see
+  [Tested and working](#tested-and-working). `kirlian --check-artwork` shows what
+  your terminal can display.
+- **No song notes**: press `i` to check that notes are on and a key is set, and run
+  `kirlian --check-facts` to test the key. Notes need title and album tags, and the
+  record pane needs 110 columns.
+- **"Could not save … Is the disk full?"**: free some disk space and make the change
+  again; playback carries on meanwhile.
+- **Start fresh**: `kirlian --data-dir /tmp/fresh` uses an empty library, or delete
+  the data folder listed under [Privacy and data](#privacy-and-data).
 
 ## Current limits
 

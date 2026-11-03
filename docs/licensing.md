@@ -34,7 +34,7 @@ benefit. Replacing the tag reader is not planned.
 | --- | --- | --- | --- |
 | Mutagen | 1.48.1 | GPL-2.0-or-later | Tag and embedded-cover reader |
 | Textual | 8.2.8 | MIT | Terminal interface |
-| Pillow | 12.3.0 | MIT-CMU | Image decoding and resizing |
+| Pillow | 13.0.0 | MIT-CMU | Image decoding and resizing |
 | textual-image | 0.14.1 | LGPL-3.0-or-later | Terminal graphics and character-cell image rendering |
 | platformdirs | 4.13.0 | MIT | Application data location |
 | keyring | 25.7.0 | MIT | Optional song-facts API keys in the system credential store |
