@@ -16,7 +16,8 @@ import kirlian_terminal.app as app_module
 import kirlian_terminal.cover as cover_module
 from kirlian_terminal.app import KirlianApp
 from kirlian_terminal.cover import CoverImage
-from kirlian_terminal.graphics import KittyImage
+from kirlian_terminal.graphics import KittyImage, cover_setting
+from kirlian_terminal.library import Library
 
 
 async def wait_for_native(widget):
@@ -213,12 +214,12 @@ async def test_cover_switch_preserves_selection_image_and_playback(
         assert cover.mode == "native"
         assert cover.native.image is image
         assert cover.blocks.image is None
-        assert library.setting("artwork_mode") == "native"
+        assert library.setting(cover_setting()) == "native"
         await pilot.press("c")
         assert cover.mode == "blocks"
         assert cover.blocks.image is image
         assert cover.native.image is None
-        assert library.setting("artwork_mode") == "blocks"
+        assert library.setting(cover_setting()) == "blocks"
         assert app.selected() == selection
         assert not player.calls
         await pilot.resize_terminal(80, 24)
@@ -231,6 +232,20 @@ async def test_cover_switch_preserves_selection_image_and_playback(
         assert cover.mode == "blocks"
         assert not player.calls
     assert KirlianApp(library, player=FakePlayer()).artwork_mode == "blocks"
+
+
+def test_each_terminal_remembers_its_own_cover_choice(tmp_path, monkeypatch):
+    library = Library(tmp_path / "library.db")
+    library.set_setting("artwork_mode", "blocks")  # Saved once for every terminal, before.
+    monkeypatch.setenv("TERM_PROGRAM", "WarpTerminal")
+    monkeypatch.delenv("TMUX", raising=False)
+    library.set_setting(cover_setting(), "blocks")  # Chosen with c in Warp.
+    assert KirlianApp(library, player=FakePlayer()).artwork_mode == "blocks"
+    assert library.setting("artwork_mode") is None  # The shared choice is gone.
+    monkeypatch.setenv("TERM_PROGRAM", "kitty")  # Kitty still detects on its own.
+    assert KirlianApp(library, player=FakePlayer()).artwork_mode == "auto"
+    monkeypatch.setenv("TMUX", "/tmp/tmux-1/default,1,0")  # tmux in Kitty is separate.
+    assert cover_setting() == "artwork_mode:kitty+tmux"
 
 
 def test_partial_protocol_support_uses_deliberate_fallback():

@@ -154,10 +154,10 @@ class RecordPane(Vertical):
                 height += child.styles.margin.height
                 # The fact card grows when its next note is longer; keep room for that.
                 reserve += max(12, height) if child.id == "fact-card" else height
+        height = self.content_size.height
+        # The cover keeps a fair share even beside a long note; the pane scrolls then.
+        least = max(4, min(12, height // 3))
         for cover in self.query(CoverImage):
             # App resize events arrive before pane geometry updates, so measuring
             # there can be stale.
-            cover.fit(
-                min(34, self.content_size.width),
-                min(17, max(4, self.content_size.height - reserve)),
-            )
+            cover.fit(min(34, self.content_size.width), min(17, max(least, height - reserve)))

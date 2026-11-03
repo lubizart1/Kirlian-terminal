@@ -20,19 +20,19 @@ DataTable > .datatable--cursor, DataTable:focus > .datatable--cursor { backgroun
 #nav > .option-list--option-highlighted { background: $k-surface; color: $k-accent; text-style: bold; }
 #nav:focus > .option-list--option-highlighted { background: $k-selected; color: $k-ink; }
 #tracks > .datatable--even-row, #tracks > .datatable--odd-row { background: $k-surface; }
-#context { width: 32%; min-width: 30; max-width: 56; padding: 1 2; border-left: solid $k-edge; color: $k-quiet; }
+#context { width: 32%; min-width: 30; max-width: 56; padding: 1 2; border-left: solid $k-edge; color: $k-quiet; overflow-y: auto; scrollbar-size-vertical: 1; }
 #cover { width: 30; height: 15; margin-bottom: 1; }
 #cover-placeholder { height: 3; color: $k-quiet; }
 #record-details { height: auto; margin-bottom: 1; }
 #record-stores { height: auto; margin-bottom: 1; }
 #record-note { height: auto; border-top: solid $k-edge; padding-top: 1; }
 #fact-card { height: auto; border: round $k-edge; padding: 0 1; margin-top: 1; }
-#fact-heading { height: 2; }
+#fact-heading { height: 1; margin-bottom: 1; }
 #fact-label { width: 1fr; color: $k-quiet; }
 #fact-spark { width: auto; color: $k-accent; }
 #fact-text { height: auto; color: $k-ink; }
 #fact-pulse { height: 1; margin: 1 0; text-wrap: nowrap; }
-#fact-source { height: auto; border-top: solid $k-edge; margin-top: 1; padding-top: 1; color: $k-quiet; }
+#fact-source { height: auto; border-top: solid $k-edge; margin-top: 1; color: $k-quiet; }
 #empty { height: auto; max-height: 4; color: $k-quiet; }
 #status { height: 1; padding: 0 2; color: $k-quiet; }
 #playback { height: 8; padding: 1 2 0 2; border-top: solid $k-edge; background: $k-surface; }

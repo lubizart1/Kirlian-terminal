@@ -320,6 +320,11 @@ than the column (0.2 s per character after a short hold) and restores the origin
   Floyd–Steinberg dithered into the xterm cube and gray ramp (never the first 16,
   which themes redefine), so the terminal shows exactly those colors instead of
   snapping each pixel; on one cover the perceived error fell from 11.4 to 1.9.
+- **Cover choice per terminal.** `c` is saved under `artwork_mode:<TERM_PROGRAM or
+  TERM>[+tmux]`, so blocks chosen in a multiplexer or a 256-color terminal never
+  make covers blocky in a terminal with real images; the old single setting is
+  dropped on launch. The cover keeps at least a third of the record pane (up to 12
+  rows) beside a long note, and the pane scrolls rather than squeezing it.
 
 ## Distribution
 

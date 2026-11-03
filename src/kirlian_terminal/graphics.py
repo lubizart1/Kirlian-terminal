@@ -22,6 +22,18 @@ from textual_image.widget import Image as DetectedImage
 from .terminal_support import query_terminal_version
 
 
+def cover_setting() -> str:
+    """Where this terminal's cover choice (c) is saved.
+
+    Each terminal remembers its own: blocks chosen in a multiplexer or a 256-color
+    terminal must not make covers blocky in a terminal that shows real images.
+    """
+    name = os.environ.get("TERM_PROGRAM") or os.environ.get("TERM") or "unknown"
+    if os.environ.get("TMUX"):
+        name += "+tmux"
+    return "artwork_mode:" + "".join(c if c.isalnum() or c in "+-._" else "-" for c in name)
+
+
 def encode_pixels(image: Image.Image) -> str:
     pixels = image.convert("RGBA")
     return base64.b64encode(zlib.compress(pixels.tobytes())).decode("ascii")

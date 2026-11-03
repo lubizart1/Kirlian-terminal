@@ -69,7 +69,7 @@ from .facts import (
     fact_key,
     request_facts,
 )
-from .graphics import NATIVE_SUPPORTED
+from .graphics import NATIVE_SUPPORTED, cover_setting
 from .i18n import _, n_, resolve, set_language
 from .i18n import language as active_language
 from .library import Album, Library, ScanProgress, Track, albums_from, display_text
@@ -254,9 +254,12 @@ class KirlianApp(App):
         # (provider id, language, song) tried this session.
         self.facts_asked: set[tuple[str, str, str]] = set()
         self.fact_loading = False
+        # The choice used to be one for every terminal; each now keeps its own.
+        with contextlib.suppress(sqlite3.Error), library.connect() as db:
+            db.execute("DELETE FROM settings WHERE key = 'artwork_mode'")
         self.artwork_mode = (
             artwork
-            or library.setting("artwork_mode")
+            or library.setting(cover_setting())
             or ("blocks" if os.environ.get("TERM") == "linux" else "auto")
         )
         # Theme files first, so a saved custom palette is recognized.
@@ -2169,7 +2172,7 @@ class KirlianApp(App):
         self.cover_key = None
         self.update_context()
         try:
-            self.library.set_setting("artwork_mode", cover.mode)
+            self.library.set_setting(cover_setting(), cover.mode)
         except sqlite3.Error as error:
             self.report_save_error(error)  # The display changed; say it will not last.
             return
