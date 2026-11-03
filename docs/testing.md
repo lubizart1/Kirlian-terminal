@@ -82,8 +82,8 @@ the **Report a check** template. Remove an item once it has been checked.
 - **Terminals:** Linux terminals and the Linux console; native covers while
   switching panes, resizing, and quitting in Herdr;
   CJK text width and font fallback; the 180 patterns in a real terminal.
-- **Song notes:** live requests to providers other than Anthropic. Default model
-  names will age.
+- **Song notes:** all five providers were tested live with their default models;
+  those default model names will age.
 - **macOS privacy:** whether granting folder access exposes downloaded
   (non-streaming) Music app files.
 - **Translations:** drafted by AI, not yet reviewed by native speakers. Flagged:

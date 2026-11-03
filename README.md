@@ -86,6 +86,9 @@ retrieved.
 | Perplexity | [perplexity.ai](https://www.perplexity.ai/account/api) | `PERPLEXITY_API_KEY` |
 | Parallel | [platform.parallel.ai](https://platform.parallel.ai) | `PARALLEL_API_KEY` |
 
+All five providers have been tested live with their default models. **Anthropic and
+Parallel are recommended:** they surface the most interesting insights.
+
 - **What is sent:** title, artist, album, year, and the language to write in.
   Never audio, artwork, file paths, or folder names; untagged files are not asked
   about.
@@ -135,7 +138,6 @@ blank anywhere, press `c` for blocks, or run `kirlian --check-artwork`.
 - Audio quality and gapless transitions still need a careful listening check.
 - The record pane (cover, details, notes) needs 110 columns; the minimum is 80 × 24.
 - Identical editions in one flat folder are told apart only by a MusicBrainz release id.
-- Notes were checked live with Anthropic; the other providers against their documented formats.
 - Translations were written with AI help and await native-speaker review.
 
 ## Kirlian
