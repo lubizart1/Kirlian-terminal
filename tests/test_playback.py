@@ -76,8 +76,10 @@ async def test_real_mpv_queue_controls_transitions_and_owned_cleanup(tmp_path, a
         await wait_until(lambda: player.state.paused)
         await player.command("seek", 1, "absolute+exact")
         # Ask mpv where it is: a paused player does not always report the new position.
+        # Under load, a paused audio-only seek can settle up to one audio buffer
+        # (--audio-buffer, 0.2 s by default) short of its target: 1.0 reads as 0.81.
         async with asyncio.timeout(6):
-            while (await player.command("get_property", "time-pos") or 0) < 0.9:
+            while abs((await player.command("get_property", "time-pos") or 0) - 1) > 0.25:
                 await asyncio.sleep(0.02)
         await player.command("set_property", "volume", 35)
         await wait_until(lambda: player.state.volume == 35)
