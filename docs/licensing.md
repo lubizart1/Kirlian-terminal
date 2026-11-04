@@ -41,11 +41,26 @@ benefit. Replacing the tag reader is not planned.
 | mpv | External installation | Depends on build; see mpv's license | Separate playback process |
 
 The MIT, MIT-CMU, and LGPL-3.0-or-later components are compatible with
-distribution under GPL-3.0-or-later. This table lists direct dependencies, not a
-full distribution audit; transitive dependencies and any bundled binaries need
-their notices checked for whatever packaging format is eventually published.
-textual-image is used unmodified, and its LGPL notice must remain visible in a
-distribution.
+distribution under GPL-3.0-or-later. textual-image is used unmodified, and its LGPL
+notice must remain visible in a distribution.
+
+The rest of the locked runtime dependencies (`uv export --no-dev`) were reviewed for
+1.0.0 and are all compatible with GPL-3.0-or-later:
+
+| License | Packages |
+| --- | --- |
+| MIT | jaraco.classes, jaraco.context, jaraco.functools, linkify-it-py, markdown-it-py, mdit-py-plugins, mdurl, more-itertools, rich; jeepney (Linux) |
+| MIT-0 | cffi (Linux) |
+| BSD-2-Clause | Pygments |
+| BSD-3-Clause | pycparser, SecretStorage (Linux); pywin32-ctypes (Windows only, never installed on a supported platform) |
+| Apache-2.0 OR BSD-3-Clause | cryptography (Linux) |
+| PSF-2.0 | typing-extensions |
+
+The release publishes a wheel and a source archive. The wheel holds only this
+project's code, stylesheet, translations, and `LICENSE`; no dependency or binary is
+bundled, and `uv` installs each dependency from PyPI with its own license files.
+A packaging format that bundles dependencies (an app bundle, a frozen binary, a
+distribution package) needs its own review of every bundled notice.
 
 mpv runs as an independently installed program through its normal JSON IPC. We do
 not bundle its binary. A future bundled release requires a separate review of the
