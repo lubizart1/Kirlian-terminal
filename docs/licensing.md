@@ -36,7 +36,7 @@ benefit. Replacing the tag reader is not planned.
 | Textual | 8.2.8 | MIT | Terminal interface |
 | Pillow | 13.0.0 | MIT-CMU | Image decoding and resizing |
 | textual-image | 0.14.1 | LGPL-3.0-or-later | Terminal graphics and character-cell image rendering |
-| platformdirs | 4.13.0 | MIT | Application data location |
+| platformdirs | 4.14.0 | MIT | Application data location |
 | keyring | 25.7.0 | MIT | Optional song-facts API keys in the system credential store |
 | mpv | External installation | Depends on build; see mpv's license | Separate playback process |
 
