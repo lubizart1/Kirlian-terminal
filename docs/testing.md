@@ -74,6 +74,15 @@ Publication-preparation checks on 2026-11-15:
   playback position, and exited successfully. The audio file's SHA-256 was unchanged.
   This was a functional smoke check, not an audible or terminal-graphics review.
 
+Release **v1.0.0** was published on 2026-11-16 (UTC) from `6ad7f49`.
+The [tagged release workflow](https://github.com/lubizart1/Kirlian-terminal/actions/runs/43783236329)
+passed all checks, including both platform installers. After publication, an
+unauthenticated request to `releases/latest/download/install.sh` returned HTTP 200.
+The downloaded installer fetched the real GitHub wheel, passed its SHA-256 check,
+and installed into isolated uv tool directories on macOS, without a local-wheel
+override. The installed command reported version 1.0.0 and GPL-3.0-or-later;
+uninstall also succeeded. Existing mpv and uv were available for this check.
+
 Before publication, run the automated checks above and inspect the corresponding
 GitHub Actions run. Keep the repository-publication step separate from publishing
 a release: the public download command cannot work until release assets exist.
@@ -137,10 +146,6 @@ the **Report a check** template. Remove an item once it has been checked.
   Korean particles after placeholders (이(가)); mixed gender in pt-BR "Reserva"
   descriptions; German "bewegen" used for both focus and reordering.
 - **macOS Terminal:** recheck the plain borders and dithered covers in the real app.
-- **Installer download:** the `releases/latest/download/install.sh` path, the wheel
-  download, and its checksum were tested only against a local web server; the real
-  GitHub URLs work once the repository and a release are public. The installer itself
-  passes in CI on clean Ubuntu and macOS runners.
 
 
 ## Artwork and animation review

@@ -28,8 +28,7 @@ On macOS, install [Homebrew](https://brew.sh) first if mpv is not already availa
 the installer uses it to install mpv. On Linux, install mpv with your package
 manager first (commands below). The installer brings uv and Python.
 
-Until the first public release is published, use the source instructions below.
-After publication, install or update with:
+Install or update with:
 
 ```sh
 curl -fsSL https://github.com/lubizart1/Kirlian-terminal/releases/latest/download/install.sh | sh
