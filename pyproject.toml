@@ -28,6 +28,7 @@ packages = ["src/kirlian_terminal"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
 markers = ["integration: exercises an installed mpv process"]
 
 [tool.ruff]

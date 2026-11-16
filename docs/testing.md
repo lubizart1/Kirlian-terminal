@@ -36,6 +36,50 @@ macOS lets it install mpv with Homebrew), and the installed `kirlian` is started
 is not evidence that a run passed. Headless tests do not establish terminal or
 audio-device support.
 
+## Release verification
+
+The intended first release is **1.0.0**, as declared in `pyproject.toml`.
+
+On 2026-11-15, the maintainer reported a successful full-album listen on macOS,
+confirmed that the player works on Linux, and reported that the earlier Sound
+screen freeze / unresponsive-controls symptom did not recur. The application
+code at the time was `007a0b8`; the subsequent dependency updates affect developer
+tools, not playback.
+
+These are listener reports, separate from automated checks. The Linux
+distribution, terminal, installation method, audio device, formats, and exact
+tested revision were not recorded. The macOS report does not certify every
+format, gapless transition, or sound effect. The Sound screen report records
+non-recurrence, not an identified cause or a code fix; report it again if it returns.
+
+Publication-preparation checks on 2026-11-15:
+
+- Ruff lint and formatting, all eight translation catalogs (360 strings), and
+  217 tests passed locally after updating Ruff, pytest, and pytest-asyncio.
+  Async fixtures explicitly use function-scoped event loops.
+- Gitleaks 8.30.1 scanned all local Git refs (59 commits) with no secrets detected.
+  A separate history inventory found no private notes, local agent instructions,
+  music, databases, or personal absolute paths. These scans are not a guarantee
+  that every possible secret can be detected.
+- `pip-audit` found no known vulnerabilities in all 30 locked dependencies,
+  including development and platform-specific packages. The input was a list of
+  exact versions from `uv.lock`, audited with `--no-deps --disable-pip`.
+- Built and inspected the wheel and source archive: 42 wheel files and 79 source
+  archive entries, including the license and required styles and translations,
+  without private files or personal absolute paths.
+- Installed the wheel with the rendered installer into isolated uv tool directories.
+  The installed command reported version 1.0.0 and GPL-3.0-or-later. In an owned
+  pseudo-terminal, the installed app indexed generated silent audio, played it
+  through real mpv, accepted Sound-screen keys, saved a +1 dB preamp setting and
+  playback position, and exited successfully. The audio file's SHA-256 was unchanged.
+  This was a functional smoke check, not an audible or terminal-graphics review.
+
+Before publication, run the automated checks above and inspect the corresponding
+GitHub Actions run. Keep the repository-publication step separate from publishing
+a release: the public download command cannot work until release assets exist.
+After publication, verify the real GitHub installer and wheel download, including
+the checksum. A local wheel install does not exercise that download path.
+
 ## Manual playback walkthrough
 
 Use music you have the right to play. Do not commit it or its artwork.
@@ -77,10 +121,11 @@ Automated tests do not replace these checks. Some need hardware, terminals, or
 languages we do not have, so reports from listeners are welcome: open an issue with
 the **Report a check** template. Remove an item once it has been checked.
 
-- **Listening:** a full real-album pass for audio quality and gapless transitions;
-  equalizer bands and presets, pitch shifting, and tape mode by ear.
-- **Linux:** a fresh install and a full album by ear on a real Linux machine. CI
-  covers the tests and the installer on Ubuntu, not listening.
+- **Listening coverage:** dedicated gapless-transition checks across formats;
+  equalizer bands and presets, pitch shifting, and tape mode by ear. The successful
+  full-album listen is recorded above.
+- **Linux coverage:** playback is listener-confirmed, but distribution- and
+  terminal-specific results and the fresh-install procedure still need recording.
 - **Terminals:** Linux terminals and the Linux console; native covers while
   switching panes, resizing, and quitting in Herdr;
   CJK text width and font fallback; the 180 patterns in a real terminal.

@@ -17,14 +17,19 @@ files and tags are never changed, and there is no account.
 
 For a tour of everything it does, see the [website](https://kirlian.ai/player/terminal).
 
-**Platforms:** macOS, tested by hand. Linux runs the same automated tests and
-installer on every change; listening reports from Linux are welcome. Windows is not
-supported.
+**Platforms:** macOS and Linux. Full-album listening has been checked on macOS,
+and a listener has confirmed Linux playback. CI checks both platforms with Python
+3.12–3.14, including installation. Windows is not supported.
 
 ## Install
 
 You need macOS or Linux, a terminal, and an internet connection for the install.
-The installer brings everything else.
+On macOS, install [Homebrew](https://brew.sh) first if mpv is not already available;
+the installer uses it to install mpv. On Linux, install mpv with your package
+manager first (commands below). The installer brings uv and Python.
+
+Until the first public release is published, use the source instructions below.
+After publication, install or update with:
 
 ```sh
 curl -fsSL https://github.com/lubizart1/Kirlian-terminal/releases/latest/download/install.sh | sh
@@ -41,6 +46,8 @@ On Linux, install mpv first if you don't have it (`sudo apt-get install mpv`,
 and mpv:
 
 ```sh
+git clone https://github.com/lubizart1/Kirlian-terminal.git
+cd Kirlian-terminal
 uv sync --locked
 uv run kirlian
 ```
@@ -135,7 +142,9 @@ playlists, themes, and saved notes live in:
 
 ## Tested and working
 
-Checked by hand on macOS; reports from other setups are welcome
+The terminal observations below are from macOS; Linux playback has also been
+confirmed by a listener. See the [verification record](docs/testing.md#release-verification)
+for the scope of those checks. Reports from other setups are welcome
 ([open a check report](https://github.com/lubizart1/Kirlian-terminal/issues/new?template=check-report.yml)).
 
 | Terminal | Result |
@@ -173,7 +182,7 @@ blank anywhere, press `c` for blocks, or run `kirlian --check-artwork`.
 
 ## Current limits
 
-- Audio quality and gapless transitions still need a careful listening check.
+- Gapless transitions across formats and the sound effects still need dedicated listening checks.
 - The record pane (cover, details, notes) needs 110 columns; the minimum is 80 × 24.
 - Identical editions in one flat folder are told apart only by a MusicBrainz release id.
 - Translations were written with AI help and await native-speaker review.
@@ -189,6 +198,9 @@ your music, go see what Kirlian does with it.
 See [CONTRIBUTING.md](CONTRIBUTING.md), [architecture](docs/architecture.md),
 [testing](docs/testing.md), and the [ribbon patterns](docs/patterns.md). Working
 with a coding agent? Start it on [AGENTS.md](AGENTS.md).
+
+If you have any problems, suggestions or comments, please email
+[hello@kirlian.ai](mailto:hello@kirlian.ai).
 
 ## License
 
